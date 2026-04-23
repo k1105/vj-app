@@ -32,6 +32,7 @@ export default class DJHTKText {
     const cols = Math.max(1, Math.min(16, Math.round(params?.grid ?? 4)));
     const rows = Math.max(1, Math.ceil((h / w) * cols));
     const scale = Math.max(0.1, Math.min(3, params?.scale ?? 1));
+    const vibrateOn = params?.vibrate !== false;
 
     const beat = global?.beat ?? 0;
 
@@ -64,7 +65,7 @@ export default class DJHTKText {
         const dr = row - centerRow;
         const dist = Math.sqrt(dc * dc + dr * dr) / maxDist;
         const delayedBeat = (beat + dist * 0.4) % 1;
-        const wave = 1 - easeExpOut(delayedBeat);
+        const wave = vibrateOn ? 1 - easeExpOut(delayedBeat) : 0;
 
         const vibX = wave * 6 * Math.sin(idx * 1.7);
         const vibY = wave * 6 * Math.cos(idx * 2.3);
