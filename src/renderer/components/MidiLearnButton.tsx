@@ -1,4 +1,4 @@
-import { useMidiStore, formatAddress } from "../state/midiStore";
+import { useMidiStore, formatAddress, shortAddress } from "../state/midiStore";
 
 interface Props {
   targetId: string;
@@ -6,12 +6,12 @@ interface Props {
 
 export function MidiLearnButton({ targetId }: Props) {
   const learningTarget = useMidiStore((s) => s.learningTarget);
-  const mappings = useMidiStore((s) => s.mappings);
+  const mapped = useMidiStore((s) => s.mappings[targetId]);
+  const isPulsing = useMidiStore((s) => s.pulseTargets[targetId] != null);
   const startLearn = useMidiStore((s) => s.startLearn);
   const cancelLearn = useMidiStore((s) => s.cancelLearn);
   const removeMapping = useMidiStore((s) => s.removeMapping);
 
-  const mapped = mappings[targetId];
   const isLearning = learningTarget === targetId;
 
   const title = isLearning
@@ -20,9 +20,17 @@ export function MidiLearnButton({ targetId }: Props) {
     ? `${formatAddress(mapped)} · click to remap · right-click to clear`
     : "MIDI learn";
 
+  const label = isLearning ? "●" : mapped ? shortAddress(mapped) : "M";
+
+  const className =
+    "midi-learn-btn" +
+    (isLearning ? " learning" : "") +
+    (mapped && !isLearning ? " mapped" : "") +
+    (isPulsing ? " pulse" : "");
+
   return (
     <button
-      className={`midi-learn-btn${isLearning ? " learning" : ""}${mapped && !isLearning ? " mapped" : ""}`}
+      className={className}
       title={title}
       onClick={(e) => {
         e.stopPropagation();
@@ -35,7 +43,7 @@ export function MidiLearnButton({ targetId }: Props) {
         if (mapped) removeMapping(targetId);
       }}
     >
-      {isLearning ? "●" : "M"}
+      {label}
     </button>
   );
 }

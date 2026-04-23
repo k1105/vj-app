@@ -11,17 +11,24 @@ interface MidiStoreShape {
   mappings: Record<string, MidiAddress>;
   /** targetId that is currently waiting for a MIDI message (learn mode) */
   learningTarget: string | null;
+  /** targetIds that are currently being pulsed (recently received MIDI) */
+  pulseTargets: Record<string, number>;
   startLearn: (targetId: string) => void;
   cancelLearn: () => void;
   /** Called by midiManager when a MIDI message arrives during learn mode */
   applyLearn: (address: MidiAddress) => void;
   removeMapping: (targetId: string) => void;
   setMappings: (mappings: Record<string, MidiAddress>) => void;
+  /** Briefly mark a target as active so its button flashes */
+  pulse: (targetId: string) => void;
 }
+
+const PULSE_DURATION_MS = 150;
 
 export const useMidiStore = create<MidiStoreShape>((set, get) => ({
   mappings: {},
   learningTarget: null,
+  pulseTargets: {},
 
   startLearn: (targetId) => {
     set({ learningTarget: targetId });
@@ -54,8 +61,26 @@ export const useMidiStore = create<MidiStoreShape>((set, get) => ({
   },
 
   setMappings: (mappings) => set({ mappings }),
+
+  pulse: (targetId) => {
+    const prev = get().pulseTargets[targetId];
+    if (prev != null) window.clearTimeout(prev);
+    const handle = window.setTimeout(() => {
+      set((s) => {
+        const next = { ...s.pulseTargets };
+        delete next[targetId];
+        return { pulseTargets: next };
+      });
+    }, PULSE_DURATION_MS);
+    set((s) => ({ pulseTargets: { ...s.pulseTargets, [targetId]: handle } }));
+  },
 }));
 
 export function formatAddress(a: MidiAddress): string {
   return `CH${a.channel + 1} ${a.type.toUpperCase()}#${a.number}`;
+}
+
+/** Short label shown on the MIDI button face. Number only keeps the 16px button compact. */
+export function shortAddress(a: MidiAddress): string {
+  return String(a.number);
 }

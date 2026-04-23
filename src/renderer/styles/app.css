@@ -1280,9 +1280,10 @@ input[type="range"]::-moz-range-thumb {
 /* ── MIDI Learn ─────────────────────────────────────────────── */
 .midi-learn-btn {
   flex-shrink: 0;
-  width: 16px;
+  min-width: 16px;
+  width: auto;
   height: 16px;
-  padding: 0;
+  padding: 0 3px;
   font-size: 8px;
   font-family: var(--font-mono);
   font-weight: 700;
@@ -1295,7 +1296,7 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.1s, border-color 0.1s, background 0.1s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .midi-learn-btn:hover {
   color: var(--text);
@@ -1311,6 +1312,12 @@ input[type="range"]::-moz-range-thumb {
   border-color: var(--accent);
   background: var(--accent-dim);
   animation: midi-blink 0.6s ease-in-out infinite alternate;
+}
+.midi-learn-btn.pulse {
+  color: #000;
+  background: var(--live);
+  border-color: var(--live);
+  transition: color 0s, border-color 0s, background 0s;
 }
 @keyframes midi-blink {
   from { opacity: 0.6; }

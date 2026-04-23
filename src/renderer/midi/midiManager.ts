@@ -78,6 +78,7 @@ function handleMessage(e: MIDIMessageEvent): void {
   });
   if (!matchedId) return;
 
+  midiState.pulse(matchedId);
   dispatch(matchedId, value, type);
 }
 
