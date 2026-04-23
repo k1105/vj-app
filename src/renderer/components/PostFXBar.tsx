@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import type { ParamDef } from "../../shared/types";
 import { MidiLearnButton } from "./MidiLearnButton";
+import { AutoSyncButton } from "./AutoSyncButton";
 
 /**
  * PostFX rack — lives inside the Master panel. Reads the available postfx
@@ -89,6 +90,7 @@ export function PostFXRack() {
                 />
                 <span className="postfx-rack-param-val">{value.toFixed(2)}</span>
                 <MidiLearnButton targetId={`postfx:${selectedPlugin.id}:${def.key}`} />
+                <AutoSyncButton targetId={`postfx:${selectedPlugin.id}:${def.key}`} />
               </div>
             );
           })

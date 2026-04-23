@@ -1,5 +1,6 @@
 import { useVJStore } from "../state/vjStore";
 import { useMidiStore, type MidiAddress } from "../state/midiStore";
+import { useAutoSyncStore } from "../state/autoSyncStore";
 
 let _connected = false;
 
@@ -88,6 +89,10 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
   // Note velocity=0 is note-off — skip it for trigger targets.
   // CC value=0 from a toggle button IS a real button press, so don't skip it.
   const isNoteOff = addrType === "note" && rawValue === 0;
+
+  // Touching a MIDI control on a sync-active target turns sync off (matches
+  // the user's mental model: physical input takes over).
+  if (!isNoteOff) useAutoSyncStore.getState().disable(targetId);
 
   if (targetId === "go") {
     if (!isNoteOff) vj.commitGo();

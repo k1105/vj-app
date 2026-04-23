@@ -1,5 +1,6 @@
 import { useVJStore } from "../state/vjStore";
 import { MidiLearnButton } from "./MidiLearnButton";
+import { AutoSyncButton } from "./AutoSyncButton";
 import type { ParamDef } from "../../shared/types";
 
 type ParamGroup =
@@ -197,7 +198,9 @@ function RangeControl({
         {fmt(s)}–{fmt(e)}
       </span>
       <MidiLearnButton targetId={midiStartId} />
+      <AutoSyncButton targetId={midiStartId} />
       <MidiLearnButton targetId={midiEndId} />
+      <AutoSyncButton targetId={midiEndId} />
     </div>
   );
 }
@@ -299,6 +302,7 @@ function ParamControl({
       />
       <span className="param-val">{displayVal}</span>
       <MidiLearnButton targetId={midiTargetId} />
+      <AutoSyncButton targetId={midiTargetId} />
     </div>
   );
 }

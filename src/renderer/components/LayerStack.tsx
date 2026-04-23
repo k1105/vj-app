@@ -1,6 +1,7 @@
 import { useVJStore } from "../state/vjStore";
 import type { LayerState, PluginMeta } from "../../shared/types";
 import { MidiLearnButton } from "./MidiLearnButton";
+import { AutoSyncButton } from "./AutoSyncButton";
 
 const BLEND_MODES: LayerState["blend"][] = ["normal", "add", "multiply", "screen"];
 
@@ -218,6 +219,7 @@ function LayerRow(props: {
         />
         <span className="opacity-val">{Math.round(layer.opacity * 100)}%</span>
         <MidiLearnButton targetId={`layer-opacity-${idx}`} />
+        <AutoSyncButton targetId={`layer-opacity-${idx}`} />
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useVJStore } from "./state/vjStore";
 import { initMidi } from "./midi/midiManager";
+import { startAutoSyncDriver } from "./autoSync/autoSyncDriver";
 import { TopBar } from "./components/TopBar";
 import { AssetsPanel } from "./components/AssetsPanel";
 import { LayerStack } from "./components/LayerStack";
@@ -22,6 +23,10 @@ export function App() {
 
   useEffect(() => {
     initMidi();
+  }, []);
+
+  useEffect(() => {
+    return startAutoSyncDriver();
   }, []);
 
   // Push state to output window (debounced inside the store)
