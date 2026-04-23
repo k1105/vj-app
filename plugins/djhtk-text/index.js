@@ -31,6 +31,7 @@ export default class DJHTKText {
 
     const cols = Math.max(1, Math.min(16, Math.round(params?.grid ?? 4)));
     const rows = Math.max(1, Math.ceil((h / w) * cols));
+    const scale = Math.max(0.1, Math.min(3, params?.scale ?? 1));
 
     const beat = global?.beat ?? 0;
 
@@ -43,7 +44,7 @@ export default class DJHTKText {
 
     // Fit "DJ HTK" inside the cell. measureText is accurate but needs a ctx
     // font set first — use a heuristic cap then refine per-draw.
-    const baseFontSize = Math.min(cellH * 0.45, cellW * 0.22);
+    const baseFontSize = Math.min(cellH * 0.45, cellW * 0.22) * scale;
 
     // Clear to black (transparent layers will show through)
     ctx.clearRect(0, 0, w, h);
