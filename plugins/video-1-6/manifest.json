@@ -1,0 +1,39 @@
+{
+  "name": "1-6",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/1-6.mp4",
+  "thumbnail": "thumbnail.jpg",
+  "duration": 8,
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2,
+      "step": 0.05
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 0,
+      "min": 0,
+      "max": 8,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 8,
+      "min": 0,
+      "max": 8,
+      "step": 1
+    }
+  ]
+}
