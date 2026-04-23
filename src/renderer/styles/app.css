@@ -1176,7 +1176,8 @@ input[type="range"]::-moz-range-thumb {
 .postfx-rack-param-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  min-width: 0;
 }
 .postfx-rack-param-label {
   font-size: 8px;
@@ -1184,12 +1185,13 @@ input[type="range"]::-moz-range-thumb {
   color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  width: 60px;
+  width: 44px;
   flex-shrink: 0;
 }
 .postfx-rack-param-slider {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  width: 0;
 }
 .postfx-rack-param-val {
   font-size: 8px;
