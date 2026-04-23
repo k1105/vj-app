@@ -390,15 +390,29 @@ export class PluginHost {
    * texture as dirty via the update() call.
    */
   renderAll(global: GlobalUniforms, layers: LayerState[]): void {
-    // params are taken from the first layer whose active clip references this plugin
+    // Prefer the active clip's params; during a transition the plugin may
+    // only appear in NEXT, so fall back to nextClipIdx — otherwise the TO
+    // side renders with empty params (all manifest defaults).
     for (const m of this.mounted.values()) {
       let params: Record<string, number | boolean | string> = {};
+      let found = false;
       for (const layer of layers) {
         const clip =
           layer.activeClipIdx >= 0 ? layer.clips[layer.activeClipIdx] : null;
         if (clip && clip.pluginId === m.id) {
           params = clip.params;
+          found = true;
           break;
+        }
+      }
+      if (!found) {
+        for (const layer of layers) {
+          const clip =
+            layer.nextClipIdx >= 0 ? layer.clips[layer.nextClipIdx] : null;
+          if (clip && clip.pluginId === m.id) {
+            params = clip.params;
+            break;
+          }
         }
       }
       try {
