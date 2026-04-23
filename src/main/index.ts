@@ -93,6 +93,10 @@ app.whenReady().then(async () => {
 
   startPluginWatcher((event) => {
     controllerWindow?.webContents.send(event.channel, event.payload);
+    // Output's Composer holds its own plugin-meta cache and must be
+    // refreshed too, otherwise newly-imported assets mount-fail in the
+    // Output window with "meta not found".
+    outputWindow?.webContents.send(event.channel, event.payload);
     if (managerWindow && !managerWindow.isDestroyed()) {
       managerWindow.webContents.send(event.channel, event.payload);
     }
