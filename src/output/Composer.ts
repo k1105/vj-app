@@ -504,15 +504,35 @@ export class Composer {
       const inTransition =
         transition && transition.startedAt != null && transition.type !== "cut";
 
-      // Does the user currently want any postfx applied? Transitions bypass
-      // postfx in v1 for simplicity.
       const activePostFX =
-        !inTransition && this.state
+        this.state
           ? this.state.postfx
               .filter((p) => p.enabled)
               .map((p) => this.postfxMaterials.get(p.pluginId))
               .filter((e): e is PostFXEntry => !!e)
           : [];
+
+      // Run the enabled postfx chain starting from `srcRt`, presenting the
+      // final result to the screen. Used by both the transition and the
+      // plain composite paths so postfx survives a cross-fade.
+      const presentWithPostFX = (srcRt: THREE.WebGLRenderTarget): void => {
+        let src = srcRt;
+        let dst = (src === this.rtPingA ? this.rtPingB : this.rtPingA)!;
+        for (let i = 0; i < activePostFX.length; i++) {
+          const entry = activePostFX[i];
+          entry.material.uniforms.uTex.value = src.texture;
+          this.presentQuad.material = entry.material;
+          this.renderer.setRenderTarget(dst);
+          this.renderer.render(this.presentScene, this.displayCamera);
+          const tmp = src;
+          src = dst;
+          dst = tmp;
+        }
+        this.presentMaterial.uniforms.uTex.value = src.texture;
+        this.presentQuad.material = this.presentMaterial;
+        this.renderer.setRenderTarget(null);
+        this.renderer.render(this.presentScene, this.displayCamera);
+      };
 
       if (inTransition && this.state) {
         this.ensureTransitionTargets();
@@ -529,10 +549,17 @@ export class Composer {
         this.mixMaterial.uniforms.uFrom.value = this.rtFrom!.texture;
         this.mixMaterial.uniforms.uTo.value = this.rtTo!.texture;
         this.mixMaterial.uniforms.uProgress.value = progress;
-        this.renderer.setRenderTarget(null);
-        this.renderer.render(this.mixScene, this.displayCamera);
+
+        if (activePostFX.length > 0) {
+          this.ensurePingPongTargets();
+          this.renderer.setRenderTarget(this.rtPingA);
+          this.renderer.render(this.mixScene, this.displayCamera);
+          presentWithPostFX(this.rtPingA!);
+        } else {
+          this.renderer.setRenderTarget(null);
+          this.renderer.render(this.mixScene, this.displayCamera);
+        }
       } else if (this.state && activePostFX.length > 0) {
-        // Compose into rtPingA, then chain postfx through ping-pong to screen.
         this.ensurePingPongTargets();
         this.setCompositeSlots(
           this.state.layers,
@@ -540,26 +567,7 @@ export class Composer {
         );
         this.renderer.setRenderTarget(this.rtPingA);
         this.renderer.render(this.displayScene, this.displayCamera);
-
-        let src = this.rtPingA!;
-        let dst = this.rtPingB!;
-        for (let i = 0; i < activePostFX.length; i++) {
-          const entry = activePostFX[i];
-          entry.material.uniforms.uTex.value = src.texture;
-          this.presentQuad.material = entry.material;
-          // Always write to dst so the final result stays in a texture;
-          // presentMaterial then blits it to screen with flash-zoom applied.
-          this.renderer.setRenderTarget(dst);
-          this.renderer.render(this.presentScene, this.displayCamera);
-          const tmp = src;
-          src = dst;
-          dst = tmp;
-        }
-        // Final blit with flash-zoom via presentMaterial (uZoomScale already set).
-        this.presentMaterial.uniforms.uTex.value = src.texture;
-        this.presentQuad.material = this.presentMaterial;
-        this.renderer.setRenderTarget(null);
-        this.renderer.render(this.presentScene, this.displayCamera);
+        presentWithPostFX(this.rtPingA!);
       } else if (this.state) {
         // No transition and no postfx — direct composite to screen.
         this.setCompositeSlots(
