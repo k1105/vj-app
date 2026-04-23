@@ -4,29 +4,51 @@ import { MidiLearnButton } from "./MidiLearnButton";
 
 const BLEND_MODES: LayerState["blend"][] = ["normal", "add", "multiply", "screen"];
 
+// Drag types. x-plugin-id: a fresh asset from the AssetsPanel (copy).
+// x-clip-move: an existing layer clip being moved between layers (move).
+const DT_PLUGIN = "application/x-plugin-id";
+const DT_CLIP_MOVE = "application/x-clip-move";
+
 export function LayerStack() {
   const layers = useVJStore((s) => s.state.layers);
   const plugins = useVJStore((s) => s.plugins);
   const addClip = useVJStore((s) => s.addClip);
   const triggerClip = useVJStore((s) => s.triggerClip);
   const removeClip = useVJStore((s) => s.removeClip);
+  const moveClip = useVJStore((s) => s.moveClip);
   const setLayerOpacity = useVJStore((s) => s.setLayerOpacity);
   const setLayerBlend = useVJStore((s) => s.setLayerBlend);
   const setLayerMute = useVJStore((s) => s.setLayerMute);
   const setLayerSolo = useVJStore((s) => s.setLayerSolo);
   const selectLayer = useVJStore((s) => s.selectLayer);
 
-  const onDrop = (e: React.DragEvent, idx: number) => {
+  const onDrop = (e: React.DragEvent, toLayer: number) => {
     e.preventDefault();
-    const pluginId = e.dataTransfer.getData("application/x-plugin-id");
+    const moveRaw = e.dataTransfer.getData(DT_CLIP_MOVE);
+    if (moveRaw) {
+      try {
+        const { fromLayer, fromClipIdx } = JSON.parse(moveRaw) as {
+          fromLayer: number;
+          fromClipIdx: number;
+        };
+        moveClip(fromLayer, fromClipIdx, toLayer);
+      } catch {
+        /* malformed payload — ignore */
+      }
+      return;
+    }
+    const pluginId = e.dataTransfer.getData(DT_PLUGIN);
     if (!pluginId) return;
-    addClip(idx, pluginId);
+    addClip(toLayer, pluginId);
   };
 
   const onDragOver = (e: React.DragEvent) => {
-    if (!e.dataTransfer.types.includes("application/x-plugin-id")) return;
+    const types = e.dataTransfer.types;
+    const isPlugin = types.includes(DT_PLUGIN);
+    const isMove = types.includes(DT_CLIP_MOVE);
+    if (!isPlugin && !isMove) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
+    e.dataTransfer.dropEffect = isMove ? "move" : "copy";
   };
 
   return (
@@ -125,6 +147,15 @@ function LayerRow(props: {
                 key={clipIdx}
                 className={classes.join(" ")}
                 style={bgStyle}
+                draggable
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData(
+                    DT_CLIP_MOVE,
+                    JSON.stringify({ fromLayer: idx, fromClipIdx: clipIdx }),
+                  );
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onTriggerClip(clipIdx);
@@ -134,7 +165,7 @@ function LayerRow(props: {
                   e.stopPropagation();
                   onRemoveClip(clipIdx);
                 }}
-                title={`${pluginName(clip.pluginId)} (click to trigger · right-click to remove)`}
+                title={`${pluginName(clip.pluginId)} (click to trigger · drag to another layer to move · right-click to remove)`}
               >
                 <div className="mat-name">{pluginName(clip.pluginId)}</div>
               </div>

@@ -1,6 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import type { DownloadProgress } from "../../shared/types";
+
+const ASSETS_WIDTH_MIN = 140;
+const ASSETS_WIDTH_MAX = 600;
+const ASSETS_WIDTH_DEFAULT = 200;
+const ASSETS_WIDTH_SETTING = "assetsWidth";
 
 export function AssetsPanel() {
   const plugins = useVJStore((s) => s.plugins);
@@ -14,6 +19,41 @@ export function AssetsPanel() {
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const widthRef = useRef<number>(ASSETS_WIDTH_DEFAULT);
+
+  // Load the persisted width once on mount and apply it via CSS var.
+  // We write directly to the CSS var (not via React state) so the drag
+  // stays smooth; React state is only used to re-render on boot.
+  useEffect(() => {
+    window.vj.getSetting(ASSETS_WIDTH_SETTING).then((v) => {
+      const n = typeof v === "number" ? v : ASSETS_WIDTH_DEFAULT;
+      const clamped = Math.max(ASSETS_WIDTH_MIN, Math.min(ASSETS_WIDTH_MAX, n));
+      widthRef.current = clamped;
+      document.documentElement.style.setProperty("--assets-width", `${clamped}px`);
+    });
+  }, []);
+
+  const onResizeStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = widthRef.current;
+    let latest = startWidth;
+    const onMove = (ev: PointerEvent) => {
+      latest = Math.max(
+        ASSETS_WIDTH_MIN,
+        Math.min(ASSETS_WIDTH_MAX, startWidth + (ev.clientX - startX)),
+      );
+      document.documentElement.style.setProperty("--assets-width", `${latest}px`);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      widthRef.current = latest;
+      window.vj.setSetting(ASSETS_WIDTH_SETTING, latest);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
   useEffect(() => {
     const off = window.vj.onDownloadProgress((p: DownloadProgress) => {
@@ -53,7 +93,6 @@ export function AssetsPanel() {
     <div className="assets-area">
       <div className="assets-header">
         <span>Assets</span>
-        <span>drag → layer</span>
       </div>
       <div className="assets-grid">
         {materials.map((p) => (
@@ -95,6 +134,11 @@ export function AssetsPanel() {
         </div>
         {status && <div className="dl-status">{status}</div>}
       </div>
+      <div
+        className="assets-resize-handle"
+        onPointerDown={onResizeStart}
+        title="Drag to resize"
+      />
     </div>
   );
 }

@@ -340,7 +340,9 @@ input[type="range"]::-moz-range-thumb {
    ───────────────────────────────────────────── */
 .middle {
   display: grid;
-  grid-template-columns: 200px 1fr 264px;
+  /* assets width is driven by the resize handle in AssetsPanel and
+     persisted via electron-store. Default kicks in before first paint. */
+  grid-template-columns: var(--assets-width, 200px) 1fr 264px;
   overflow: hidden;
   background: var(--bg-primary);
 }
@@ -387,11 +389,28 @@ input[type="range"]::-moz-range-thumb {
 
 /* ─────── Assets Column ─────── */
 .assets-area {
+  position: relative; /* anchor for .assets-resize-handle */
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--bg-panel);
   border-right: 1px solid var(--border-strong);
+}
+.assets-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 5;
+  background: transparent;
+  transition: background 0.1s;
+}
+.assets-resize-handle:hover,
+.assets-resize-handle:active {
+  background: var(--accent);
+  opacity: 0.5;
 }
 .assets-grid {
   flex: 1;

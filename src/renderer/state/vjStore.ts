@@ -52,6 +52,13 @@ interface VJStoreShape {
   triggerClip: (layerIdx: number, clipIdx: number) => void;
   /** Remove a clip from a layer's bin. Adjusts active/next indices. */
   removeClip: (layerIdx: number, clipIdx: number) => void;
+  /**
+   * Move a clip (with its params) from one layer to another. No-op if
+   * source and destination are the same. The moved clip lands at the end
+   * of the destination bin and becomes its NEXT; if the destination was
+   * empty, it also becomes LIVE so playback starts immediately.
+   */
+  moveClip: (fromLayer: number, fromClipIdx: number, toLayer: number) => void;
   setLayerOpacity: (layerIdx: number, opacity: number) => void;
   setLayerBlend: (layerIdx: number, blend: LayerState["blend"]) => void;
   setLayerMute: (layerIdx: number, mute: boolean) => void;
@@ -168,6 +175,47 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
         };
       });
       return { state: { ...s.state, layers } };
+    });
+  },
+
+  moveClip: (fromLayer, fromClipIdx, toLayer) => {
+    if (fromLayer === toLayer) return;
+    set((s) => {
+      const src = s.state.layers[fromLayer];
+      if (!src) return s;
+      const clip = src.clips[fromClipIdx];
+      if (!clip) return s;
+
+      const layers = s.state.layers.map((l, i) => {
+        if (i === fromLayer) {
+          const clips = l.clips.filter((_, j) => j !== fromClipIdx);
+          const adjust = (idx: number): number => {
+            if (clips.length === 0) return -1;
+            if (idx === fromClipIdx) return Math.min(idx, clips.length - 1);
+            if (idx > fromClipIdx) return idx - 1;
+            return idx;
+          };
+          return {
+            ...l,
+            clips,
+            activeClipIdx: adjust(l.activeClipIdx),
+            nextClipIdx: adjust(l.nextClipIdx),
+          };
+        }
+        if (i === toLayer) {
+          const clips = [...l.clips, clip];
+          const newIdx = clips.length - 1;
+          const wasEmpty = l.activeClipIdx === -1;
+          return {
+            ...l,
+            clips,
+            activeClipIdx: wasEmpty ? newIdx : l.activeClipIdx,
+            nextClipIdx: newIdx,
+          };
+        }
+        return l;
+      });
+      return { state: { ...s.state, layers, selectedLayer: toLayer } };
     });
   },
 
