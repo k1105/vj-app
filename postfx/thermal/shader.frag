@@ -1,6 +1,7 @@
 // Thermal (heat-map) filter. Remaps luminance to a cold→hot gradient
 // (black → blue → magenta → red → yellow → white). `contrast` steepens
-// the gradient around mid, `shift` biases toward cold (-) or hot (+),
+// the gradient around mid, `shift` cyclically rotates the palette
+// (slides along the color ramp without changing overall brightness),
 // `levels` posterizes the gradient (low = fewer bands, high = smooth),
 // `intensity` blends between the original and the thermal look.
 precision highp float;
@@ -35,11 +36,13 @@ void main() {
 
   float k = mix(0.5, 6.0, u_contrast);
   float t = 1.0 / (1.0 + exp(-k * (lum - 0.5)));
-  t = clamp(t + u_shift * 0.5, 0.0, 1.0);
 
   // Posterize: levels=0 -> 3 bands, levels=1 -> smooth (32+)
   float steps = floor(mix(3.0, 32.0, clamp(u_levels, 0.0, 1.0)));
   t = floor(t * steps) / max(steps - 1.0, 1.0);
+
+  // Cyclic palette shift: slide along the color ramp, wrap at the ends.
+  t = fract(t + u_shift + 1.0);
 
   vec3 thermal = thermalRamp(t);
   vec3 outCol = mix(base.rgb, thermal, clamp(u_intensity, 0.0, 1.0));
