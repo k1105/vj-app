@@ -199,9 +199,19 @@ export async function listPlugins(): Promise<PluginMeta[]> {
   return [...materials, ...postfx, ...transitions];
 }
 
+// Saved so other main-process modules (videoImporter, videoDownloader) can
+// trigger an immediate broadcast after writing a new manifest — fs.watch's
+// delivery is asynchronous on macOS and can arrive AFTER the renderer has
+// already dropped the new asset into a layer, causing Output to mount with
+// stale meta.
+let currentEmit:
+  | ((event: { channel: string; payload: unknown }) => void)
+  | null = null;
+
 export function startPluginWatcher(
   emit: (event: { channel: string; payload: unknown }) => void,
 ): void {
+  currentEmit = emit;
   const kinds: PluginKind[] = ["material", "postfx", "transition"];
   for (const kind of kinds) {
     const dir = pluginRoot(kind);
@@ -215,4 +225,15 @@ export function startPluginWatcher(
       // Directory may not exist yet — fail silently.
     }
   }
+}
+
+/**
+ * Re-scan plugins and broadcast immediately. Call this after the main
+ * process writes a new manifest so renderers see the new meta before
+ * the relevant IPC call resolves.
+ */
+export async function broadcastPluginsNow(): Promise<void> {
+  if (!currentEmit) return;
+  const plugins = await listPlugins();
+  currentEmit({ channel: IPC.PluginsChanged, payload: plugins });
 }

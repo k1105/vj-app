@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import { basename, extname, join, relative } from "path";
-import { appRoot } from "./pluginLoader";
+import { appRoot, broadcastPluginsNow } from "./pluginLoader";
 import { generateVideoThumbnail, getVideoDuration } from "./thumbnail";
 import type { DownloadProgress, DownloadResult } from "../shared/types";
 
@@ -60,6 +60,10 @@ export async function writeVideoPluginManifest(
 
   // Best-effort thumbnail. Fails silently; the Controller falls back to text.
   await generateVideoThumbnail(filePath, join(pluginDir, "thumbnail.jpg"));
+
+  // Explicit broadcast: don't rely on fs.watch timing. By the time the
+  // triggering IPC call resolves, every window has the new meta.
+  await broadcastPluginsNow();
 
   return pluginDir;
 }
