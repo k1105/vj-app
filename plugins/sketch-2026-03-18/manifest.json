@@ -1,0 +1,11 @@
+{
+  "name": "2026-03-18 Trail Paths",
+  "author": "yamagishi",
+  "version": "0.1.0",
+  "outputType": "canvas",
+  "entry": "index.js",
+  "thumbnail": "thumbnail.png",
+  "params": [
+    { "key": "speed", "type": "float", "default": 1.0, "min": 0.1, "max": 4.0 }
+  ]
+}

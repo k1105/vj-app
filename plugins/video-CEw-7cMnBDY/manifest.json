@@ -1,0 +1,37 @@
+{
+  "name": "CEw-7cMnBDY",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/CEw-7cMnBDY.mp4",
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 0,
+      "min": 0,
+      "max": 204,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 204,
+      "min": 0,
+      "max": 204,
+      "step": 1
+    }
+  ],
+  "duration": 203.174603
+}

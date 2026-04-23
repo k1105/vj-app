@@ -1,0 +1,10 @@
+{
+  "name": "Bloom",
+  "author": "vj-app",
+  "entry": "shader.frag",
+  "params": [
+    { "key": "threshold", "type": "float", "default": 0.5, "min": 0, "max": 1 },
+    { "key": "radius",    "type": "float", "default": 0.4, "min": 0, "max": 1 },
+    { "key": "strength",  "type": "float", "default": 0.6, "min": 0, "max": 1 }
+  ]
+}

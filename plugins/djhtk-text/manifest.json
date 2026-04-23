@@ -1,0 +1,10 @@
+{
+  "name": "DJ HTK Text",
+  "author": "yamagishi",
+  "version": "0.1.0",
+  "outputType": "canvas",
+  "entry": "index.js",
+  "params": [
+    { "key": "grid", "type": "int", "default": 4, "min": 1, "max": 16, "step": 1 }
+  ]
+}

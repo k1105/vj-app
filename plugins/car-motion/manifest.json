@@ -1,0 +1,16 @@
+{
+  "name": "Car Motion",
+  "author": "yamagishi",
+  "version": "0.2.0",
+  "outputType": "canvas",
+  "entry": "index.js",
+  "thumbnail": "thumbnail.png",
+  "params": [
+    { "key": "autoRotate",  "type": "bool",  "default": false },
+    { "key": "rotateSpeed", "type": "float", "default": 30,  "min": 1,   "max": 180 },
+    { "key": "camAngle",    "type": "float", "default": 0,   "min": 0,   "max": 360, "step": 60 },
+    { "key": "camRadius",   "type": "float", "default": 8,   "min": 2,   "max": 20  },
+    { "key": "camHeight",   "type": "float", "default": 4,   "min": 0.5, "max": 15  },
+    { "key": "fov",         "type": "float", "default": 50,  "min": 20,  ｀"max": 90  }
+  ]
+}

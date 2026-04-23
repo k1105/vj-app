@@ -1,0 +1,38 @@
+{
+  "name": "The Notorious B.I.G. - Big Poppa (Official Music Video)",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/phaJXp_zMYM.mp4",
+  "thumbnail": "thumbnail.jpg",
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 0,
+      "min": 0,
+      "max": 262,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 262,
+      "min": 0,
+      "max": 262,
+      "step": 1
+    }
+  ],
+  "duration": 261.619229
+}

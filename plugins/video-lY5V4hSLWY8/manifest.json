@@ -1,0 +1,37 @@
+{
+  "name": "lY5V4hSLWY8",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/lY5V4hSLWY8.mp4",
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 0,
+      "min": 0,
+      "max": 211,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 211,
+      "min": 0,
+      "max": 211,
+      "step": 1
+    }
+  ],
+  "duration": 210.721088
+}

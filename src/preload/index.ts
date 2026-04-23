@@ -1,0 +1,58 @@
+import { contextBridge, ipcRenderer } from "electron";
+import {
+  IPC,
+  type DownloadProgress,
+  type DownloadResult,
+  type PluginKind,
+  type PluginMeta,
+  type VJState,
+} from "../shared/types";
+import type { VJApi } from "../shared/vjApi";
+
+const api: VJApi = {
+  listPlugins: (): Promise<PluginMeta[]> => ipcRenderer.invoke(IPC.ListPlugins),
+
+  readPluginSource: (kind: PluginKind, id: string): Promise<string | null> =>
+    ipcRenderer.invoke(IPC.ReadPluginSource, { kind, id }),
+
+  downloadVideo: (url: string): Promise<DownloadResult> =>
+    ipcRenderer.invoke(IPC.DownloadVideo, url),
+
+  onDownloadProgress: (cb: (p: DownloadProgress) => void) => {
+    const listener = (_: unknown, p: DownloadProgress) => cb(p);
+    ipcRenderer.on(IPC.DownloadProgress, listener);
+    return () => ipcRenderer.removeListener(IPC.DownloadProgress, listener);
+  },
+
+  onPluginsChanged: (cb: (plugins: PluginMeta[]) => void) => {
+    const listener = (_: unknown, plugins: PluginMeta[]) => cb(plugins);
+    ipcRenderer.on(IPC.PluginsChanged, listener);
+    return () => ipcRenderer.removeListener(IPC.PluginsChanged, listener);
+  },
+
+  sendStateUpdate: (state: VJState) => {
+    ipcRenderer.send(IPC.StateUpdate, state);
+  },
+
+  onStateBroadcast: (cb: (state: VJState) => void) => {
+    const listener = (_: unknown, state: VJState) => cb(state);
+    ipcRenderer.on(IPC.StateBroadcast, listener);
+    return () => ipcRenderer.removeListener(IPC.StateBroadcast, listener);
+  },
+
+  onPreviewLive: (cb: (dataUrl: string) => void) => {
+    const listener = (_: unknown, dataUrl: string) => cb(dataUrl);
+    ipcRenderer.on(IPC.PreviewLive, listener);
+    return () => ipcRenderer.removeListener(IPC.PreviewLive, listener);
+  },
+
+  getSetting: (key: string) => ipcRenderer.invoke(IPC.SettingsGet, key),
+  setSetting: (key: string, value: unknown) =>
+    ipcRenderer.invoke(IPC.SettingsSet, key, value),
+
+  toggleOutputFullscreen: () => ipcRenderer.send(IPC.OutputToggleFullscreen),
+};
+
+contextBridge.exposeInMainWorld("vj", api);
+
+export type { VJApi };

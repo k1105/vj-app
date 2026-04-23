@@ -1,0 +1,37 @@
+{
+  "name": "eEQMtIX61LA",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/eEQMtIX61LA.mp4",
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 0,
+      "min": 0,
+      "max": 308,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 308,
+      "min": 0,
+      "max": 308,
+      "step": 1
+    }
+  ],
+  "duration": 307.0839
+}
