@@ -1,0 +1,41 @@
+// Thermal (heat-map) filter. Remaps luminance to a cold→hot gradient
+// (black → blue → magenta → red → yellow → white). `contrast` steepens
+// the gradient around mid, `shift` biases toward cold (-) or hot (+),
+// `intensity` blends between the original and the thermal look.
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D uTex;
+uniform vec2 uResolution;
+uniform float uTime;
+uniform float uBeat;
+uniform float u_intensity;
+uniform float u_contrast;
+uniform float u_shift;
+
+vec3 thermalRamp(float t) {
+  t = clamp(t, 0.0, 1.0);
+  vec3 c0 = vec3(0.0, 0.0, 0.0);
+  vec3 c1 = vec3(0.0, 0.0, 0.5);
+  vec3 c2 = vec3(0.5, 0.0, 0.8);
+  vec3 c3 = vec3(1.0, 0.1, 0.2);
+  vec3 c4 = vec3(1.0, 0.8, 0.0);
+  vec3 c5 = vec3(1.0, 1.0, 1.0);
+  if (t < 0.2)      return mix(c0, c1, t / 0.2);
+  else if (t < 0.4) return mix(c1, c2, (t - 0.2) / 0.2);
+  else if (t < 0.6) return mix(c2, c3, (t - 0.4) / 0.2);
+  else if (t < 0.8) return mix(c3, c4, (t - 0.6) / 0.2);
+  else              return mix(c4, c5, (t - 0.8) / 0.2);
+}
+
+void main() {
+  vec4 base = texture2D(uTex, vUv);
+  float lum = dot(base.rgb, vec3(0.299, 0.587, 0.114));
+
+  float k = mix(0.5, 6.0, u_contrast);
+  float t = 1.0 / (1.0 + exp(-k * (lum - 0.5)));
+  t = clamp(t + u_shift * 0.5, 0.0, 1.0);
+
+  vec3 thermal = thermalRamp(t);
+  vec3 outCol = mix(base.rgb, thermal, clamp(u_intensity, 0.0, 1.0));
+  gl_FragColor = vec4(outCol, base.a);
+}
