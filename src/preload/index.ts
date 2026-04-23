@@ -47,6 +47,14 @@ const api: VJApi = {
     return () => ipcRenderer.removeListener(IPC.StateBroadcast, listener);
   },
 
+  requestStateRebroadcast: () => ipcRenderer.send(IPC.RequestStateRebroadcast),
+
+  onRequestStateRebroadcast: (cb: () => void) => {
+    const listener = () => cb();
+    ipcRenderer.on(IPC.RequestStateRebroadcast, listener);
+    return () => ipcRenderer.removeListener(IPC.RequestStateRebroadcast, listener);
+  },
+
   onPreviewLive: (cb: (dataUrl: string) => void) => {
     const listener = (_: unknown, dataUrl: string) => cb(dataUrl);
     ipcRenderer.on(IPC.PreviewLive, listener);
@@ -60,6 +68,15 @@ const api: VJApi = {
   toggleOutputFullscreen: () => ipcRenderer.send(IPC.OutputToggleFullscreen),
 
   openManager: () => ipcRenderer.send(IPC.OpenManager),
+
+  deletePlugin: (kind: PluginKind, id: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.DeletePlugin, { kind, id }),
+
+  renamePlugin: (kind: PluginKind, id: string, name: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.RenamePlugin, { kind, id, name }),
+
+  revealPlugin: (kind: PluginKind, id: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.RevealPlugin, { kind, id }),
 };
 
 contextBridge.exposeInMainWorld("vj", api);

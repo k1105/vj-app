@@ -6,10 +6,14 @@ export const IPC = {
   ImportVideo: "vj:import-video",
   PickVideoFile: "vj:pick-video-file",
   OpenManager: "vj:open-manager",
+  DeletePlugin: "vj:delete-plugin",
+  RenamePlugin: "vj:rename-plugin",
+  RevealPlugin: "vj:reveal-plugin",
   ListPlugins: "vj:list-plugins",
   PluginsChanged: "vj:plugins-changed",
   StateUpdate: "vj:state-update",
   StateBroadcast: "vj:state-broadcast",
+  RequestStateRebroadcast: "vj:request-state-rebroadcast",
   SettingsGet: "vj:settings-get",
   SettingsSet: "vj:settings-set",
   OutputToggleFullscreen: "vj:output-toggle-fullscreen",
@@ -46,6 +50,10 @@ export interface PluginMeta {
   // Optional preview image URL (vj-asset://local/...). Resolved from
   // manifest.thumbnail when the file exists in the plugin directory.
   thumbnailUrl?: string;
+  /** Clip length in seconds. For video plugins, read from manifest.duration. */
+  duration?: number;
+  /** Size on disk. For video plugins, size of the videoFile; undefined otherwise. */
+  sizeBytes?: number;
 }
 
 /**

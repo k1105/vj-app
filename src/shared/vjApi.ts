@@ -28,6 +28,10 @@ export interface VJApi {
   onPluginsChanged(cb: (plugins: PluginMeta[]) => void): () => void;
   sendStateUpdate(state: VJState): void;
   onStateBroadcast(cb: (state: VJState) => void): () => void;
+  /** Ask the Controller to rebroadcast its current state immediately. */
+  requestStateRebroadcast(): void;
+  /** Controller listens for "please rebroadcast" asks from other windows. */
+  onRequestStateRebroadcast(cb: () => void): () => void;
   /** Controller subscribes to LIVE preview JPEG frames sampled from Output. */
   onPreviewLive(cb: (dataUrl: string) => void): () => void;
   getSetting(key: string): Promise<unknown>;
@@ -35,6 +39,12 @@ export interface VJApi {
   toggleOutputFullscreen(): void;
   /** Open (or focus) the Library / asset manager window. */
   openManager(): void;
+  /** Delete a plugin — its directory and (for video plugins) its mp4. */
+  deletePlugin(kind: PluginKind, id: string): Promise<void>;
+  /** Update the plugin's display name (manifest.name). */
+  renamePlugin(kind: PluginKind, id: string, name: string): Promise<void>;
+  /** Open Finder with the plugin directory selected. */
+  revealPlugin(kind: PluginKind, id: string): Promise<void>;
 }
 
 declare global {

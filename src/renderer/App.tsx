@@ -29,6 +29,12 @@ export function App() {
     broadcastState();
   }, [state, broadcastState]);
 
+  // When the Manager window opens mid-session it asks us to rebroadcast
+  // state so it has something to compute "in-use" from right away.
+  useEffect(() => {
+    return window.vj.onRequestStateRebroadcast(() => broadcastState());
+  }, [broadcastState]);
+
   // Global keyboard shortcuts. Ignore when the user is typing in a field.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

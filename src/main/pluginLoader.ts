@@ -107,6 +107,7 @@ async function scanKind(kind: PluginKind): Promise<PluginMeta[]> {
 
       // Resolve a video asset to a vj-asset:// URL the Output window can load.
       let videoUrl: string | undefined;
+      let sizeBytes: number | undefined;
       if (manifest.outputType === "video" && typeof manifest.videoFile === "string") {
         const abs = resolve(pluginDir, manifest.videoFile);
         const root = resolve(appRoot());
@@ -117,6 +118,12 @@ async function scanKind(kind: PluginKind): Promise<PluginMeta[]> {
           console.warn(
             `[pluginLoader] ${entry}: videoFile "${manifest.videoFile}" is outside app root`,
           );
+        }
+        try {
+          const st = await fs.stat(abs);
+          sizeBytes = st.size;
+        } catch {
+          /* video file missing or unreadable — leave sizeBytes undefined */
         }
       }
 
@@ -158,6 +165,8 @@ async function scanKind(kind: PluginKind): Promise<PluginMeta[]> {
         manifestPath,
         videoUrl,
         thumbnailUrl,
+        duration: typeof manifest.duration === "number" ? manifest.duration : undefined,
+        sizeBytes,
       });
     } catch (err) {
       console.warn(`[pluginLoader] skip ${entry}:`, err);

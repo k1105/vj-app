@@ -88,6 +88,7 @@ app.whenReady().then(async () => {
   registerIpcHandlers({
     getController: () => controllerWindow,
     getOutput: () => outputWindow,
+    getManager: () => managerWindow,
     openManager: openManagerWindow,
   });
 
