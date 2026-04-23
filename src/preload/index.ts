@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   IPC,
   type DownloadProgress,
@@ -17,6 +17,13 @@ const api: VJApi = {
 
   downloadVideo: (url: string): Promise<DownloadResult> =>
     ipcRenderer.invoke(IPC.DownloadVideo, url),
+
+  importVideo: (srcPath: string): Promise<DownloadResult> =>
+    ipcRenderer.invoke(IPC.ImportVideo, srcPath),
+
+  pickVideoFile: (): Promise<string[]> => ipcRenderer.invoke(IPC.PickVideoFile),
+
+  getFilePath: (file: File): string => webUtils.getPathForFile(file),
 
   onDownloadProgress: (cb: (p: DownloadProgress) => void) => {
     const listener = (_: unknown, p: DownloadProgress) => cb(p);
@@ -51,6 +58,8 @@ const api: VJApi = {
     ipcRenderer.invoke(IPC.SettingsSet, key, value),
 
   toggleOutputFullscreen: () => ipcRenderer.send(IPC.OutputToggleFullscreen),
+
+  openManager: () => ipcRenderer.send(IPC.OpenManager),
 };
 
 contextBridge.exposeInMainWorld("vj", api);

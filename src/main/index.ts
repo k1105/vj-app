@@ -1,7 +1,7 @@
 import { app, BrowserWindow, net, protocol } from "electron";
 import { pathToFileURL } from "url";
 import { resolve } from "path";
-import { createControllerWindow, createOutputWindow } from "./windows";
+import { createControllerWindow, createManagerWindow, createOutputWindow } from "./windows";
 import { registerIpcHandlers } from "./ipc";
 import { startPluginWatcher, appRoot } from "./pluginLoader";
 import { startLivePreview } from "./livePreview";
@@ -14,6 +14,18 @@ if (!app.isPackaged) {
 
 let controllerWindow: BrowserWindow | null = null;
 let outputWindow: BrowserWindow | null = null;
+let managerWindow: BrowserWindow | null = null;
+
+function openManagerWindow(): void {
+  if (managerWindow && !managerWindow.isDestroyed()) {
+    managerWindow.focus();
+    return;
+  }
+  managerWindow = createManagerWindow();
+  managerWindow.on("closed", () => {
+    managerWindow = null;
+  });
+}
 
 // `vj-asset://local/<relative-path>` serves files from the app root
 // (plugins/, materials/, postfx/, transitions/). Must be registered
@@ -73,10 +85,14 @@ app.whenReady().then(async () => {
   registerIpcHandlers({
     getController: () => controllerWindow,
     getOutput: () => outputWindow,
+    openManager: openManagerWindow,
   });
 
   startPluginWatcher((event) => {
     controllerWindow?.webContents.send(event.channel, event.payload);
+    if (managerWindow && !managerWindow.isDestroyed()) {
+      managerWindow.webContents.send(event.channel, event.payload);
+    }
   });
 
   if (controllerWindow && outputWindow) {

@@ -36,6 +36,31 @@ export function createControllerWindow(): BrowserWindow {
   return win;
 }
 
+export function createManagerWindow(): BrowserWindow {
+  const win = new BrowserWindow({
+    width: 960,
+    height: 720,
+    minWidth: 720,
+    minHeight: 540,
+    backgroundColor: "#05070a",
+    title: "hatakanata-vj · Library",
+    webPreferences: {
+      preload: preloadPath,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  if (process.env["ELECTRON_RENDERER_URL"]) {
+    win.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}/index.html?window=manager`);
+  } else {
+    win.loadFile(join(__dirname, "../renderer/index.html"), { search: "window=manager" });
+  }
+
+  return win;
+}
+
 export function createOutputWindow(): BrowserWindow {
   // Place on a secondary display if one exists.
   const displays = screen.getAllDisplays();

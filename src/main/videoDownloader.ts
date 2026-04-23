@@ -1,16 +1,12 @@
 import { spawn } from "child_process";
 import { promises as fs } from "fs";
-import { basename, join, relative } from "path";
+import { join } from "path";
 import { appRoot } from "./pluginLoader";
-import { generateVideoThumbnail, getVideoDuration } from "./thumbnail";
+import { writeVideoPluginManifest } from "./videoImporter";
 import type { DownloadProgress, DownloadResult } from "../shared/types";
 
 function videosDir(): string {
   return join(appRoot(), "materials", "videos");
-}
-
-function videoPluginsRoot(): string {
-  return join(appRoot(), "plugins");
 }
 
 // yt-dlp emits one progress line per chunk; `[download]  42.0% of ...`.
@@ -143,48 +139,4 @@ function extract(output: string, sentinel: string): string | null {
     if (i !== -1) return line.slice(i + sentinel.length).trim();
   }
   return null;
-}
-
-/**
- * Write a minimal material-plugin manifest so the downloaded video shows up
- * as a draggable asset in the Controller. The plugin directory is
- * `plugins/video-<id>/`, where <id> is derived from the yt-dlp output filename.
- * fs.watch picks up the new directory and broadcasts PluginsChanged.
- */
-async function writeVideoPluginManifest(filePath: string, title: string): Promise<void> {
-  // videoId = filename without extension (yt-dlp uses %(id)s.%(ext)s)
-  const videoId = basename(filePath).replace(/\.[^.]+$/, "");
-  const pluginDir = join(videoPluginsRoot(), `video-${videoId}`);
-  await fs.mkdir(pluginDir, { recursive: true });
-
-  // videoFile is written as a path relative to the plugin directory so the
-  // manifest is portable if the whole tree is moved.
-  const videoFileRel = relative(pluginDir, filePath);
-
-  const duration = await getVideoDuration(filePath);
-  const durationMax = duration != null ? Math.ceil(duration) : 3600;
-
-  const manifest = {
-    name: title,
-    author: "yt-dlp",
-    outputType: "video" as const,
-    videoFile: videoFileRel,
-    thumbnail: "thumbnail.jpg",
-    duration: duration ?? undefined,
-    params: [
-      { key: "playing",   type: "bool",  default: true },
-      { key: "speed",     type: "float", default: 1,          min: 0.25,       max: 2,          step: 0.05 },
-      { key: "loopStart", type: "float", default: 0,          min: 0,          max: durationMax, step: 1 },
-      { key: "loopEnd",   type: "float", default: durationMax, min: 0,          max: durationMax, step: 1 },
-    ],
-  };
-
-  await fs.writeFile(
-    join(pluginDir, "manifest.json"),
-    JSON.stringify(manifest, null, 2) + "\n",
-    "utf-8",
-  );
-
-  // Best-effort thumbnail. Fails silently; the Controller falls back to text.
-  await generateVideoThumbnail(filePath, join(pluginDir, "thumbnail.jpg"));
 }

@@ -1,12 +1,14 @@
-import { BrowserWindow, ipcMain } from "electron";
+import { BrowserWindow, dialog, ipcMain } from "electron";
 import { IPC, type PluginKind, type VJState } from "../shared/types";
 import { downloadVideo } from "./videoDownloader";
+import { importLocalVideo } from "./videoImporter";
 import { listPlugins, readPluginSource } from "./pluginLoader";
 import { getSetting, setSetting } from "./store";
 
 interface Ctx {
   getController: () => BrowserWindow | null;
   getOutput: () => BrowserWindow | null;
+  openManager: () => void;
 }
 
 export function registerIpcHandlers(ctx: Ctx): void {
@@ -25,6 +27,26 @@ export function registerIpcHandlers(ctx: Ctx): void {
     return downloadVideo(url, (progress) => {
       event.sender.send(IPC.DownloadProgress, progress);
     });
+  });
+
+  ipcMain.handle(IPC.ImportVideo, async (event, srcPath: string) => {
+    return importLocalVideo(srcPath, (progress) => {
+      event.sender.send(IPC.DownloadProgress, progress);
+    });
+  });
+
+  ipcMain.handle(IPC.PickVideoFile, async () => {
+    const result = await dialog.showOpenDialog({
+      title: "Import video",
+      filters: [{ name: "Video (mp4)", extensions: ["mp4"] }],
+      properties: ["openFile", "multiSelections"],
+    });
+    if (result.canceled) return [];
+    return result.filePaths;
+  });
+
+  ipcMain.on(IPC.OpenManager, () => {
+    ctx.openManager();
   });
 
   // Controller → Main → Output broadcast

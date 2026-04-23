@@ -3,6 +3,9 @@
 export const IPC = {
   DownloadVideo: "vj:download-video",
   DownloadProgress: "vj:download-progress",
+  ImportVideo: "vj:import-video",
+  PickVideoFile: "vj:pick-video-file",
+  OpenManager: "vj:open-manager",
   ListPlugins: "vj:list-plugins",
   PluginsChanged: "vj:plugins-changed",
   StateUpdate: "vj:state-update",
