@@ -107,7 +107,6 @@ body {
    Top Bar: Previews + Master
    ───────────────────────────────────────────── */
 .top-bar {
-  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr 280px;
   gap: 0;
@@ -1500,26 +1499,3 @@ input[type="range"]::-moz-range-thumb {
   letter-spacing: 0.3px;
 }
 
-/* LIBRARY button — anchored to the top-right of the top bar so it stays
-   out of the performance area's primary focus. */
-.btn-library {
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  z-index: 2;
-  background: var(--bg-inset);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  padding: 2px 6px;
-  border-radius: 2px;
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-}
-.btn-library:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}

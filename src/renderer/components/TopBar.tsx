@@ -58,13 +58,6 @@ export function TopBar() {
 
   return (
     <div className="top-bar">
-      <button
-        className="btn-library"
-        onClick={() => window.vj.openManager()}
-        title="Open asset library"
-      >
-        LIB
-      </button>
       <div className="preview-box live">
         <div className="preview-label">LIVE OUT</div>
         <div className="preview-badge">LIVE</div>

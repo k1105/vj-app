@@ -3,6 +3,7 @@ import { pathToFileURL } from "url";
 import { resolve } from "path";
 import { createControllerWindow, createManagerWindow, createOutputWindow } from "./windows";
 import { registerIpcHandlers } from "./ipc";
+import { installAppMenu } from "./menu";
 import { startPluginWatcher, appRoot } from "./pluginLoader";
 import { startLivePreview } from "./livePreview";
 
@@ -78,6 +79,8 @@ app.whenReady().then(async () => {
       return new Response(String(err), { status: 500 });
     }
   });
+
+  installAppMenu({ openManager: openManagerWindow });
 
   controllerWindow = createControllerWindow();
   outputWindow = createOutputWindow();
