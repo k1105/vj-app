@@ -139,6 +139,9 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
     const layerIdx = parseInt(rest.slice(0, colonIdx), 10);
     const key = rest.slice(colonIdx + 1);
     if (isNaN(layerIdx) || !key) return;
+    // Loop boundaries are structural — never drive them from MIDI even if a
+    // legacy mapping exists.
+    if (key === "loopStart" || key === "loopEnd") return;
     const layer = vj.state.layers[layerIdx];
     const clipIdx = layer?.activeClipIdx ?? -1;
     if (clipIdx < 0) return;

@@ -154,6 +154,10 @@ function RangeControl({
   const label =
     startDef.key.slice(0, -5) || "range"; // e.g. "loopStart" → "loop"
 
+  // Loop range is a structural marker for the playhead window — controlling it
+  // via MIDI / sync would just scrub the loop boundaries, which isn't musical.
+  const showAutoControls = label !== "loop";
+
   const fmt = (v: number) =>
     startDef.type === "int" ? String(Math.round(v)) : v.toFixed(1);
 
@@ -197,10 +201,14 @@ function RangeControl({
       <span className="param-val range2-val">
         {fmt(s)}–{fmt(e)}
       </span>
-      <MidiLearnButton targetId={midiStartId} />
-      <AutoSyncButton targetId={midiStartId} />
-      <MidiLearnButton targetId={midiEndId} />
-      <AutoSyncButton targetId={midiEndId} />
+      {showAutoControls && (
+        <>
+          <MidiLearnButton targetId={midiStartId} />
+          <AutoSyncButton targetId={midiStartId} />
+          <MidiLearnButton targetId={midiEndId} />
+          <AutoSyncButton targetId={midiEndId} />
+        </>
+      )}
     </div>
   );
 }
