@@ -1,3 +1,4 @@
+import { spawn } from "child_process";
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import { basename, extname, join, relative } from "path";
@@ -118,14 +119,21 @@ export async function importLocalVideo(
 
   onProgress({ percent: 0, stage: "downloading" });
   try {
-    await fs.copyFile(srcPath, destPath);
+    // Always transcode to a known Chromium-safe H.264 subset (Main profile +
+    // yuv420p) — even files that report as H.264 can trip macOS VideoToolbox
+    // (-12909) depending on encoder-specific bitstream quirks. Transcoding
+    // on import trades import time for guaranteed playback.
+    await transcodeToSafeH264(srcPath, destPath, (pct) => {
+      // Reserve the last 5% for manifest + thumbnail work.
+      onProgress({ percent: Math.min(pct * 0.95, 95), stage: "downloading" });
+    });
   } catch (err) {
-    const message = `copy failed: ${(err as Error).message}`;
+    // If transcode failed partway, clean up the half-written destination.
+    try { await fs.unlink(destPath); } catch { /* ignore */ }
+    const message = (err as Error).message;
     onProgress({ percent: 0, stage: "error", message });
-    throw new Error(message);
+    throw err;
   }
-
-  onProgress({ percent: 50, stage: "downloading" });
 
   const title = stem;
   try {
@@ -138,4 +146,73 @@ export async function importLocalVideo(
 
   onProgress({ percent: 100, stage: "done" });
   return { filePath: destPath, title };
+}
+
+/**
+ * Transcode any mp4 into Main-profile H.264 + yuv420p + faststart. This is
+ * the subset Electron's macOS VideoToolbox decoder reliably accepts.
+ *
+ * Progress is derived from ffmpeg's `-progress pipe:1` key=value stream.
+ * `out_time_us` is documented, unambiguous microseconds; we divide by the
+ * source duration (ffprobe) to get a 0-100 percent.
+ */
+async function transcodeToSafeH264(
+  srcPath: string,
+  destPath: string,
+  onPercent: (pct: number) => void,
+): Promise<void> {
+  const duration = await getVideoDuration(srcPath);
+  const totalUs = duration != null && duration > 0 ? duration * 1_000_000 : null;
+
+  return new Promise((resolve, reject) => {
+    const proc = spawn("ffmpeg", [
+      "-y",
+      "-i", srcPath,
+      "-c:v", "libx264",
+      "-profile:v", "main",
+      "-preset", "medium",
+      "-pix_fmt", "yuv420p",
+      "-c:a", "aac",
+      "-b:a", "128k",
+      "-movflags", "+faststart",
+      "-progress", "pipe:1",
+      "-nostats",
+      destPath,
+    ]);
+
+    let stderrTail = "";
+
+    proc.stdout.on("data", (chunk: Buffer) => {
+      if (totalUs == null) return;
+      for (const line of chunk.toString().split(/\r?\n/)) {
+        const m = line.match(/^out_time_us=(\d+)/);
+        if (m) {
+          const us = Number(m[1]);
+          onPercent(Math.min(99, (us / totalUs) * 100));
+        }
+      }
+    });
+
+    proc.stderr.on("data", (c: Buffer) => {
+      // Keep the tail so we can surface something useful on failure.
+      stderrTail = (stderrTail + c.toString()).slice(-2000);
+    });
+
+    proc.on("error", (err) => {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        reject(new Error("ffmpeg not found. install with `brew install ffmpeg`"));
+        return;
+      }
+      reject(err);
+    });
+
+    proc.on("close", (code) => {
+      if (code !== 0) {
+        const tail = stderrTail.trim().split("\n").slice(-3).join(" | ");
+        reject(new Error(`ffmpeg failed (code ${code})${tail ? `: ${tail}` : ""}`));
+        return;
+      }
+      resolve();
+    });
+  });
 }
