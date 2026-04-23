@@ -142,30 +142,18 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
     const def = plugin?.params.find((p) => p.key === key);
     const min = def?.min ?? 0;
     const max = def?.max ?? 1;
-
     const step = def?.step;
 
-    if (step != null) {
-      // Step param: any trigger (note-on OR CC > 63) increments by step.
-      // The plugin tracks delta, so the store value is a running accumulator.
-      const isPress = addrType === "note" ? !isNoteOff : rawValue > 63;
-      if (!isPress) return;
-      const current = typeof clip.params[key] === "number"
-        ? (clip.params[key] as number)
-        : (typeof def?.default === "number" ? def.default : min);
-      vj.setClipParam(layerIdx, clipIdx, key, current + step);
-      return;
-    }
+    if (addrType === "note" && isNoteOff) return;
 
-    // Non-step param
-    if (addrType === "note") {
-      if (isNoteOff) return;
-      vj.setClipParam(layerIdx, clipIdx, key, min + (rawValue / 127) * (max - min));
-      return;
+    // Linear map 0-127 → min-max, then snap to step if defined.
+    let value = min + (rawValue / 127) * (max - min);
+    if (step != null && step > 0) {
+      value = min + Math.round((value - min) / step) * step;
+      if (value < min) value = min;
+      if (value > max) value = max;
     }
-
-    // CC: scale 0-127 → min-max
-    vj.setClipParam(layerIdx, clipIdx, key, min + (rawValue / 127) * (max - min));
+    vj.setClipParam(layerIdx, clipIdx, key, value);
     return;
   }
 }
