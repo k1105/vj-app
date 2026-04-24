@@ -3,6 +3,7 @@ import { useVJStore } from "../state/vjStore";
 import type { LayerClip, LayerState, PluginMeta } from "../../shared/types";
 import { PostFXRack } from "./PostFXBar";
 import { AudioMeters } from "./AudioMeters";
+import { AssetPreview } from "./AssetPreview";
 
 // CSS mix-blend-mode doesn't have a native `add`, but `plus-lighter` /
 // `lighten` approximate the additive look well enough for a small preview.
@@ -70,6 +71,20 @@ export function TopBar() {
           opacity: layer.opacity,
           mixBlendMode: CSS_BLEND[layer.blend] as React.CSSProperties["mixBlendMode"],
         };
+        // Canvas plugins have no useful thumbnail and their look depends on
+        // live param values — render them for real in the NEXT preview so
+        // grid / scale / idx edits are reflected before the user hits GO.
+        if (plugin.outputType === "canvas") {
+          return (
+            <div
+              key={`${i}-${useNext}`}
+              className="preview-layer preview-layer-live"
+              style={style}
+            >
+              <AssetPreview plugin={plugin} params={clip.params} />
+            </div>
+          );
+        }
         if (plugin.thumbnailUrl) {
           return (
             <div
@@ -79,9 +94,8 @@ export function TopBar() {
             />
           );
         }
-        // No thumbnail (e.g. text assets) — best-effort text placeholder so
-        // the NEXT preview isn't blank. Uses the `strings`-param value when
-        // available, otherwise the plugin name.
+        // Fallback for non-canvas plugins missing a thumbnail — a text label
+        // so the slot isn't blank.
         const label = textLabelForClip(plugin, clip);
         return (
           <div

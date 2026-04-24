@@ -160,6 +160,14 @@ body {
   background-size: cover;
   background-position: center;
 }
+.preview-layer-live {
+  background: #000;
+  overflow: hidden;
+}
+.preview-layer-live .asset-preview-canvas-wrap {
+  width: 100%;
+  height: 100%;
+}
 .preview-layer-text {
   background: #000;
   display: flex;
