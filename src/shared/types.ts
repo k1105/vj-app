@@ -30,7 +30,7 @@ export type ParamValue = number | boolean | string | string[];
 
 export interface ParamDef {
   key: string;
-  type: "float" | "int" | "bool" | "enum" | "strings";
+  type: "float" | "int" | "bool" | "enum" | "strings" | "camera";
   default: ParamValue;
   min?: number;
   max?: number;

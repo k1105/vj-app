@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import { MidiLearnButton } from "./MidiLearnButton";
 import { AutoSyncButton } from "./AutoSyncButton";
@@ -304,6 +305,18 @@ function ParamControl({
     );
   }
 
+  if (def.type === "camera") {
+    return (
+      <div className="param-row">
+        <span className="param-label">{def.key}</span>
+        <CameraDeviceSelect
+          value={typeof value === "string" ? value : ""}
+          onChange={onChange}
+        />
+      </div>
+    );
+  }
+
   // float / int
   const num = typeof value === "number" ? value : Number(value);
   const min = def.min ?? 0;
@@ -331,5 +344,56 @@ function ParamControl({
       <MidiLearnButton targetId={midiTargetId} />
       <AutoSyncButton targetId={midiTargetId} />
     </div>
+  );
+}
+
+/**
+ * Dropdown of system-recognized video input devices. Labels are only
+ * populated after camera permission is granted, so until the camera
+ * plugin successfully opens a stream the entries fall back to a short
+ * deviceId hash.
+ */
+function CameraDeviceSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+
+  useEffect(() => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const list = await navigator.mediaDevices.enumerateDevices();
+        if (cancelled) return;
+        setDevices(list.filter((d) => d.kind === "videoinput"));
+      } catch {
+        /* ignore — empty list is a fine default */
+      }
+    };
+    refresh();
+    navigator.mediaDevices.addEventListener?.("devicechange", refresh);
+    return () => {
+      cancelled = true;
+      navigator.mediaDevices.removeEventListener?.("devicechange", refresh);
+    };
+  }, []);
+
+  return (
+    <select
+      className="param-select"
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">Default camera</option>
+      {devices.map((d) => (
+        <option key={d.deviceId} value={d.deviceId}>
+          {d.label || `camera ${d.deviceId.slice(0, 6)}`}
+        </option>
+      ))}
+    </select>
   );
 }
