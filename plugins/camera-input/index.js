@@ -82,10 +82,17 @@ export default class CameraPolkaDot {
     let data;
     try {
       data = offCtx.getImageData(0, 0, cols, rows).data;
-    } catch {
+    } catch (err) {
       // Tainted canvas (cross-origin video): bail and leave the frame black.
+      // Logged once per occurrence so a black frame in the middle of a session
+      // is traceable.
+      if (!this._readErrorLogged) {
+        console.warn("[camera-input] getImageData failed:", err);
+        this._readErrorLogged = true;
+      }
       return;
     }
+    this._readErrorLogged = false;
 
     const radius = (cellSize / 2) * dotRatio;
     for (let r = 0; r < rows; r++) {
