@@ -365,6 +365,26 @@ input[type="range"]::-moz-range-thumb {
   color: var(--accent);
   flex-shrink: 0;
 }
+.asset-edit-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  border-radius: 2px;
+  vertical-align: 1px;
+}
+.asset-edit-badge.live {
+  color: var(--live);
+  background: var(--live-dim);
+  border: 1px solid var(--live);
+}
+.asset-edit-badge.next {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+}
 .asset-remove-btn {
   background: transparent;
   color: var(--danger);

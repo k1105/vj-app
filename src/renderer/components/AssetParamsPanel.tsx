@@ -34,19 +34,26 @@ export function AssetParamsPanel() {
   const removeClip = useVJStore((s) => s.removeClip);
   const setClipParam = useVJStore((s) => s.setClipParam);
 
-  const clipIdx = layer?.activeClipIdx ?? -1;
-  const activeClip = clipIdx >= 0 ? layer?.clips[clipIdx] : null;
-  const plugin = plugins.find((p) => p.id === activeClip?.pluginId);
+  // Edit the most-recently-selected clip on this layer: NEXT if a different
+  // clip is queued, otherwise LIVE. Lets the user pre-configure params on a
+  // clip before pressing GO — clicking a thumb queues it as NEXT and the
+  // panel follows the queue.
+  const activeIdx = layer?.activeClipIdx ?? -1;
+  const nextIdx = layer?.nextClipIdx ?? -1;
+  const editingClipIdx = nextIdx >= 0 ? nextIdx : activeIdx;
+  const editingIsNext = nextIdx >= 0 && nextIdx !== activeIdx;
+  const editingClip = editingClipIdx >= 0 ? layer?.clips[editingClipIdx] : null;
+  const plugin = plugins.find((p) => p.id === editingClip?.pluginId);
 
   const setValue = (key: string, value: number | boolean | string) => {
-    if (clipIdx < 0) return;
-    setClipParam(selectedLayer, clipIdx, key, value);
+    if (editingClipIdx < 0) return;
+    setClipParam(selectedLayer, editingClipIdx, key, value);
   };
 
   // Array-valued params (e.g. "strings") are filtered out before reaching
   // ParamControl, so narrowing here is safe.
   const currentVal = (def: ParamDef): number | boolean | string => {
-    const v = activeClip?.params[def.key];
+    const v = editingClip?.params[def.key];
     if (v !== undefined && !Array.isArray(v)) return v;
     return def.default as number | boolean | string;
   };
@@ -56,11 +63,20 @@ export function AssetParamsPanel() {
   return (
     <div className="asset-panel">
       <div className="asset-panel-header">
-        <span>Asset Parameters</span>
+        <span>
+          Asset Parameters
+          {editingClip && (
+            <span className={`asset-edit-badge ${editingIsNext ? "next" : "live"}`}>
+              {editingIsNext ? "NEXT" : "LIVE"}
+            </span>
+          )}
+        </span>
         <button
           className="asset-remove-btn"
-          onClick={() => clipIdx >= 0 && removeClip(selectedLayer, clipIdx)}
-          disabled={!activeClip}
+          onClick={() =>
+            editingClipIdx >= 0 && removeClip(selectedLayer, editingClipIdx)
+          }
+          disabled={!editingClip}
           title="remove clip from layer"
         >
           REMOVE
@@ -80,13 +96,13 @@ export function AssetParamsPanel() {
         <div className="asset-name">{plugin?.name ?? "--"}</div>
         <div className="asset-layer-info">
           L{selectedLayer + 1}
-          {activeClip ? ` · clip ${clipIdx + 1}/${layer!.clips.length}` : ""}
+          {editingClip ? ` · clip ${editingClipIdx + 1}/${layer!.clips.length}` : ""}
         </div>
       </div>
 
       <div className="asset-params">
         <div className="param-section-title">Params</div>
-        {!activeClip && (
+        {!editingClip && (
           <div className="param-empty">no clip selected</div>
         )}
         {groupParams(visibleParams).map((group) => {
