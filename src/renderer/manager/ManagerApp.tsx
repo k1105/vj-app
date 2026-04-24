@@ -2,11 +2,11 @@ import { useState } from "react";
 import { ImportTab } from "./ImportTab";
 import { LibraryTab } from "./LibraryTab";
 
-type Tab = "library" | "import";
+type Tab = "library" | "create";
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "library", label: "Library" },
-  { id: "import", label: "Import" },
+  { id: "create", label: "Create" },
 ];
 
 export function ManagerApp() {
@@ -30,7 +30,7 @@ export function ManagerApp() {
       </div>
       <div className="manager-body">
         {active === "library" && <LibraryTab />}
-        {active === "import" && <ImportTab />}
+        {active === "create" && <ImportTab />}
       </div>
     </div>
   );
