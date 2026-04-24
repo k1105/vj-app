@@ -541,6 +541,17 @@ export class Composer {
         return src;
       };
 
+      // Clear any rtPing reference left on postfx / present materials so the
+      // next frame can write to the same RT without ANGLE flagging a
+      // feedback loop on a stale binding.
+      const detachChainSamplers = () => {
+        for (const entry of activePostFX) {
+          entry.material.uniforms.uTex.value = this.blackTexture;
+        }
+        this.presentMaterial.uniforms.uTex.value = this.blackTexture;
+        this.displayMaterial.uniforms.uBase.value = this.blackTexture;
+      };
+
       // Blit an RT to the screen via presentMaterial (applies flash-zoom).
       const presentToScreen = (rt: THREE.WebGLRenderTarget): void => {
         this.presentMaterial.uniforms.uTex.value = rt.texture;
@@ -578,6 +589,7 @@ export class Composer {
           this.renderer.render(this.mixScene, this.displayCamera);
           const finalRt = runPostFXChain(this.rtPingA!);
           presentToScreen(finalRt);
+          detachChainSamplers();
         } else {
           this.renderer.setRenderTarget(null);
           this.renderer.render(this.mixScene, this.displayCamera);
@@ -614,6 +626,7 @@ export class Composer {
         this.renderer.setRenderTarget(null);
         this.renderer.render(this.displayScene, this.displayCamera);
         this.displayMaterial.uniforms.uBaseActive.value = 0;
+        detachChainSamplers();
       } else if (this.state && activePostFX.length > 0 && boundary === 0) {
         // Postfx applied to all layers (original path).
         this.ensurePingPongTargets();
@@ -626,6 +639,7 @@ export class Composer {
         this.renderer.render(this.displayScene, this.displayCamera);
         const finalRt = runPostFXChain(this.rtPingA!);
         presentToScreen(finalRt);
+        detachChainSamplers();
       } else if (this.state) {
         // No postfx (either none enabled, or boundary === MAX_LAYERS).
         this.displayMaterial.uniforms.uBaseActive.value = 0;
