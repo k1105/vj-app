@@ -1,6 +1,7 @@
 import { useVJStore } from "../state/vjStore";
 import { MidiLearnButton } from "./MidiLearnButton";
 import { AutoSyncButton } from "./AutoSyncButton";
+import { AssetPreview } from "./AssetPreview";
 import type { ParamDef } from "../../shared/types";
 
 type ParamGroup =
@@ -84,15 +85,12 @@ export function AssetParamsPanel() {
       </div>
 
       <div className="asset-preview-wrap">
-        {plugin?.thumbnailUrl ? (
-          <img
-            className="asset-preview-img"
-            src={plugin.thumbnailUrl}
-            alt={plugin.name}
+        <div className="asset-preview-frame">
+          <AssetPreview
+            plugin={plugin ?? null}
+            params={editingClip?.params ?? {}}
           />
-        ) : (
-          <canvas className="asset-preview-canvas" width={240} height={100} />
-        )}
+        </div>
         <div className="asset-name">{plugin?.name ?? "--"}</div>
         <div className="asset-layer-info">
           L{selectedLayer + 1}
