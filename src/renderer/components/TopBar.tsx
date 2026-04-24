@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useVJStore } from "../state/vjStore";
-import type { LayerState } from "../../shared/types";
+import type { LayerClip, LayerState, PluginMeta } from "../../shared/types";
 import { PostFXRack } from "./PostFXBar";
 import { AudioMeters } from "./AudioMeters";
 
@@ -13,6 +13,31 @@ const CSS_BLEND: Record<LayerState["blend"], string> = {
   screen: "screen",
 };
 
+/**
+ * Pick a human label for a clip that has no thumbnail. Text assets expose a
+ * `strings` param + `idx`; use the currently-selected string. Other plugins
+ * fall back to the plugin name so the user still sees *something*.
+ */
+function textLabelForClip(plugin: PluginMeta, clip: LayerClip): string {
+  const stringsDef = plugin.params.find((p) => p.type === "strings");
+  if (stringsDef) {
+    const raw = clip.params[stringsDef.key] ?? stringsDef.default;
+    const texts = Array.isArray(raw)
+      ? (raw as unknown[]).map((t) => String(t))
+      : [];
+    if (texts.length > 0) {
+      const idxDef = plugin.params.find((p) => p.key === "idx");
+      const idxRaw = idxDef
+        ? clip.params[idxDef.key] ?? idxDef.default
+        : 0;
+      const idx = Math.max(0, Math.round(Number(idxRaw) || 0));
+      const label = texts[idx % texts.length];
+      if (label) return label;
+    }
+  }
+  return plugin.name;
+}
+
 export function TopBar() {
   const layers = useVJStore((s) => s.state.layers);
   const plugins = useVJStore((s) => s.plugins);
@@ -24,8 +49,8 @@ export function TopBar() {
     return off;
   }, []);
 
-  const thumbFor = (pluginId: string): string | undefined =>
-    plugins.find((p) => p.id === pluginId)?.thumbnailUrl;
+  const pluginById = (pluginId: string): PluginMeta | undefined =>
+    plugins.find((p) => p.id === pluginId);
 
   // Same render rules as Composer: respect solo/mute. Draw bottom-up so L1
   // (layers[0]) ends up on top, matching the Output composition order.
@@ -39,18 +64,33 @@ export function TopBar() {
         if (idx < 0) return null;
         const clip = layer.clips[idx];
         if (!clip) return null;
-        const thumb = thumbFor(clip.pluginId);
-        if (!thumb) return null;
+        const plugin = pluginById(clip.pluginId);
+        if (!plugin) return null;
+        const style: React.CSSProperties = {
+          opacity: layer.opacity,
+          mixBlendMode: CSS_BLEND[layer.blend] as React.CSSProperties["mixBlendMode"],
+        };
+        if (plugin.thumbnailUrl) {
+          return (
+            <div
+              key={`${i}-${useNext}`}
+              className="preview-layer"
+              style={{ ...style, backgroundImage: `url("${plugin.thumbnailUrl}")` }}
+            />
+          );
+        }
+        // No thumbnail (e.g. text assets) — best-effort text placeholder so
+        // the NEXT preview isn't blank. Uses the `strings`-param value when
+        // available, otherwise the plugin name.
+        const label = textLabelForClip(plugin, clip);
         return (
           <div
             key={`${i}-${useNext}`}
-            className="preview-layer"
-            style={{
-              backgroundImage: `url("${thumb}")`,
-              opacity: layer.opacity,
-              mixBlendMode: CSS_BLEND[layer.blend] as React.CSSProperties["mixBlendMode"],
-            }}
-          />
+            className="preview-layer preview-layer-text"
+            style={style}
+          >
+            <span>{label}</span>
+          </div>
         );
       })
       .filter(Boolean)

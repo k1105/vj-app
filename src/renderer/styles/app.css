@@ -160,6 +160,22 @@ body {
   background-size: cover;
   background-position: center;
 }
+.preview-layer-text {
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6%;
+  color: #fff;
+  font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 900;
+  font-size: clamp(12px, 4cqw, 28px);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.1;
+  container-type: inline-size;
+}
 .preview-box.live .preview-canvas {
   border-color: var(--live);
 }
