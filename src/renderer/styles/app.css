@@ -576,6 +576,61 @@ input[type="range"]::-moz-range-thumb {
   overflow-y: auto;
   padding: 0;
 }
+.layer-row-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── PostFX boundary handle (sits between rows) ────────────────── */
+.postfx-boundary-slot {
+  position: relative;
+  height: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+.postfx-boundary-slot::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 50%;
+  height: 1px;
+  background: var(--border-subtle);
+  transform: translateY(-50%);
+  transition: background 0.1s, height 0.1s;
+}
+.postfx-boundary-slot:hover::before {
+  background: var(--border-strong);
+}
+.postfx-boundary-slot .postfx-boundary-label {
+  position: relative;
+  z-index: 1;
+  padding: 0 8px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--text-muted);
+  background: var(--bg-panel);
+  opacity: 0;
+  transition: opacity 0.1s, color 0.1s;
+}
+.postfx-boundary-slot:hover .postfx-boundary-label {
+  opacity: 1;
+  color: var(--text-dim);
+}
+.postfx-boundary-slot.active::before {
+  background: var(--accent);
+  height: 2px;
+}
+.postfx-boundary-slot.active .postfx-boundary-label {
+  opacity: 1;
+  color: var(--accent);
+}
 
 /* ─────── Layer Row ─────── */
 .layer-row {

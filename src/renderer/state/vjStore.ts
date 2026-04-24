@@ -36,6 +36,7 @@ const initialState: VJState = {
     toActive: [-1, -1, -1, -1],
   },
   postfx: [],
+  postfxBoundary: 0,
   flashAt: null,
 };
 
@@ -77,6 +78,8 @@ interface VJStoreShape {
   tap: () => void;
   /** Flip a postfx slot's enabled flag. Lazy-inserts if not present. */
   togglePostFX: (pluginId: string) => void;
+  /** Set the postfx application boundary. Clamped to [0, layers.length]. */
+  setPostfxBoundary: (n: number) => void;
   /** Set a single param on an existing postfx slot. No-op if not present. */
   setPostFXParam: (
     pluginId: string,
@@ -343,6 +346,15 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
         postfx = [...s.state.postfx, { pluginId, enabled: true, params }];
       }
       return { state: { ...s.state, postfx } };
+    });
+  },
+
+  setPostfxBoundary: (n) => {
+    set((s) => {
+      const max = s.state.layers.length;
+      const clamped = Math.max(0, Math.min(max, Math.round(n)));
+      if (clamped === s.state.postfxBoundary) return s;
+      return { state: { ...s.state, postfxBoundary: clamped } };
     });
   },
 

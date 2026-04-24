@@ -123,6 +123,12 @@ export interface VJState {
   selectedLayer: number;
   transition: TransitionState;
   postfx: Array<{ pluginId: string; enabled: boolean; params: Record<string, ParamValue> }>;
+  /**
+   * PostFX application boundary. PostFX runs on `layers[postfxBoundary..N-1]`;
+   * layers above the boundary composite on top of the postfx'd result without
+   * being processed. 0 = everything (default); layers.length = nothing.
+   */
+  postfxBoundary: number;
   /** Epoch ms of the last flash trigger. null when never triggered. */
   flashAt: number | null;
 }

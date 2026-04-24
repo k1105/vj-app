@@ -13,6 +13,8 @@ const DT_CLIP_MOVE = "application/x-clip-move";
 export function LayerStack() {
   const layers = useVJStore((s) => s.state.layers);
   const plugins = useVJStore((s) => s.plugins);
+  const postfxBoundary = useVJStore((s) => s.state.postfxBoundary);
+  const setPostfxBoundary = useVJStore((s) => s.setPostfxBoundary);
   const addClip = useVJStore((s) => s.addClip);
   const triggerClip = useVJStore((s) => s.triggerClip);
   const removeClip = useVJStore((s) => s.removeClip);
@@ -60,23 +62,72 @@ export function LayerStack() {
       </div>
       <div className="layer-stack">
         {layers.map((layer, idx) => (
-          <LayerRow
-            key={layer.id}
-            layer={layer}
-            idx={idx}
-            plugins={plugins}
-            onDrop={(e) => onDrop(e, idx)}
-            onDragOver={onDragOver}
-            onOpacityChange={(v) => setLayerOpacity(idx, v)}
-            onBlendChange={(b) => setLayerBlend(idx, b)}
-            onMuteToggle={() => setLayerMute(idx, !layer.mute)}
-            onSoloToggle={() => setLayerSolo(idx, !layer.solo)}
-            onSelect={() => selectLayer(idx)}
-            onTriggerClip={(clipIdx) => triggerClip(idx, clipIdx)}
-            onRemoveClip={(clipIdx) => removeClip(idx, clipIdx)}
-          />
+          <div key={layer.id} className="layer-row-wrap">
+            <PostfxBoundarySlot
+              slotIdx={idx}
+              currentBoundary={postfxBoundary}
+              totalLayers={layers.length}
+              onSet={setPostfxBoundary}
+            />
+            <LayerRow
+              layer={layer}
+              idx={idx}
+              plugins={plugins}
+              onDrop={(e) => onDrop(e, idx)}
+              onDragOver={onDragOver}
+              onOpacityChange={(v) => setLayerOpacity(idx, v)}
+              onBlendChange={(b) => setLayerBlend(idx, b)}
+              onMuteToggle={() => setLayerMute(idx, !layer.mute)}
+              onSoloToggle={() => setLayerSolo(idx, !layer.solo)}
+              onSelect={() => selectLayer(idx)}
+              onTriggerClip={(clipIdx) => triggerClip(idx, clipIdx)}
+              onRemoveClip={(clipIdx) => removeClip(idx, clipIdx)}
+            />
+          </div>
         ))}
+        <PostfxBoundarySlot
+          slotIdx={layers.length}
+          currentBoundary={postfxBoundary}
+          totalLayers={layers.length}
+          onSet={setPostfxBoundary}
+        />
       </div>
+    </div>
+  );
+}
+
+function PostfxBoundarySlot({
+  slotIdx,
+  currentBoundary,
+  totalLayers,
+  onSet,
+}: {
+  slotIdx: number;
+  currentBoundary: number;
+  totalLayers: number;
+  onSet: (n: number) => void;
+}) {
+  const active = slotIdx === currentBoundary;
+  // Human-readable description of the slot's effect.
+  const label =
+    slotIdx === 0
+      ? "POSTFX · ALL"
+      : slotIdx === totalLayers
+      ? "POSTFX · OFF"
+      : `POSTFX ↓ L${slotIdx + 1}…`;
+  const title =
+    slotIdx === 0
+      ? "PostFX applies to every layer"
+      : slotIdx === totalLayers
+      ? "PostFX disabled for all layers"
+      : `PostFX applies to L${slotIdx + 1} and below; L1..L${slotIdx} render on top unaffected`;
+  return (
+    <div
+      className={`postfx-boundary-slot ${active ? "active" : ""}`}
+      onClick={() => onSet(slotIdx)}
+      title={title}
+    >
+      <span className="postfx-boundary-label">{label}</span>
     </div>
   );
 }

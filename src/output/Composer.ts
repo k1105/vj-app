@@ -120,15 +120,20 @@ export class Composer {
     const geom = new THREE.PlaneGeometry(2, 2);
     this.displayMaterial = new THREE.ShaderMaterial({
       uniforms: {
-        uLayer0:    { value: this.blackTexture as THREE.Texture },
-        uLayer1:    { value: this.blackTexture as THREE.Texture },
-        uLayer2:    { value: this.blackTexture as THREE.Texture },
-        uLayer3:    { value: this.blackTexture as THREE.Texture },
-        uOpacity:   { value: [0, 0, 0, 0] },
-        uBlend:     { value: [0, 0, 0, 0] },
-        uActive:    { value: [0, 0, 0, 0] },
-        uTime:      { value: 0 },
-        uZoomScale: { value: 1.0 },
+        uLayer0:     { value: this.blackTexture as THREE.Texture },
+        uLayer1:     { value: this.blackTexture as THREE.Texture },
+        uLayer2:     { value: this.blackTexture as THREE.Texture },
+        uLayer3:     { value: this.blackTexture as THREE.Texture },
+        uOpacity:    { value: [0, 0, 0, 0] },
+        uBlend:      { value: [0, 0, 0, 0] },
+        uActive:     { value: [0, 0, 0, 0] },
+        uTime:       { value: 0 },
+        uZoomScale:  { value: 1.0 },
+        // When uBaseActive=1, the composite starts from uBase instead of
+        // transparent black. Used for the postfx-boundary 2-pass path where
+        // the postfx'd "below" group is the background for the "above" group.
+        uBase:       { value: this.blackTexture as THREE.Texture },
+        uBaseActive: { value: 0 },
       },
       vertexShader: ZOOM_VERTEX_SHADER,
       fragmentShader: /* glsl */ `
@@ -138,6 +143,8 @@ export class Composer {
         uniform sampler2D uLayer1;
         uniform sampler2D uLayer2;
         uniform sampler2D uLayer3;
+        uniform sampler2D uBase;
+        uniform int uBaseActive;
         uniform float uOpacity[4];
         uniform int uBlend[4];
         uniform int uActive[4];
@@ -169,7 +176,9 @@ export class Composer {
         void main() {
           // Draw bottom-up so L1 (layers[0]) ends up on top — matches the
           // Controller's layer-list convention and Resolume-style apps.
-          vec4 acc = vec4(0.0, 0.0, 0.0, 0.0);
+          vec4 acc = uBaseActive == 1
+            ? vec4(texture2D(uBase, vUv).rgb, 1.0)
+            : vec4(0.0, 0.0, 0.0, 0.0);
           for (int i = 3; i >= 0; i--) {
             if (uActive[i] == 0) continue;
             vec4 src = sampleLayer(i);
@@ -512,10 +521,11 @@ export class Composer {
               .filter((e): e is PostFXEntry => !!e)
           : [];
 
-      // Run the enabled postfx chain starting from `srcRt`, presenting the
-      // final result to the screen. Used by both the transition and the
-      // plain composite paths so postfx survives a cross-fade.
-      const presentWithPostFX = (srcRt: THREE.WebGLRenderTarget): void => {
+      // Run the enabled postfx chain starting from `srcRt`; returns the RT
+      // holding the final result. Caller decides what to do with it.
+      const runPostFXChain = (
+        srcRt: THREE.WebGLRenderTarget,
+      ): THREE.WebGLRenderTarget => {
         let src = srcRt;
         let dst = (src === this.rtPingA ? this.rtPingB : this.rtPingA)!;
         for (let i = 0; i < activePostFX.length; i++) {
@@ -528,11 +538,20 @@ export class Composer {
           src = dst;
           dst = tmp;
         }
-        this.presentMaterial.uniforms.uTex.value = src.texture;
+        return src;
+      };
+
+      // Blit an RT to the screen via presentMaterial (applies flash-zoom).
+      const presentToScreen = (rt: THREE.WebGLRenderTarget): void => {
+        this.presentMaterial.uniforms.uTex.value = rt.texture;
         this.presentQuad.material = this.presentMaterial;
         this.renderer.setRenderTarget(null);
         this.renderer.render(this.presentScene, this.displayCamera);
       };
+
+      const boundary = this.state
+        ? Math.max(0, Math.min(MAX_LAYERS, this.state.postfxBoundary ?? 0))
+        : 0;
 
       if (inTransition && this.state) {
         this.ensureTransitionTargets();
@@ -540,6 +559,9 @@ export class Composer {
           (now - (transition!.startedAt as number)) / transition!.duration,
           1,
         );
+        // Boundary doesn't apply during transitions — keep the v1 behavior
+        // of postfx-ing the whole mixed result.
+        this.displayMaterial.uniforms.uBaseActive.value = 0;
         this.setCompositeSlots(this.state.layers, transition!.fromActive);
         this.renderer.setRenderTarget(this.rtFrom);
         this.renderer.render(this.displayScene, this.displayCamera);
@@ -554,22 +576,59 @@ export class Composer {
           this.ensurePingPongTargets();
           this.renderer.setRenderTarget(this.rtPingA);
           this.renderer.render(this.mixScene, this.displayCamera);
-          presentWithPostFX(this.rtPingA!);
+          const finalRt = runPostFXChain(this.rtPingA!);
+          presentToScreen(finalRt);
         } else {
           this.renderer.setRenderTarget(null);
           this.renderer.render(this.mixScene, this.displayCamera);
         }
-      } else if (this.state && activePostFX.length > 0) {
+      } else if (
+        this.state &&
+        activePostFX.length > 0 &&
+        boundary > 0 &&
+        boundary < MAX_LAYERS
+      ) {
+        // ── Postfx boundary (2-pass) ──────────────────────────────────────
+        // Pass 1: composite layers[boundary..N-1] → postfx chain.
+        // Pass 2: composite layers[0..boundary-1] on top of the postfx'd
+        //         result via uBase. Zoom is applied on the final screen blit.
         this.ensurePingPongTargets();
+        const activeIndices = this.state.layers.map((l) => l.activeClipIdx);
+        this.displayMaterial.uniforms.uBaseActive.value = 0;
+        this.setCompositeSlots(
+          this.state.layers,
+          activeIndices,
+          (i) => i >= boundary,
+        );
+        this.renderer.setRenderTarget(this.rtPingA);
+        this.renderer.render(this.displayScene, this.displayCamera);
+        const postfxedRt = runPostFXChain(this.rtPingA!);
+
+        this.setCompositeSlots(
+          this.state.layers,
+          activeIndices,
+          (i) => i < boundary,
+        );
+        this.displayMaterial.uniforms.uBase.value = postfxedRt.texture;
+        this.displayMaterial.uniforms.uBaseActive.value = 1;
+        this.renderer.setRenderTarget(null);
+        this.renderer.render(this.displayScene, this.displayCamera);
+        this.displayMaterial.uniforms.uBaseActive.value = 0;
+      } else if (this.state && activePostFX.length > 0 && boundary === 0) {
+        // Postfx applied to all layers (original path).
+        this.ensurePingPongTargets();
+        this.displayMaterial.uniforms.uBaseActive.value = 0;
         this.setCompositeSlots(
           this.state.layers,
           this.state.layers.map((l) => l.activeClipIdx),
         );
         this.renderer.setRenderTarget(this.rtPingA);
         this.renderer.render(this.displayScene, this.displayCamera);
-        presentWithPostFX(this.rtPingA!);
+        const finalRt = runPostFXChain(this.rtPingA!);
+        presentToScreen(finalRt);
       } else if (this.state) {
-        // No transition and no postfx — direct composite to screen.
+        // No postfx (either none enabled, or boundary === MAX_LAYERS).
+        this.displayMaterial.uniforms.uBaseActive.value = 0;
         this.setCompositeSlots(
           this.state.layers,
           this.state.layers.map((l) => l.activeClipIdx),
@@ -606,10 +665,13 @@ export class Composer {
    * Populate the 4-layer composite uniforms. `activeIndices[i]` tells which
    * clip in `layers[i]` should be sampled (used so we can render the "from"
    * and "to" sides of a transition without mutating LayerState).
+   * `includeFilter`, if supplied, lets the postfx-boundary path render only
+   * a subset of layer indices while keeping the others inactive.
    */
   private setCompositeSlots(
     layers: LayerState[],
     activeIndices: number[],
+    includeFilter?: (layerIdx: number) => boolean,
   ): void {
     const slotTextures: (THREE.Texture | null)[] = [null, null, null, null];
     const slotOpacity = [0, 0, 0, 0];
@@ -619,6 +681,7 @@ export class Composer {
     const bounded = layers.slice(0, MAX_LAYERS);
     const anySolo = bounded.some((l) => l.solo);
     for (let i = 0; i < bounded.length; i++) {
+      if (includeFilter && !includeFilter(i)) continue;
       const layer = bounded[i];
       if (layer.mute) continue;
       if (anySolo && !layer.solo) continue;
