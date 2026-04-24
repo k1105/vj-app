@@ -2,8 +2,11 @@ import { useEffect, useRef } from "react";
 import { useVJStore } from "../state/vjStore";
 import type { ParamValue, PluginMeta } from "../../shared/types";
 
-const PREVIEW_W = 320;
-const PREVIEW_H = 180;
+// Low-res on purpose — previews are at most a couple hundred pixels wide
+// and we may have several canvas plugins running in parallel (one per
+// NEXT layer + one in AssetParamsPanel). CSS stretches the canvas to fit.
+const PREVIEW_W = 160;
+const PREVIEW_H = 90;
 
 interface Props {
   plugin: PluginMeta | null;
