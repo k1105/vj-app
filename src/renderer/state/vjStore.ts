@@ -14,7 +14,7 @@ const makeLayer = (id: number): LayerState => ({
   clips: [],
   activeClipIdx: -1,
   nextClipIdx: -1,
-  opacity: id === 0 ? 1 : 0,
+  opacity: 1,
   blend: "normal",
   solo: false,
   mute: false,
