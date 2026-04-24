@@ -7,7 +7,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { Pass, FullScreenQuad } from "three/addons/postprocessing/Pass.js";
 import { disposeObject3D, disposeVideo } from "../core/dispose";
 import { createRenderTarget } from "../core/texture";
-import type { LayerState, PluginMeta } from "../shared/types";
+import type { LayerState, ParamValue, PluginMeta } from "../shared/types";
 
 /**
  * PluginHost
@@ -56,7 +56,7 @@ export interface PluginSetupContext {
 
 export interface PluginUpdateContext {
   global: GlobalUniforms;
-  params: Record<string, number | boolean | string>;
+  params: Record<string, ParamValue>;
   inputTextures?: Record<string, THREE.Texture>;
 }
 
@@ -394,7 +394,7 @@ export class PluginHost {
     // only appear in NEXT, so fall back to nextClipIdx — otherwise the TO
     // side renders with empty params (all manifest defaults).
     for (const m of this.mounted.values()) {
-      let params: Record<string, number | boolean | string> = {};
+      let params: Record<string, ParamValue> = {};
       let found = false;
       for (const layer of layers) {
         const clip =

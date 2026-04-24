@@ -45,6 +45,10 @@ export interface VJApi {
   renamePlugin(kind: PluginKind, id: string, name: string): Promise<void>;
   /** Open Finder with the plugin directory selected. */
   revealPlugin(kind: PluginKind, id: string): Promise<void>;
+  /** Create a new text asset from the shared template. Returns the new plugin id. */
+  createTextAsset(name: string, texts: string[]): Promise<string>;
+  /** Rewrite every text asset's manifest against the current template schema. Returns count migrated. */
+  migrateTextAssets(): Promise<number>;
 }
 
 declare global {

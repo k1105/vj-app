@@ -77,6 +77,12 @@ const api: VJApi = {
 
   revealPlugin: (kind: PluginKind, id: string): Promise<void> =>
     ipcRenderer.invoke(IPC.RevealPlugin, { kind, id }),
+
+  createTextAsset: (name: string, texts: string[]): Promise<string> =>
+    ipcRenderer.invoke(IPC.CreateTextAsset, { name, texts }),
+
+  migrateTextAssets: (): Promise<number> =>
+    ipcRenderer.invoke(IPC.MigrateTextAssets),
 };
 
 contextBridge.exposeInMainWorld("vj", api);

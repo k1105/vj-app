@@ -43,10 +43,15 @@ export function AssetParamsPanel() {
     setClipParam(selectedLayer, clipIdx, key, value);
   };
 
+  // Array-valued params (e.g. "strings") are filtered out before reaching
+  // ParamControl, so narrowing here is safe.
   const currentVal = (def: ParamDef): number | boolean | string => {
     const v = activeClip?.params[def.key];
-    return v !== undefined ? v : def.default;
+    if (v !== undefined && !Array.isArray(v)) return v;
+    return def.default as number | boolean | string;
   };
+
+  const visibleParams = (plugin?.params ?? []).filter((d) => d.type !== "strings");
 
   return (
     <div className="asset-panel">
@@ -84,7 +89,7 @@ export function AssetParamsPanel() {
         {!activeClip && (
           <div className="param-empty">no clip selected</div>
         )}
-        {groupParams(plugin?.params ?? []).map((group) => {
+        {groupParams(visibleParams).map((group) => {
           if (group.type === "range") {
             const { start, end } = group;
             return (

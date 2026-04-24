@@ -19,14 +19,19 @@ export const IPC = {
   OutputToggleFullscreen: "vj:output-toggle-fullscreen",
   ReadPluginSource: "vj:read-plugin-source",
   PreviewLive: "vj:preview-live",
+  CreateTextAsset: "vj:create-text-asset",
+  MigrateTextAssets: "vj:migrate-text-assets",
 } as const;
 
 export type PluginKind = "material" | "postfx" | "transition";
 
+/** A parameter value may be a number, boolean, single string (enum), or string array. */
+export type ParamValue = number | boolean | string | string[];
+
 export interface ParamDef {
   key: string;
-  type: "float" | "int" | "bool" | "enum";
-  default: number | boolean | string;
+  type: "float" | "int" | "bool" | "enum" | "strings";
+  default: ParamValue;
   min?: number;
   max?: number;
   step?: number;
@@ -64,7 +69,7 @@ export interface PluginMeta {
  */
 export interface LayerClip {
   pluginId: string;
-  params: Record<string, number | boolean | string>;
+  params: Record<string, ParamValue>;
 }
 
 export interface LayerState {
@@ -117,7 +122,7 @@ export interface VJState {
   layers: LayerState[];
   selectedLayer: number;
   transition: TransitionState;
-  postfx: Array<{ pluginId: string; enabled: boolean; params: Record<string, number | boolean | string> }>;
+  postfx: Array<{ pluginId: string; enabled: boolean; params: Record<string, ParamValue> }>;
   /** Epoch ms of the last flash trigger. null when never triggered. */
   flashAt: number | null;
 }

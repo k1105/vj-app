@@ -2,6 +2,7 @@ import { BrowserWindow, dialog, ipcMain } from "electron";
 import { IPC, type PluginKind, type VJState } from "../shared/types";
 import { downloadVideo } from "./videoDownloader";
 import { importLocalVideo } from "./videoImporter";
+import { createTextAsset, migrateAllTextAssets } from "./textAssetImporter";
 import { listPlugins, readPluginSource } from "./pluginLoader";
 import { deletePlugin, renamePlugin, revealPlugin } from "./pluginCrud";
 import { getSetting, setSetting } from "./store";
@@ -98,4 +99,13 @@ export function registerIpcHandlers(ctx: Ctx): void {
     if (!output) return;
     output.setFullScreen(!output.isFullScreen());
   });
+
+  ipcMain.handle(
+    IPC.CreateTextAsset,
+    async (_event, args: { name: string; texts: string[] }) => {
+      return createTextAsset(args.name, args.texts);
+    },
+  );
+
+  ipcMain.handle(IPC.MigrateTextAssets, async () => migrateAllTextAssets());
 }

@@ -1,12 +1,14 @@
 {
   "name": "DJ HTK Text",
   "author": "yamagishi",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "outputType": "canvas",
-  "entry": "index.js",
+  "entry": "../../templates/text-asset/index.js",
   "params": [
-    { "key": "grid",    "type": "int",   "default": 4,    "min": 1,   "max": 16, "step": 1    },
-    { "key": "scale",   "type": "float", "default": 1,    "min": 0.1, "max": 3,  "step": 0.05 },
-    { "key": "vibrate", "type": "bool",  "default": true                                       }
+    { "key": "texts",   "type": "strings", "default": ["DJ HTK"]                               },
+    { "key": "idx",     "type": "int",     "default": 0, "min": 0,   "max": 0,  "step": 1    },
+    { "key": "grid",    "type": "int",     "default": 4, "min": 1,   "max": 16, "step": 1    },
+    { "key": "scale",   "type": "float",   "default": 1, "min": 0.1, "max": 3,  "step": 0.05 },
+    { "key": "vibrate", "type": "bool",    "default": true                                    }
   ]
 }

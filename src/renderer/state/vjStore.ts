@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
   LayerState,
+  ParamValue,
   PluginMeta,
   TransitionType,
   VJState,
@@ -80,14 +81,14 @@ interface VJStoreShape {
   setPostFXParam: (
     pluginId: string,
     key: string,
-    value: number | boolean | string,
+    value: ParamValue,
   ) => void;
   /** Set a single param on an active clip. Immediately broadcasts. */
   setClipParam: (
     layerIdx: number,
     clipIdx: number,
     key: string,
-    value: number | boolean | string,
+    value: ParamValue,
   ) => void;
   /** Set flashAt to now. Composer picks it up and decays the overlay per-frame. */
   triggerFlash: () => void;
@@ -130,7 +131,7 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
         if (i !== layerIdx) return l;
         // Seed clip params with manifest defaults so controls show correct initial values.
         const meta = s.plugins.find((p) => p.id === pluginId);
-        const params: Record<string, number | boolean | string> = {};
+        const params: Record<string, ParamValue> = {};
         for (const def of meta?.params ?? []) params[def.key] = def.default;
         const clips = [...l.clips, { pluginId, params }];
         const newIdx = clips.length - 1;
@@ -335,7 +336,7 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
       } else {
         // Seed with default params from the plugin manifest.
         const plugin = s.plugins.find((p) => p.id === pluginId);
-        const params: Record<string, number | boolean | string> = {};
+        const params: Record<string, ParamValue> = {};
         for (const def of plugin?.params ?? []) {
           params[def.key] = def.default;
         }

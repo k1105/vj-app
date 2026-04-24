@@ -1,18 +1,17 @@
 /**
- * djhtk-text — "DJ HTK" text grid with BPM-synced vibration.
+ * Text asset template — renders one text (chosen by `idx` from the `texts`
+ * array) into a grid of repeated cells with BPM-synced vibration.
  *
- * Beat 0 = sharp pulse, then exponential decay. Each cell gets a phase offset
- * based on its distance from the grid center, so the beat ripples outward.
- *
- * Ported from hatakanata-vj-nxpc/vj-interface/src/components/TextOverlay.tsx
+ * Shared implementation; every `plugins/text-*` manifest points its `entry`
+ * here via a relative `..` path. See templates/text-asset/manifest.params.json
+ * for the canonical param schema used by the main-process generator.
  */
 
-/** d3-ease easeExpOut: sharp attack, exponential tail */
 function easeExpOut(t) {
   return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
 }
 
-export default class DJHTKText {
+export default class TextAsset {
   /** @param {import("../../src/output/PluginHost").PluginSetupContext} ctx */
   setup(ctx) {
     this.canvas = document.createElement("canvas");
@@ -29,6 +28,10 @@ export default class DJHTKText {
     const w = canvas.width;
     const h = canvas.height;
 
+    const texts = Array.isArray(params?.texts) ? params.texts : [];
+    const idxRaw = Math.max(0, Math.round(Number(params?.idx) || 0));
+    const text = texts.length > 0 ? String(texts[idxRaw % texts.length] ?? "") : "";
+
     const cols = Math.max(1, Math.min(16, Math.round(params?.grid ?? 4)));
     const rows = Math.max(1, Math.ceil((h / w) * cols));
     const scale = Math.max(0.1, Math.min(3, params?.scale ?? 1));
@@ -43,14 +46,13 @@ export default class DJHTKText {
     const cellW = w / cols;
     const cellH = h / rows;
 
-    // Fit "DJ HTK" inside the cell. measureText is accurate but needs a ctx
-    // font set first — use a heuristic cap then refine per-draw.
     const baseFontSize = Math.min(cellH * 0.45, cellW * 0.22) * scale;
 
-    // Clear to black (transparent layers will show through)
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, w, h);
+
+    if (!text) return;
 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -60,7 +62,6 @@ export default class DJHTKText {
       for (let col = 0; col < cols; col++) {
         const idx = row * cols + col;
 
-        // Distance from grid center → phase offset so beat ripples outward
         const dc = col - centerCol;
         const dr = row - centerRow;
         const dist = Math.sqrt(dc * dc + dr * dr) / maxDist;
@@ -80,7 +81,7 @@ export default class DJHTKText {
         ctx.translate(cx, cy);
         ctx.rotate(vibRot);
         ctx.font = `900 ${fontSize}px "Inter", "Helvetica Neue", Arial, sans-serif`;
-        ctx.fillText("DJ HTK", 0, 0);
+        ctx.fillText(text, 0, 0);
         ctx.restore();
       }
     }
