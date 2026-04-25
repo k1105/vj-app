@@ -35,13 +35,13 @@ export function TransportBar() {
         <button className="btn-go" onClick={() => commitGo()}>
           G O
         </button>
-        <MidiLearnButton targetId="go" />
+        <MidiLearnButton targetId="go" label="GO" group="Transport" />
       </div>
       <div className="tap-section">
         <button className="btn-tap" onClick={() => tap()}>
           TAP
         </button>
-        <MidiLearnButton targetId="tap" />
+        <MidiLearnButton targetId="tap" label="TAP" group="Transport" />
         <span className="bpm">{bpm.toFixed(1)}</span>
         <span className="bpm-label">BPM</span>
         <BeatPulse />
@@ -51,7 +51,7 @@ export function TransportBar() {
         <button className="btn-flash" onClick={() => triggerFlash()}>
           FLASH
         </button>
-        <MidiLearnButton targetId="flash" />
+        <MidiLearnButton targetId="flash" label="FLASH" group="Transport" />
       </div>
       <button
         className="btn-blackout"

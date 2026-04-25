@@ -1,6 +1,8 @@
 import { useVJStore } from "../state/vjStore";
 import { useMidiStore, type MidiAddress } from "../state/midiStore";
 import { useAutoSyncStore } from "../state/autoSyncStore";
+import { useMidiMapPanelStore } from "../state/midiMapPanelStore";
+import { LCXL3_LAYOUT } from "../components/midiMap/lcxl3Layout";
 
 let _connected = false;
 
@@ -17,6 +19,18 @@ export async function initMidi(): Promise<void> {
     }
   } catch (e) {
     console.warn("[MIDI] failed to load saved mappings:", e);
+  }
+
+  // Load LCXL3 calibration overrides used by the MIDI Map panel
+  try {
+    const saved = await window.vj.getSetting("lcxl3Overrides");
+    if (saved && typeof saved === "object" && !Array.isArray(saved)) {
+      useMidiMapPanelStore.getState().setOverrides(
+        saved as Record<string, MidiAddress>,
+      );
+    }
+  } catch (e) {
+    console.warn("[MIDI] failed to load LCXL3 overrides:", e);
   }
 
   if (!navigator.requestMIDIAccess) {
@@ -63,14 +77,30 @@ function handleMessage(e: MIDIMessageEvent): void {
 
   const address: MidiAddress = { channel, type, number };
   const midiState = useMidiStore.getState();
+  const panel = useMidiMapPanelStore.getState();
+
+  // MIDI Map panel calibration: bind the next incoming message to the
+  // pending physical control. Skips note-off so we capture the press.
+  if (panel.calibratingControlId) {
+    if (type === "note" && value === 0) return;
+    panel.applyOverride(panel.calibratingControlId, address);
+    midiState.pulsePhysical(panel.calibratingControlId);
+    return;
+  }
 
   // Learn mode: capture the next incoming message
   if (midiState.learningTarget) {
     // For notes, skip note-off (velocity 0) so we capture the note-on
     if (type === "note" && value === 0) return;
     midiState.applyLearn(address);
+    // Reflect the bind on the physical layout if the address is recognised
+    pulsePhysicalForAddress(address);
     return;
   }
+
+  // Always pulse the physical control if we recognise the address — useful
+  // both for the MIDI Map panel and any future visualisations.
+  pulsePhysicalForAddress(address);
 
   // Normal dispatch
   const matchedId = Object.keys(midiState.mappings).find((id) => {
@@ -81,6 +111,34 @@ function handleMessage(e: MIDIMessageEvent): void {
 
   midiState.pulse(matchedId);
   dispatch(matchedId, value, type);
+}
+
+function pulsePhysicalForAddress(address: MidiAddress): void {
+  const overrides = useMidiMapPanelStore.getState().overrides;
+  // Override wins over the layout default when both name the same address.
+  for (const [controlId, addr] of Object.entries(overrides)) {
+    if (
+      addr.channel === address.channel &&
+      addr.type === address.type &&
+      addr.number === address.number
+    ) {
+      useMidiStore.getState().pulsePhysical(controlId);
+      return;
+    }
+  }
+  for (const c of LCXL3_LAYOUT) {
+    if (overrides[c.id]) continue; // already considered above
+    const a = c.defaultAddress;
+    if (
+      a &&
+      a.channel === address.channel &&
+      a.type === address.type &&
+      a.number === address.number
+    ) {
+      useMidiStore.getState().pulsePhysical(c.id);
+      return;
+    }
+  }
 }
 
 function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): void {

@@ -89,7 +89,11 @@ export function PostFXRack() {
                   className="postfx-rack-param-slider"
                 />
                 <span className="postfx-rack-param-val">{value.toFixed(2)}</span>
-                <MidiLearnButton targetId={`postfx:${selectedPlugin.id}:${def.key}`} />
+                <MidiLearnButton
+                  targetId={`postfx:${selectedPlugin.id}:${def.key}`}
+                  label={`${selectedPlugin.name} · ${def.key}`}
+                  group="PostFX"
+                />
                 <AutoSyncButton targetId={`postfx:${selectedPlugin.id}:${def.key}`} />
               </div>
             );

@@ -269,7 +269,11 @@ function LayerRow(props: {
           onClick={(e) => e.stopPropagation()}
         />
         <span className="opacity-val">{Math.round(layer.opacity * 100)}%</span>
-        <MidiLearnButton targetId={`layer-opacity-${idx}`} />
+        <MidiLearnButton
+          targetId={`layer-opacity-${idx}`}
+          label={`L${idx + 1} Opacity`}
+          group="Layers"
+        />
         <AutoSyncButton targetId={`layer-opacity-${idx}`} />
       </div>
     </div>

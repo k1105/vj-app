@@ -105,6 +105,7 @@ export function AssetParamsPanel() {
           <div className="param-empty">no clip selected</div>
         )}
         {groupParams(visibleParams).map((group) => {
+          const labelPrefix = `L${selectedLayer + 1} ${plugin?.name ?? "?"}`;
           if (group.type === "range") {
             const { start, end } = group;
             return (
@@ -118,6 +119,7 @@ export function AssetParamsPanel() {
                 onEndChange={(v) => setValue(end.key, v)}
                 midiStartId={`clip:${selectedLayer}:${start.key}`}
                 midiEndId={`clip:${selectedLayer}:${end.key}`}
+                labelPrefix={labelPrefix}
               />
             );
           }
@@ -128,6 +130,7 @@ export function AssetParamsPanel() {
               value={currentVal(group.def)}
               onChange={(v) => setValue(group.def.key, v)}
               midiTargetId={`clip:${selectedLayer}:${group.def.key}`}
+              labelPrefix={labelPrefix}
             />
           );
         })}
@@ -149,6 +152,7 @@ function RangeControl({
   onEndChange,
   midiStartId,
   midiEndId,
+  labelPrefix,
 }: {
   startDef: ParamDef;
   endDef: ParamDef;
@@ -158,6 +162,7 @@ function RangeControl({
   onEndChange: (v: number) => void;
   midiStartId: string;
   midiEndId: string;
+  labelPrefix: string;
 }) {
   const min = startDef.min ?? 0;
   const max = endDef.max ?? startDef.max ?? 1;
@@ -223,9 +228,17 @@ function RangeControl({
       </span>
       {showAutoControls && (
         <>
-          <MidiLearnButton targetId={midiStartId} />
+          <MidiLearnButton
+            targetId={midiStartId}
+            label={`${labelPrefix} · ${startDef.key}`}
+            group="Clip Params"
+          />
           <AutoSyncButton targetId={midiStartId} />
-          <MidiLearnButton targetId={midiEndId} />
+          <MidiLearnButton
+            targetId={midiEndId}
+            label={`${labelPrefix} · ${endDef.key}`}
+            group="Clip Params"
+          />
           <AutoSyncButton targetId={midiEndId} />
         </>
       )}
@@ -246,12 +259,15 @@ function ParamControl({
   value,
   onChange,
   midiTargetId,
+  labelPrefix,
 }: {
   def: ParamDef;
   value: number | boolean | string;
   onChange: (v: number | boolean | string) => void;
   midiTargetId: string;
+  labelPrefix: string;
 }) {
+  const midiLabel = `${labelPrefix} · ${def.key}`;
   if (isStepParam(def)) {
     const num = typeof value === "number" ? value : Number(value);
     const step = def.step!;
@@ -264,7 +280,7 @@ function ParamControl({
         <button className="param-step-btn" onClick={() => onChange(num - step)}>◀</button>
         <span className="param-step-val">{displayVal}</span>
         <button className="param-step-btn" onClick={() => onChange(num + step)}>▶</button>
-        <MidiLearnButton targetId={midiTargetId} />
+        <MidiLearnButton targetId={midiTargetId} label={midiLabel} group="Clip Params" />
       </div>
     );
   }
@@ -280,7 +296,7 @@ function ParamControl({
         >
           {on ? "ON" : "OFF"}
         </button>
-        <MidiLearnButton targetId={midiTargetId} />
+        <MidiLearnButton targetId={midiTargetId} label={midiLabel} group="Clip Params" />
       </div>
     );
   }
@@ -300,7 +316,7 @@ function ParamControl({
             </option>
           ))}
         </select>
-        <MidiLearnButton targetId={midiTargetId} />
+        <MidiLearnButton targetId={midiTargetId} label={midiLabel} group="Clip Params" />
       </div>
     );
   }
@@ -341,7 +357,7 @@ function ParamControl({
         }}
       />
       <span className="param-val">{displayVal}</span>
-      <MidiLearnButton targetId={midiTargetId} />
+      <MidiLearnButton targetId={midiTargetId} label={midiLabel} group="Clip Params" />
       <AutoSyncButton targetId={midiTargetId} />
     </div>
   );

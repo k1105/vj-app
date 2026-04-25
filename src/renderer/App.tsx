@@ -7,6 +7,8 @@ import { AssetsPanel } from "./components/AssetsPanel";
 import { LayerStack } from "./components/LayerStack";
 import { AssetParamsPanel } from "./components/AssetParamsPanel";
 import { TransportBar } from "./components/TransportBar";
+import { MidiMapPanel } from "./components/midiMap/MidiMapPanel";
+import { useMidiMapPanelStore } from "./state/midiMapPanelStore";
 
 export function App() {
   const loadPlugins = useVJStore((s) => s.loadPlugins);
@@ -14,6 +16,7 @@ export function App() {
   const tap = useVJStore((s) => s.tap);
   const commitGo = useVJStore((s) => s.commitGo);
   const state = useVJStore((s) => s.state);
+  const toggleMidiMap = useMidiMapPanelStore((s) => s.toggle);
 
   useEffect(() => {
     loadPlugins();
@@ -56,11 +59,14 @@ export function App() {
       } else if (e.code === "Space") {
         e.preventDefault();
         commitGo();
+      } else if (e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        toggleMidiMap();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [tap, commitGo]);
+  }, [tap, commitGo, toggleMidiMap]);
 
   return (
     <div className="app">
@@ -71,6 +77,7 @@ export function App() {
         <AssetParamsPanel />
       </div>
       <TransportBar />
+      <MidiMapPanel />
     </div>
   );
 }
