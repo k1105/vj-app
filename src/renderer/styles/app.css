@@ -1993,28 +1993,25 @@ input[type="range"]::-moz-range-thumb {
   padding: 8px;
 }
 
-/* device layout (bottom of panel) */
+/* device layout — left side column + main 6×8 grid */
 .midi-map-device {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px;
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  padding: 12px;
   background: var(--bg-inset);
   border: 1px solid var(--border);
 }
-.midi-map-section {
-  display: grid;
-  grid-template-columns: repeat(9, 1fr);
+.midi-map-side {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
 }
-.midi-map-knobs .midi-map-slot {
-  height: 64px;
-}
-.midi-map-buttons .midi-map-slot {
-  height: 36px;
-}
-.midi-map-faders .midi-map-slot {
-  height: 80px;
+.midi-map-main {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: 60px 60px 60px 100px 32px 32px;
+  gap: 6px;
 }
 
 .midi-map-slot {
@@ -2026,7 +2023,7 @@ input[type="range"]::-moz-range-thumb {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
   padding: 4px;
   overflow: hidden;
 }
@@ -2055,24 +2052,68 @@ input[type="range"]::-moz-range-thumb {
   outline: 1px dashed var(--accent);
   outline-offset: -3px;
 }
+.midi-map-slot.display {
+  cursor: default;
+  background: #000;
+  color: var(--text-dim);
+  border-color: var(--border);
+}
+.midi-map-slot.display:hover {
+  border-color: var(--border);
+}
+
+/* shape glyphs ─ knob = circle, fader = vertical bar, button = pill */
 .midi-map-slot-shape {
-  width: 14px;
-  height: 14px;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   border: 1px solid currentColor;
-  opacity: 0.6;
+  opacity: 0.7;
 }
+.midi-map-slot-knob-a .midi-map-slot-shape { border-color: #d050ff; opacity: 1; }
+.midi-map-slot-knob-b .midi-map-slot-shape { border-color: #4080ff; opacity: 1; }
+.midi-map-slot-knob-c .midi-map-slot-shape { border-color: #50ff80; opacity: 1; }
 .midi-map-slot-fader .midi-map-slot-shape {
   width: 6px;
+  height: 40px;
+  border-radius: 2px;
+}
+.midi-map-slot-button-row1 .midi-map-slot-shape,
+.midi-map-slot-button-row2 .midi-map-slot-shape {
+  display: none;
+}
+.midi-map-slot-side-btn .midi-map-slot-shape {
+  display: none;
+}
+.midi-map-slot-display .midi-map-slot-shape {
+  display: none;
+}
+
+/* fader-row buttons: keep them flat & numeric */
+.midi-map-slot-button-row1,
+.midi-map-slot-button-row2 {
+  flex-direction: row;
+  gap: 4px;
+  padding: 2px 4px;
+  font-size: 9px;
+}
+
+/* side column slots: full-width pills */
+.midi-map-slot-side-btn {
   height: 30px;
-  border-radius: 1px;
+  flex-direction: row;
+  gap: 4px;
+  font-size: 10px;
+  padding: 2px 6px;
+  justify-content: flex-start;
 }
-.midi-map-slot-button .midi-map-slot-shape,
-.midi-map-slot-side .midi-map-slot-shape {
-  width: 14px;
-  height: 8px;
-  border-radius: 1px;
+.midi-map-slot-display {
+  height: 36px;
+  font-size: 9px;
+  letter-spacing: 0.05em;
 }
+
 .midi-map-slot-text {
   display: flex;
   flex-direction: column;
@@ -2081,6 +2122,14 @@ input[type="range"]::-moz-range-thumb {
   font-size: 9px;
   line-height: 1;
   text-align: center;
+  min-width: 0;
+}
+.midi-map-slot-side-btn .midi-map-slot-text,
+.midi-map-slot-button-row1 .midi-map-slot-text,
+.midi-map-slot-button-row2 .midi-map-slot-text {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4px;
 }
 .midi-map-slot-target {
   font-weight: 700;

@@ -11,7 +11,6 @@ import {
   type ControlDef,
 } from "./lcxl3Layout";
 
-/** Resolve a control's effective address: override wins over default. */
 function effectiveAddress(
   control: ControlDef,
   overrides: Record<string, MidiAddress>,
@@ -19,7 +18,6 @@ function effectiveAddress(
   return overrides[control.id] ?? control.defaultAddress;
 }
 
-/** Stable address key for use as a Map key / dedup. */
 function addrKey(a: MidiAddress): string {
   return `${a.channel}:${a.type}:${a.number}`;
 }
@@ -40,7 +38,6 @@ export function MidiMapPanel() {
   const assignMapping = useMidiStore((s) => s.assignMapping);
   const removeMapping = useMidiStore((s) => s.removeMapping);
 
-  // Build address → targetId index so each physical slot can show what it controls.
   const addressToTarget = useMemo(() => {
     const m = new Map<string, string>();
     for (const [id, addr] of Object.entries(mappings)) {
@@ -54,23 +51,20 @@ export function MidiMapPanel() {
   const groupedTargets = groupTargets(targets);
 
   const handleControlClick = (control: ControlDef) => {
+    if (control.kind === "display") return;
     const addr = effectiveAddress(control, overrides);
 
-    // No address yet → calibration flow regardless of any picker selection.
     if (!addr) {
       startCalibrate(control.id);
       return;
     }
 
-    // If user pre-selected a target chip, assign it to this control.
     if (selectedTargetId) {
       assignMapping(selectedTargetId, addr);
       selectTarget(null);
       return;
     }
 
-    // Otherwise toggle calibration on this control (lets user override an
-    // assumed default if it's wrong).
     if (calibratingControlId === control.id) startCalibrate(null);
     else startCalibrate(control.id);
   };
@@ -78,6 +72,7 @@ export function MidiMapPanel() {
   const handleControlContext = (e: React.MouseEvent, control: ControlDef) => {
     e.preventDefault();
     e.stopPropagation();
+    if (control.kind === "display") return;
     const addr = effectiveAddress(control, overrides);
     if (addr) {
       const targetId = addressToTarget.get(addrKey(addr));
@@ -86,13 +81,16 @@ export function MidiMapPanel() {
     if (overrides[control.id]) clearOverride(control.id);
   };
 
+  const mainControls = LCXL3_LAYOUT.filter((c) => c.section === "main");
+  const sideControls = LCXL3_LAYOUT.filter((c) => c.section === "side");
+
   return (
     <div className="midi-map-overlay" onClick={() => setOpen(false)}>
       <div className="midi-map-panel" onClick={(e) => e.stopPropagation()}>
         <div className="midi-map-header">
           <span className="midi-map-title">MIDI MAP — Launch Control XL 3</span>
           <span className="midi-map-hint">
-            click a target → click a knob · right-click slot to clear · M to close
+            click target → click control · right-click slot to clear · M to close
           </span>
           <button className="midi-map-close" onClick={() => setOpen(false)}>
             ×
@@ -135,51 +133,47 @@ export function MidiMapPanel() {
           ))}
           {Object.keys(targets).length === 0 && (
             <div className="midi-map-target-empty">
-              no MIDI targets registered (mount controls to populate)
+              no MIDI targets registered
             </div>
           )}
         </div>
 
         <div className="midi-map-device">
-          <Slot
-            controls={LCXL3_LAYOUT.filter((c) => c.row >= 1 && c.row <= 3)}
-            overrides={overrides}
-            mappings={mappings}
-            targets={targets}
-            addressToTarget={addressToTarget}
-            calibratingControlId={calibratingControlId}
-            selectedTargetId={selectedTargetId}
-            physicalPulses={physicalPulses}
-            onClick={handleControlClick}
-            onContext={handleControlContext}
-            sectionClass="midi-map-knobs"
-          />
-          <Slot
-            controls={LCXL3_LAYOUT.filter((c) => c.row === 4 || c.row === 5)}
-            overrides={overrides}
-            mappings={mappings}
-            targets={targets}
-            addressToTarget={addressToTarget}
-            calibratingControlId={calibratingControlId}
-            selectedTargetId={selectedTargetId}
-            physicalPulses={physicalPulses}
-            onClick={handleControlClick}
-            onContext={handleControlContext}
-            sectionClass="midi-map-buttons"
-          />
-          <Slot
-            controls={LCXL3_LAYOUT.filter((c) => c.row === 6 && c.kind === "fader")}
-            overrides={overrides}
-            mappings={mappings}
-            targets={targets}
-            addressToTarget={addressToTarget}
-            calibratingControlId={calibratingControlId}
-            selectedTargetId={selectedTargetId}
-            physicalPulses={physicalPulses}
-            onClick={handleControlClick}
-            onContext={handleControlContext}
-            sectionClass="midi-map-faders"
-          />
+          {/* Left side column — Display, Page, Track, Rec/Play, Shift/Mode */}
+          <div className="midi-map-side">
+            {sideControls.map((c) => (
+              <Slot
+                key={c.id}
+                control={c}
+                overrides={overrides}
+                targets={targets}
+                addressToTarget={addressToTarget}
+                calibratingControlId={calibratingControlId}
+                selectedTargetId={selectedTargetId}
+                physicalPulses={physicalPulses}
+                onClick={handleControlClick}
+                onContext={handleControlContext}
+              />
+            ))}
+          </div>
+
+          {/* Main 6×8 grid: knobs (3) → faders → buttons (2) */}
+          <div className="midi-map-main">
+            {mainControls.map((c) => (
+              <Slot
+                key={c.id}
+                control={c}
+                overrides={overrides}
+                targets={targets}
+                addressToTarget={addressToTarget}
+                calibratingControlId={calibratingControlId}
+                selectedTargetId={selectedTargetId}
+                physicalPulses={physicalPulses}
+                onClick={handleControlClick}
+                onContext={handleControlContext}
+              />
+            ))}
+          </div>
         </div>
 
         {calibratingControlId && (
@@ -201,7 +195,6 @@ function groupTargets(
     const g = info.group ?? "Other";
     (out[g] ??= []).push(id);
   }
-  // Stable order within groups by label.
   for (const g of Object.keys(out)) {
     out[g].sort((a, b) =>
       (targets[a].label || a).localeCompare(targets[b].label || b),
@@ -211,9 +204,8 @@ function groupTargets(
 }
 
 interface SlotProps {
-  controls: ControlDef[];
+  control: ControlDef;
   overrides: Record<string, MidiAddress>;
-  mappings: Record<string, MidiAddress>;
   targets: Record<string, TargetInfo>;
   addressToTarget: Map<string, string>;
   calibratingControlId: string | null;
@@ -221,13 +213,11 @@ interface SlotProps {
   physicalPulses: Record<string, number>;
   onClick: (c: ControlDef) => void;
   onContext: (e: React.MouseEvent, c: ControlDef) => void;
-  sectionClass: string;
 }
 
 function Slot({
-  controls,
+  control,
   overrides,
-  mappings,
   targets,
   addressToTarget,
   calibratingControlId,
@@ -235,62 +225,56 @@ function Slot({
   physicalPulses,
   onClick,
   onContext,
-  sectionClass,
 }: SlotProps) {
+  const addr = effectiveAddress(control, overrides);
+  const targetId = addr ? addressToTarget.get(addrKey(addr)) : null;
+  const targetLabel = targetId ? targets[targetId]?.label : null;
+  const isCalibrating = calibratingControlId === control.id;
+  const isPulsing = physicalPulses[control.id] != null;
+  const isOrphan = !addr;
+  const isDisplay = control.kind === "display";
+
+  const className =
+    `midi-map-slot midi-map-slot-${control.kind}` +
+    (targetLabel ? " assigned" : "") +
+    (isCalibrating ? " calibrating" : "") +
+    (isPulsing ? " pulse" : "") +
+    (isOrphan && !isDisplay ? " orphan" : "") +
+    (isDisplay ? " display" : "") +
+    (selectedTargetId && addr ? " can-receive" : "");
+
+  const style: React.CSSProperties =
+    control.section === "main"
+      ? { gridColumn: control.col, gridRow: control.row }
+      : {};
+
+  const title = isDisplay
+    ? "Mode Select / Peak (non-MIDI display)"
+    : targetLabel
+    ? `${targetLabel} — ${addr ? formatAddress(addr) : ""}`
+    : addr
+    ? `unassigned · ${formatAddress(addr)}`
+    : "needs calibration — click to bind";
+
   return (
-    <div className={`midi-map-section ${sectionClass}`}>
-      {controls.map((c) => {
-        const addr = effectiveAddress(c, overrides);
-        const targetId = addr ? addressToTarget.get(addrKey(addr)) : null;
-        const targetLabel = targetId ? targets[targetId]?.label : null;
-        const isCalibrating = calibratingControlId === c.id;
-        const isPulsing = physicalPulses[c.id] != null;
-        const isOrphan = !addr;
-
-        const className =
-          `midi-map-slot midi-map-slot-${c.kind}` +
-          (targetLabel ? " assigned" : "") +
-          (isCalibrating ? " calibrating" : "") +
-          (isPulsing ? " pulse" : "") +
-          (isOrphan ? " orphan" : "") +
-          (selectedTargetId && addr ? " can-receive" : "");
-
-        const style: React.CSSProperties = {
-          gridColumn: `${c.col} / span ${c.colSpan ?? 1}`,
-        };
-
-        const title = targetLabel
-          ? `${targetLabel} — ${addr ? formatAddress(addr) : ""}`
-          : addr
-          ? `unassigned · ${formatAddress(addr)}`
-          : "needs calibration — click to bind";
-
-        // Suppress mappings count noise:
-        void mappings;
-
-        return (
-          <div
-            key={c.id}
-            className={className}
-            style={style}
-            title={title}
-            onClick={() => onClick(c)}
-            onContextMenu={(e) => onContext(e, c)}
-          >
-            <div className="midi-map-slot-shape" />
-            <div className="midi-map-slot-text">
-              {targetLabel ? (
-                <span className="midi-map-slot-target">{targetLabel}</span>
-              ) : (
-                <span className="midi-map-slot-empty">{c.shortLabel}</span>
-              )}
-              <span className="midi-map-slot-addr">
-                {addr ? formatAddress(addr) : "—"}
-              </span>
-            </div>
-          </div>
-        );
-      })}
+    <div
+      className={className}
+      style={style}
+      title={title}
+      onClick={() => onClick(control)}
+      onContextMenu={(e) => onContext(e, control)}
+    >
+      <div className="midi-map-slot-shape" />
+      <div className="midi-map-slot-text">
+        {targetLabel ? (
+          <span className="midi-map-slot-target">{targetLabel}</span>
+        ) : (
+          <span className="midi-map-slot-empty">{control.shortLabel}</span>
+        )}
+        {addr && !isDisplay && (
+          <span className="midi-map-slot-addr">{formatAddress(addr)}</span>
+        )}
+      </div>
     </div>
   );
 }
