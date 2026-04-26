@@ -1,10 +1,10 @@
 {
-  "name": "Mirror",
+  "name": "Tiles",
   "author": "vj-app",
   "entry": "shader.frag",
   "params": [
-    { "key": "horizontal", "type": "float", "default": 1.0, "min": 0, "max": 1 },
-    { "key": "vertical",   "type": "float", "default": 0.0, "min": 0, "max": 1 },
-    { "key": "tiles",      "type": "float", "default": 0.0, "min": 0, "max": 1 }
+    { "key": "count",   "type": "int",  "default": 2, "min": 1, "max": 8, "step": 1 },
+    { "key": "mirrorH", "type": "bool", "default": false },
+    { "key": "mirrorV", "type": "bool", "default": false }
   ]
 }

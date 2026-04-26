@@ -21,7 +21,22 @@ export const IPC = {
   PreviewLive: "vj:preview-live",
   CreateTextAsset: "vj:create-text-asset",
   MigrateTextAssets: "vj:migrate-text-assets",
+  SetPluginHidden: "vj:set-plugin-hidden",
+  SavePluginThumbnail: "vj:save-plugin-thumbnail",
+  SetPluginDefaults: "vj:set-plugin-defaults",
+  SetPluginCategory: "vj:set-plugin-category",
+  ShowContextMenu: "vj:show-context-menu",
+  GenerateSplat: "vj:generate-splat",
+  SplatProgress: "vj:splat-progress",
+  PickImageFile: "vj:pick-image-file",
 } as const;
+
+export interface ContextMenuItem {
+  id: string;
+  label: string;
+  danger?: boolean;
+  enabled?: boolean;
+}
 
 export type PluginKind = "material" | "postfx" | "transition";
 
@@ -30,7 +45,7 @@ export type ParamValue = number | boolean | string | string[];
 
 export interface ParamDef {
   key: string;
-  type: "float" | "int" | "bool" | "enum" | "strings" | "camera";
+  type: "float" | "int" | "bool" | "enum" | "strings" | "camera" | "color";
   default: ParamValue;
   min?: number;
   max?: number;
@@ -44,7 +59,7 @@ export interface PluginMeta {
   name: string;
   author?: string;
   version?: string;
-  outputType?: "three" | "canvas" | "video";
+  outputType?: "three" | "canvas" | "video" | "splat";
   params: ParamDef[];
   inputs?: string[]; // for scene-composer style plugins
   entry?: string; // implementation entry file
@@ -52,6 +67,11 @@ export interface PluginMeta {
   // For outputType === "video": custom-scheme URL (vj-asset://local/...)
   // that the Output window can load directly. Resolved from manifest.videoFile.
   videoUrl?: string;
+  /**
+   * For outputType === "splat": vj-asset:// URL of a Gaussian Splatting
+   * file (.splat / .ply / .ksplat). Resolved from manifest.splatFile.
+   */
+  splatUrl?: string;
   // Optional preview image URL (vj-asset://local/...). Resolved from
   // manifest.thumbnail when the file exists in the plugin directory.
   thumbnailUrl?: string;
@@ -59,6 +79,18 @@ export interface PluginMeta {
   duration?: number;
   /** Size on disk. For video plugins, size of the videoFile; undefined otherwise. */
   sizeBytes?: number;
+  /**
+   * Soft-hidden from the Controller's Assets grid. Stamped from
+   * settings.hiddenPluginIds at scan time. Non-destructive — the plugin
+   * directory and manifest are untouched.
+   */
+  hidden?: boolean;
+  /**
+   * User-facing grouping bucket in the Assets panel. Read from
+   * manifest.category; falls back to `outputType` when unset (so unmigrated
+   * plugins still group sensibly under "canvas" / "video" / "three").
+   */
+  category?: string;
 }
 
 /**
@@ -92,7 +124,13 @@ export interface AudioState {
   high: number;
 }
 
-export type TransitionType = "cut" | "crossfade" | "dissolve" | "wipe";
+export type TransitionType =
+  | "cut"
+  | "crossfade"
+  | "dissolve"
+  | "wipe"
+  | "blackout"
+  | "whiteout";
 
 export interface TransitionState {
   type: TransitionType;
@@ -142,4 +180,14 @@ export interface DownloadProgress {
   percent: number;
   stage: "downloading" | "merging" | "done" | "error";
   message?: string;
+}
+
+export interface SplatProgress {
+  percent: number;
+  stage: "starting" | "running" | "done" | "error";
+  message?: string;
+}
+
+export interface SplatResult {
+  pluginId: string;
 }

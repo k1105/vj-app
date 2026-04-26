@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { ImportTab } from "./ImportTab";
 import { LibraryTab } from "./LibraryTab";
+import { SceneTab } from "./SceneTab";
 
-type Tab = "library" | "create";
+type Tab = "asset" | "postfx" | "create" | "scene";
 
 const TABS: Array<{ id: Tab; label: string }> = [
-  { id: "library", label: "Library" },
+  { id: "asset", label: "Asset" },
+  { id: "postfx", label: "PostFX" },
   { id: "create", label: "Create" },
+  { id: "scene", label: "Scene" },
 ];
 
 export function ManagerApp() {
-  const [active, setActive] = useState<Tab>("library");
+  const [active, setActive] = useState<Tab>("asset");
 
   return (
     <div className="manager">
@@ -29,8 +32,10 @@ export function ManagerApp() {
         </div>
       </div>
       <div className="manager-body">
-        {active === "library" && <LibraryTab />}
+        {active === "asset" && <LibraryTab kind="material" />}
+        {active === "postfx" && <LibraryTab kind="postfx" />}
         {active === "create" && <ImportTab />}
+        {active === "scene" && <SceneTab />}
       </div>
     </div>
   );

@@ -29,7 +29,7 @@ const initialState: VJState = {
   layers: [makeLayer(0), makeLayer(1), makeLayer(2), makeLayer(3)],
   selectedLayer: 0,
   transition: {
-    type: "cut",
+    type: "wipe",
     startedAt: null,
     duration: DEFAULT_TRANSITION_DURATION_MS,
     fromActive: [-1, -1, -1, -1],

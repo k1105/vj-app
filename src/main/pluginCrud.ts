@@ -1,8 +1,10 @@
-import { shell } from "electron";
+import { shell, type BrowserWindow } from "electron";
 import { promises as fs } from "fs";
 import { join, resolve } from "path";
 import { appRoot, broadcastPluginsNow } from "./pluginLoader";
-import type { PluginKind } from "../shared/types";
+import type { ParamValue, PluginKind } from "../shared/types";
+
+const THUMB_WIDTH = 320;
 
 function kindDir(kind: PluginKind): string {
   switch (kind) {
@@ -83,6 +85,82 @@ export async function deletePlugin(kind: PluginKind, id: string): Promise<void> 
   if (videoAbs) {
     await fs.rm(videoAbs, { force: true });
   }
+  await broadcastPluginsNow();
+}
+
+/**
+ * Capture the Output window's current frame and save it as the plugin's
+ * thumbnail.png. Captures whatever is currently being rendered — the user
+ * is expected to solo / arrange the asset they want pictured before clicking.
+ */
+export async function bakePluginThumbnail(
+  outputWindow: BrowserWindow | null,
+  kind: PluginKind,
+  id: string,
+): Promise<void> {
+  if (!outputWindow || outputWindow.isDestroyed()) {
+    throw new Error("Output window is not available");
+  }
+  const dir = pluginDir(kind, id);
+  assertInsideRoot(dir, kind);
+
+  const image = await outputWindow.webContents.capturePage();
+  if (image.isEmpty()) throw new Error("captured an empty frame");
+  const resized = image.resize({ width: THUMB_WIDTH, quality: "good" });
+  const png = resized.toPNG();
+  await fs.writeFile(join(dir, "thumbnail.png"), png);
+  await broadcastPluginsNow();
+}
+
+/**
+ * Update manifest.category. Pass an empty string to clear the field
+ * (the loader will fall back to outputType).
+ */
+export async function setPluginCategory(
+  kind: PluginKind,
+  id: string,
+  category: string,
+): Promise<void> {
+  const dir = pluginDir(kind, id);
+  assertInsideRoot(dir, kind);
+  const manifestPath = join(dir, "manifest.json");
+  const raw = await fs.readFile(manifestPath, "utf-8");
+  const manifest = JSON.parse(raw);
+  const trimmed = category.trim();
+  if (trimmed.length === 0) {
+    delete manifest.category;
+  } else {
+    manifest.category = trimmed;
+  }
+  await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf-8");
+  await broadcastPluginsNow();
+}
+
+/**
+ * Update the manifest's param defaults with the supplied values. Only keys
+ * that exist in `params` are touched; unknown keys in `values` are ignored
+ * so callers can pass a clip's full param map without worrying about extras.
+ */
+export async function setPluginDefaults(
+  kind: PluginKind,
+  id: string,
+  values: Record<string, ParamValue>,
+): Promise<void> {
+  const dir = pluginDir(kind, id);
+  assertInsideRoot(dir, kind);
+  const manifestPath = join(dir, "manifest.json");
+  const raw = await fs.readFile(manifestPath, "utf-8");
+  const manifest = JSON.parse(raw);
+  if (!Array.isArray(manifest.params)) {
+    throw new Error("manifest has no params array");
+  }
+  manifest.params = manifest.params.map((p: { key: string; default?: unknown }) => {
+    if (p.key in values) {
+      return { ...p, default: values[p.key] };
+    }
+    return p;
+  });
+  await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf-8");
   await broadcastPluginsNow();
 }
 

@@ -3,6 +3,13 @@ import { promises as fs, watch } from "fs";
 import { join, relative, resolve } from "path";
 import { IPC, type PluginKind, type PluginMeta } from "../shared/types";
 import { getVideoDuration } from "./thumbnail";
+import { getSetting } from "./store";
+
+function getHiddenIds(): Set<string> {
+  const raw = getSetting("hiddenPluginIds");
+  if (!Array.isArray(raw)) return new Set();
+  return new Set(raw.filter((v): v is string => typeof v === "string"));
+}
 
 // Plugin directories live next to the app, not inside src/.
 // In dev: cwd of electron-vite. In prod: resource path.
@@ -36,6 +43,7 @@ async function scanKind(kind: PluginKind): Promise<PluginMeta[]> {
     return [];
   }
 
+  const hiddenIds = getHiddenIds();
   const plugins: PluginMeta[] = [];
   for (const entry of entries) {
     const pluginDir = join(dir, entry);
@@ -105,6 +113,21 @@ async function scanKind(kind: PluginKind): Promise<PluginMeta[]> {
         }
       }
 
+      // Resolve a splat asset to a vj-asset:// URL.
+      let splatUrl: string | undefined;
+      if (manifest.outputType === "splat" && typeof manifest.splatFile === "string") {
+        const abs = resolve(pluginDir, manifest.splatFile);
+        const root = resolve(appRoot());
+        if (abs.startsWith(root + "/")) {
+          const rel = relative(root, abs).split(/[\\/]/).map(encodeURIComponent).join("/");
+          splatUrl = `vj-asset://local/${rel}`;
+        } else {
+          console.warn(
+            `[pluginLoader] ${entry}: splatFile "${manifest.splatFile}" is outside app root`,
+          );
+        }
+      }
+
       // Resolve a video asset to a vj-asset:// URL the Output window can load.
       let videoUrl: string | undefined;
       let sizeBytes: number | undefined;
@@ -152,6 +175,10 @@ async function scanKind(kind: PluginKind): Promise<PluginMeta[]> {
         }
       }
 
+      const category =
+        typeof manifest.category === "string" && manifest.category.trim().length > 0
+          ? manifest.category.trim()
+          : (manifest.outputType ?? "other");
       plugins.push({
         id: entry,
         kind,
@@ -164,9 +191,12 @@ async function scanKind(kind: PluginKind): Promise<PluginMeta[]> {
         entry: manifest.entry,
         manifestPath,
         videoUrl,
+        splatUrl,
         thumbnailUrl,
         duration: typeof manifest.duration === "number" ? manifest.duration : undefined,
         sizeBytes,
+        hidden: hiddenIds.has(entry),
+        category,
       });
     } catch (err) {
       console.warn(`[pluginLoader] skip ${entry}:`, err);

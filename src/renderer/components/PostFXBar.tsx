@@ -15,7 +15,7 @@ export function PostFXRack() {
   const togglePostFX = useVJStore((s) => s.togglePostFX);
   const setPostFXParam = useVJStore((s) => s.setPostFXParam);
 
-  const available = plugins.filter((p) => p.kind === "postfx");
+  const available = plugins.filter((p) => p.kind === "postfx" && !p.hidden);
   const [selected, setSelected] = useState<string | null>(null);
 
   const isEnabled = (id: string) =>
@@ -31,6 +31,13 @@ export function PostFXRack() {
     if (typeof current === "number") return current;
     if (typeof def.default === "number") return def.default;
     return 0;
+  };
+
+  const paramBool = (def: ParamDef): boolean => {
+    const current = selectedSlot?.params[def.key];
+    if (typeof current === "boolean") return current;
+    if (typeof def.default === "boolean") return def.default;
+    return false;
   };
 
   return (
@@ -68,9 +75,29 @@ export function PostFXRack() {
       <div className="postfx-rack-params">
         {selectedPlugin && selectedPlugin.params.length > 0 ? (
           selectedPlugin.params.map((def) => {
+            if (def.type === "bool") {
+              const on = paramBool(def);
+              return (
+                <div key={def.key} className="postfx-rack-param-row">
+                  <span className="postfx-rack-param-label">{def.key}</span>
+                  <button
+                    className={`param-toggle ${on ? "on" : ""}`}
+                    onClick={() => {
+                      if (!isEnabled(selectedPlugin.id))
+                        togglePostFX(selectedPlugin.id);
+                      setPostFXParam(selectedPlugin.id, def.key, !on);
+                    }}
+                  >
+                    {on ? "ON" : "OFF"}
+                  </button>
+                </div>
+              );
+            }
+
             const value = paramValue(def);
             const min = def.min ?? 0;
             const max = def.max ?? 1;
+            const isInt = def.type === "int";
             return (
               <div key={def.key} className="postfx-rack-param-row">
                 <span className="postfx-rack-param-label">{def.key}</span>
@@ -81,14 +108,17 @@ export function PostFXRack() {
                   value={Math.round(((value - min) / (max - min)) * 1000)}
                   onChange={(e) => {
                     const ratio = parseInt(e.target.value) / 1000;
-                    const next = min + ratio * (max - min);
+                    const raw = min + ratio * (max - min);
+                    const next = isInt ? Math.round(raw) : raw;
                     // toggle on if editing a disabled effect, so feedback is immediate
                     if (!isEnabled(selectedPlugin.id)) togglePostFX(selectedPlugin.id);
                     setPostFXParam(selectedPlugin.id, def.key, next);
                   }}
                   className="postfx-rack-param-slider"
                 />
-                <span className="postfx-rack-param-val">{value.toFixed(2)}</span>
+                <span className="postfx-rack-param-val">
+                  {isInt ? Math.round(value).toString() : value.toFixed(2)}
+                </span>
                 <MidiLearnButton
                   targetId={`postfx:${selectedPlugin.id}:${def.key}`}
                   label={`${selectedPlugin.name} · ${def.key}`}

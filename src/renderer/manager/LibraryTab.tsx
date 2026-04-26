@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PluginMeta, VJState } from "../../shared/types";
+import type { PluginKind, PluginMeta, VJState } from "../../shared/types";
 
 function formatDuration(seconds: number | undefined): string {
   if (seconds == null || !Number.isFinite(seconds)) return "–";
@@ -17,7 +17,11 @@ function formatSize(bytes: number | undefined): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-export function LibraryTab() {
+interface LibraryTabProps {
+  kind?: PluginKind;
+}
+
+export function LibraryTab({ kind = "material" }: LibraryTabProps = {}) {
   const [plugins, setPlugins] = useState<PluginMeta[]>([]);
   const [inUse, setInUse] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -31,25 +35,28 @@ export function LibraryTab() {
     return window.vj.onPluginsChanged(setPlugins);
   }, []);
 
-  // Listen to state broadcasts to compute which plugins are currently used
-  // by any layer (active or queued). Ask Controller to rebroadcast once on
-  // mount so we start with fresh info even if nothing is changing.
+  // Listen to state broadcasts to compute which plugins are currently used.
+  // For materials, "in use" = referenced by any layer (active or queued).
+  // For postfx, "in use" = present in the postfx rack (regardless of enabled).
   useEffect(() => {
     const off = window.vj.onStateBroadcast((state: VJState) => {
       const ids = new Set<string>();
-      for (const layer of state.layers) {
-        for (const clip of layer.clips) ids.add(clip.pluginId);
+      if (kind === "material") {
+        for (const layer of state.layers) {
+          for (const clip of layer.clips) ids.add(clip.pluginId);
+        }
+      } else if (kind === "postfx") {
+        for (const p of state.postfx) ids.add(p.pluginId);
       }
-      for (const p of state.postfx) ids.add(p.pluginId);
       setInUse(ids);
     });
     window.vj.requestStateRebroadcast();
     return off;
-  }, []);
+  }, [kind]);
 
   const materials = useMemo(
-    () => plugins.filter((p) => p.kind === "material"),
-    [plugins],
+    () => plugins.filter((p) => p.kind === kind),
+    [plugins, kind],
   );
 
   useEffect(() => {
@@ -80,6 +87,50 @@ export function LibraryTab() {
     }
   };
 
+  const [baking, setBaking] = useState<Set<string>>(new Set());
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [draftCategory, setDraftCategory] = useState<string>("");
+
+  const startEditCategory = (p: PluginMeta) => {
+    setEditingCategoryId(p.id);
+    setDraftCategory(p.category ?? "");
+  };
+  const commitCategory = async (p: PluginMeta) => {
+    const next = draftCategory.trim();
+    setEditingCategoryId(null);
+    if (next === (p.category ?? "")) return;
+    try {
+      await window.vj.setPluginCategory(p.kind, p.id, next);
+    } catch (err) {
+      setError(`category change failed: ${(err as Error).message}`);
+    }
+  };
+
+  const onBake = async (p: PluginMeta) => {
+    setBaking((s) => new Set(s).add(p.id));
+    try {
+      // Captures the Output window's current frame. The user is expected
+      // to solo / arrange the asset on Output before clicking Bake.
+      await window.vj.bakePluginThumbnail(p.kind, p.id);
+    } catch (err) {
+      setError(`bake failed for ${p.name}: ${(err as Error).message}`);
+    } finally {
+      setBaking((s) => {
+        const next = new Set(s);
+        next.delete(p.id);
+        return next;
+      });
+    }
+  };
+
+  const onToggleHidden = async (p: PluginMeta) => {
+    try {
+      await window.vj.setPluginHidden(p.id, !p.hidden);
+    } catch (err) {
+      setError(`toggle visibility failed: ${(err as Error).message}`);
+    }
+  };
+
   const onDelete = async (p: PluginMeta) => {
     if (inUse.has(p.id)) return; // UI already disables, but guard anyway
     const isVideo = p.outputType === "video";
@@ -95,12 +146,16 @@ export function LibraryTab() {
   };
 
   if (materials.length === 0) {
+    const empty =
+      kind === "postfx"
+        ? { title: "No postfx plugins yet", body: "Drop a manifest into postfx/ to add one." }
+        : kind === "transition"
+          ? { title: "No transitions yet", body: "Drop a manifest into transitions/ to add one." }
+          : { title: "No assets yet", body: "Switch to the Create tab to add videos." };
     return (
       <div className="manager-placeholder">
-        <div className="manager-placeholder-title">No assets yet</div>
-        <div className="manager-placeholder-body">
-          Switch to the Import tab to add videos.
-        </div>
+        <div className="manager-placeholder-title">{empty.title}</div>
+        <div className="manager-placeholder-body">{empty.body}</div>
       </div>
     );
   }
@@ -117,6 +172,7 @@ export function LibraryTab() {
           <tr>
             <th />
             <th>Name</th>
+            <th>Category</th>
             <th>Type</th>
             <th className="num">Duration</th>
             <th className="num">Size</th>
@@ -128,7 +184,12 @@ export function LibraryTab() {
             const used = inUse.has(p.id);
             const isEditing = editingId === p.id;
             return (
-              <tr key={p.id} className={used ? "used" : ""}>
+              <tr
+                key={p.id}
+                className={[used ? "used" : "", p.hidden ? "hidden-row" : ""]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
                 <td className="thumb-cell">
                   {p.thumbnailUrl ? (
                     <div
@@ -163,10 +224,52 @@ export function LibraryTab() {
                   )}
                   <div className="library-id">{p.id}</div>
                 </td>
+                <td className="category-cell">
+                  {editingCategoryId === p.id ? (
+                    <input
+                      autoFocus
+                      className="library-name-input"
+                      value={draftCategory}
+                      onChange={(e) => setDraftCategory(e.target.value)}
+                      onBlur={() => commitCategory(p)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                        if (e.key === "Escape") setEditingCategoryId(null);
+                      }}
+                    />
+                  ) : (
+                    <button
+                      className="library-name-btn"
+                      onClick={() => startEditCategory(p)}
+                      title="Click to edit category"
+                    >
+                      {p.category ?? "–"}
+                    </button>
+                  )}
+                </td>
                 <td>{p.outputType ?? "–"}</td>
                 <td className="num">{formatDuration(p.duration)}</td>
                 <td className="num">{formatSize(p.sizeBytes)}</td>
                 <td className="actions-cell">
+                  <button
+                    className={`btn-mini${p.hidden ? " active" : ""}`}
+                    onClick={() => onToggleHidden(p)}
+                    title={
+                      p.hidden
+                        ? "Currently hidden — click to show in Assets"
+                        : "Hide from the Controller's Assets grid (non-destructive)"
+                    }
+                  >
+                    {p.hidden ? "Show" : "Hide"}
+                  </button>
+                  <button
+                    className="btn-mini"
+                    onClick={() => onBake(p)}
+                    disabled={baking.has(p.id)}
+                    title="Capture the Output window's current frame as this asset's thumbnail. Set up the asset on Output first."
+                  >
+                    {baking.has(p.id) ? "…" : "Bake"}
+                  </button>
                   <button className="btn-mini" onClick={() => onReveal(p)}>
                     Reveal
                   </button>

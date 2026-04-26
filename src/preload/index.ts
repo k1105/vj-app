@@ -1,10 +1,14 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   IPC,
+  type ContextMenuItem,
   type DownloadProgress,
   type DownloadResult,
+  type ParamValue,
   type PluginKind,
   type PluginMeta,
+  type SplatProgress,
+  type SplatResult,
   type VJState,
 } from "../shared/types";
 import type { VJApi } from "../shared/vjApi";
@@ -83,6 +87,39 @@ const api: VJApi = {
 
   migrateTextAssets: (): Promise<number> =>
     ipcRenderer.invoke(IPC.MigrateTextAssets),
+
+  setPluginHidden: (id: string, hidden: boolean): Promise<void> =>
+    ipcRenderer.invoke(IPC.SetPluginHidden, { id, hidden }),
+
+  bakePluginThumbnail: (kind: PluginKind, id: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.SavePluginThumbnail, { kind, id }),
+
+  setPluginDefaults: (
+    kind: PluginKind,
+    id: string,
+    values: Record<string, ParamValue>,
+  ): Promise<void> => ipcRenderer.invoke(IPC.SetPluginDefaults, { kind, id, values }),
+
+  setPluginCategory: (
+    kind: PluginKind,
+    id: string,
+    category: string,
+  ): Promise<void> => ipcRenderer.invoke(IPC.SetPluginCategory, { kind, id, category }),
+
+  showContextMenu: (items: ContextMenuItem[]): Promise<string | null> =>
+    ipcRenderer.invoke(IPC.ShowContextMenu, items),
+
+  pickImageFile: (): Promise<string | null> =>
+    ipcRenderer.invoke(IPC.PickImageFile),
+
+  generateSplat: (imagePath: string, name: string): Promise<SplatResult> =>
+    ipcRenderer.invoke(IPC.GenerateSplat, { imagePath, name }),
+
+  onSplatProgress: (cb: (p: SplatProgress) => void) => {
+    const listener = (_: unknown, p: SplatProgress) => cb(p);
+    ipcRenderer.on(IPC.SplatProgress, listener);
+    return () => ipcRenderer.removeListener(IPC.SplatProgress, listener);
+  },
 };
 
 contextBridge.exposeInMainWorld("vj", api);

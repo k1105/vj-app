@@ -36,6 +36,10 @@ export default class TextAsset {
     const rows = Math.max(1, Math.ceil((h / w) * cols));
     const scale = Math.max(0.1, Math.min(3, params?.scale ?? 1));
     const vibrateOn = params?.vibrate !== false;
+    const bgColor = typeof params?.bgColor === "string" && /^#[0-9a-fA-F]{6}$/.test(params.bgColor)
+      ? params.bgColor
+      : "#000000";
+    const bgOpacity = Math.max(0, Math.min(1, Number(params?.bgOpacity ?? 1)));
 
     const beat = global?.beat ?? 0;
 
@@ -49,8 +53,13 @@ export default class TextAsset {
     const baseFontSize = Math.min(cellH * 0.45, cellW * 0.22) * scale;
 
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, w, h);
+    if (bgOpacity > 0) {
+      const r = parseInt(bgColor.slice(1, 3), 16);
+      const g = parseInt(bgColor.slice(3, 5), 16);
+      const b = parseInt(bgColor.slice(5, 7), 16);
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
+      ctx.fillRect(0, 0, w, h);
+    }
 
     if (!text) return;
 

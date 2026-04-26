@@ -45,6 +45,30 @@ export function LayerStack() {
     addClip(toLayer, pluginId);
   };
 
+  const onClipContextMenu = async (
+    layerIdx: number,
+    clipIdx: number,
+    e: React.MouseEvent,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const clip = layers[layerIdx]?.clips[clipIdx];
+    const meta = clip ? plugins.find((p) => p.id === clip.pluginId) : null;
+    const choice = await window.vj.showContextMenu([
+      { id: "bake_thumbnail", label: "Bake Thumbnail", enabled: !!meta },
+      { id: "remove", label: "Remove" },
+    ]);
+    if (choice === "remove") {
+      removeClip(layerIdx, clipIdx);
+    } else if (choice === "bake_thumbnail" && meta) {
+      try {
+        await window.vj.bakePluginThumbnail(meta.kind, meta.id);
+      } catch (err) {
+        console.error("[LayerStack] bakePluginThumbnail failed:", err);
+      }
+    }
+  };
+
   const onDragOver = (e: React.DragEvent) => {
     const types = e.dataTransfer.types;
     const isPlugin = types.includes(DT_PLUGIN);
@@ -81,7 +105,9 @@ export function LayerStack() {
               onSoloToggle={() => setLayerSolo(idx, !layer.solo)}
               onSelect={() => selectLayer(idx)}
               onTriggerClip={(clipIdx) => triggerClip(idx, clipIdx)}
-              onRemoveClip={(clipIdx) => removeClip(idx, clipIdx)}
+              onClipContextMenu={(clipIdx, e) =>
+                onClipContextMenu(idx, clipIdx, e)
+              }
             />
           </div>
         ))}
@@ -144,7 +170,7 @@ function LayerRow(props: {
   onSoloToggle: () => void;
   onSelect: () => void;
   onTriggerClip: (clipIdx: number) => void;
-  onRemoveClip: (clipIdx: number) => void;
+  onClipContextMenu: (clipIdx: number, e: React.MouseEvent) => void;
 }) {
   const {
     layer,
@@ -158,7 +184,7 @@ function LayerRow(props: {
     onSoloToggle,
     onSelect,
     onTriggerClip,
-    onRemoveClip,
+    onClipContextMenu,
   } = props;
 
   const pluginById = (pluginId: string) => plugins.find((p) => p.id === pluginId);
@@ -212,12 +238,8 @@ function LayerRow(props: {
                   e.stopPropagation();
                   onTriggerClip(clipIdx);
                 }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onRemoveClip(clipIdx);
-                }}
-                title={`${pluginName(clip.pluginId)} (click to trigger · drag to another layer to move · right-click to remove)`}
+                onContextMenu={(e) => onClipContextMenu(clipIdx, e)}
+                title={`${pluginName(clip.pluginId)} (click to trigger · drag to another layer to move · right-click for options)`}
               >
                 <div className="mat-name">{pluginName(clip.pluginId)}</div>
               </div>

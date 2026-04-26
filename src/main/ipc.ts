@@ -1,10 +1,24 @@
-import { BrowserWindow, dialog, ipcMain } from "electron";
-import { IPC, type PluginKind, type VJState } from "../shared/types";
+import { BrowserWindow, Menu, dialog, ipcMain } from "electron";
+import {
+  IPC,
+  type ContextMenuItem,
+  type ParamValue,
+  type PluginKind,
+  type VJState,
+} from "../shared/types";
 import { downloadVideo } from "./videoDownloader";
 import { importLocalVideo } from "./videoImporter";
+import { generateSplat } from "./splatGenerator";
 import { createTextAsset, migrateAllTextAssets } from "./textAssetImporter";
-import { listPlugins, readPluginSource } from "./pluginLoader";
-import { deletePlugin, renamePlugin, revealPlugin } from "./pluginCrud";
+import { broadcastPluginsNow, listPlugins, readPluginSource } from "./pluginLoader";
+import {
+  bakePluginThumbnail,
+  deletePlugin,
+  renamePlugin,
+  revealPlugin,
+  setPluginCategory,
+  setPluginDefaults,
+} from "./pluginCrud";
 import { getSetting, setSetting } from "./store";
 
 interface Ctx {
@@ -47,6 +61,27 @@ export function registerIpcHandlers(ctx: Ctx): void {
     if (result.canceled) return [];
     return result.filePaths;
   });
+
+  ipcMain.handle(IPC.PickImageFile, async () => {
+    const result = await dialog.showOpenDialog({
+      title: "Pick image for splat generation",
+      filters: [
+        { name: "Image", extensions: ["jpg", "jpeg", "png", "webp", "heic"] },
+      ],
+      properties: ["openFile"],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
+
+  ipcMain.handle(
+    IPC.GenerateSplat,
+    async (event, args: { imagePath: string; name: string }) => {
+      return generateSplat(args.imagePath, args.name, (p) => {
+        event.sender.send(IPC.SplatProgress, p);
+      });
+    },
+  );
 
   ipcMain.on(IPC.OpenManager, () => {
     ctx.openManager();
@@ -108,4 +143,71 @@ export function registerIpcHandlers(ctx: Ctx): void {
   );
 
   ipcMain.handle(IPC.MigrateTextAssets, async () => migrateAllTextAssets());
+
+  // Show a native (OS-level) context menu and resolve to the selected
+  // item id, or null if dismissed. Each `id` is opaque — the renderer
+  // decides what it means.
+  ipcMain.handle(
+    IPC.ShowContextMenu,
+    async (event, items: ContextMenuItem[]): Promise<string | null> => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!win) return null;
+      return new Promise<string | null>((resolvePromise) => {
+        let picked: string | null = null;
+        const template: Electron.MenuItemConstructorOptions[] = items.map(
+          (item) => ({
+            label: item.label,
+            enabled: item.enabled !== false,
+            click: () => {
+              picked = item.id;
+            },
+          }),
+        );
+        const menu = Menu.buildFromTemplate(template);
+        menu.popup({
+          window: win,
+          callback: () => resolvePromise(picked),
+        });
+      });
+    },
+  );
+
+  ipcMain.handle(
+    IPC.SavePluginThumbnail,
+    async (_event, args: { kind: PluginKind; id: string }) => {
+      await bakePluginThumbnail(ctx.getOutput(), args.kind, args.id);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.SetPluginDefaults,
+    async (
+      _event,
+      args: { kind: PluginKind; id: string; values: Record<string, ParamValue> },
+    ) => {
+      await setPluginDefaults(args.kind, args.id, args.values);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.SetPluginCategory,
+    async (_event, args: { kind: PluginKind; id: string; category: string }) => {
+      await setPluginCategory(args.kind, args.id, args.category);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.SetPluginHidden,
+    async (_event, args: { id: string; hidden: boolean }) => {
+      const raw = getSetting("hiddenPluginIds");
+      const list: string[] = Array.isArray(raw)
+        ? raw.filter((v): v is string => typeof v === "string")
+        : [];
+      const set = new Set(list);
+      if (args.hidden) set.add(args.id);
+      else set.delete(args.id);
+      setSetting("hiddenPluginIds", Array.from(set));
+      await broadcastPluginsNow();
+    },
+  );
 }

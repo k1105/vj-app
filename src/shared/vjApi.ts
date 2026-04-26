@@ -7,10 +7,14 @@
  * controller / output 側からも参照できるようにしている。
  */
 import type {
+  ContextMenuItem,
   DownloadProgress,
   DownloadResult,
+  ParamValue,
   PluginKind,
   PluginMeta,
+  SplatProgress,
+  SplatResult,
   VJState,
 } from "./types";
 
@@ -49,6 +53,45 @@ export interface VJApi {
   createTextAsset(name: string, texts: string[]): Promise<string>;
   /** Rewrite every text asset's manifest against the current template schema. Returns count migrated. */
   migrateTextAssets(): Promise<number>;
+  /**
+   * Soft-hide / show a plugin in the Controller's Assets grid. Non-destructive
+   * — only stores the id in settings.hiddenPluginIds and re-broadcasts.
+   */
+  setPluginHidden(id: string, hidden: boolean): Promise<void>;
+  /**
+   * Bake a thumbnail by capturing the Output window's current frame.
+   * The user is expected to arrange the desired asset on Output first.
+   */
+  bakePluginThumbnail(kind: PluginKind, id: string): Promise<void>;
+  /**
+   * Persist the supplied param values as the plugin's manifest defaults so
+   * future drops onto a layer use them as the initial preset.
+   */
+  setPluginDefaults(
+    kind: PluginKind,
+    id: string,
+    values: Record<string, ParamValue>,
+  ): Promise<void>;
+  /**
+   * Set or clear (empty string) the plugin's `category` for grouping in
+   * the Assets panel. When unset, the loader falls back to outputType.
+   */
+  setPluginCategory(kind: PluginKind, id: string, category: string): Promise<void>;
+  /**
+   * Show a native context menu at the cursor and resolve to the selected
+   * item id (or null if dismissed). The id is opaque — the caller decides.
+   */
+  showContextMenu(items: ContextMenuItem[]): Promise<string | null>;
+  /** Open a native image picker; resolves to the chosen path or null. */
+  pickImageFile(): Promise<string | null>;
+  /**
+   * Run the configured `splatGeneratorCommand` against `imagePath`. Writes
+   * the resulting .splat plus a manifest into a new plugins/scene-* dir
+   * and broadcasts so the asset appears in the Assets panel.
+   */
+  generateSplat(imagePath: string, name: string): Promise<SplatResult>;
+  /** Subscribe to per-line progress emitted while a splat is generating. */
+  onSplatProgress(cb: (p: SplatProgress) => void): () => void;
 }
 
 declare global {

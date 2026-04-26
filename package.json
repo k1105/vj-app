@@ -12,11 +12,14 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },
   "dependencies": {
+    "@mkkellogg/gaussian-splats-3d": "^0.4.7",
+    "d3-ease": "^3.0.1",
     "electron-store": "^10.0.0",
     "three": "^0.169.0",
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@types/d3-ease": "^3.0.2",
     "@types/node": "^22.7.4",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",

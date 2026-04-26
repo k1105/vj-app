@@ -3,6 +3,7 @@
   "author": "vj-app",
   "version": "0.1.0",
   "outputType": "canvas",
+  "category": "camera",
   "entry": "index.js",
   "params": [
     { "key": "cameraDeviceId", "type": "camera", "default": ""                                       },

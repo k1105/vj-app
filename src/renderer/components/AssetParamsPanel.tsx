@@ -33,7 +33,6 @@ export function AssetParamsPanel() {
   const selectedLayer = useVJStore((s) => s.state.selectedLayer);
   const layer = useVJStore((s) => s.state.layers[selectedLayer]);
   const plugins = useVJStore((s) => s.plugins);
-  const removeClip = useVJStore((s) => s.removeClip);
   const setClipParam = useVJStore((s) => s.setClipParam);
 
   // Edit the most-recently-selected clip on this layer: NEXT if a different
@@ -52,6 +51,20 @@ export function AssetParamsPanel() {
     setClipParam(selectedLayer, editingClipIdx, key, value);
   };
 
+  const [savingDefaults, setSavingDefaults] = useState(false);
+  const onSetAsDefault = async () => {
+    if (!plugin || !editingClip) return;
+    setSavingDefaults(true);
+    try {
+      await window.vj.setPluginDefaults(plugin.kind, plugin.id, editingClip.params);
+    } catch (err) {
+      console.error("[AssetParamsPanel] setPluginDefaults failed:", err);
+      alert(`Set as Default failed: ${(err as Error).message}`);
+    } finally {
+      setSavingDefaults(false);
+    }
+  };
+
   // Array-valued params (e.g. "strings") are filtered out before reaching
   // ParamControl, so narrowing here is safe.
   const currentVal = (def: ParamDef): number | boolean | string => {
@@ -65,26 +78,8 @@ export function AssetParamsPanel() {
   return (
     <div className="asset-panel">
       <div className="asset-panel-header">
-        <span>
-          Asset Parameters
-          {editingClip && (
-            <span className={`asset-edit-badge ${editingIsNext ? "next" : "live"}`}>
-              {editingIsNext ? "NEXT" : "LIVE"}
-            </span>
-          )}
-        </span>
-        <button
-          className="asset-remove-btn"
-          onClick={() =>
-            editingClipIdx >= 0 && removeClip(selectedLayer, editingClipIdx)
-          }
-          disabled={!editingClip}
-          title="remove clip from layer"
-        >
-          REMOVE
-        </button>
+        <span className="asset-panel-title-text">Asset Parameters</span>
       </div>
-
       <div className="asset-preview-wrap">
         <div className="asset-preview-frame">
           <AssetPreview
@@ -92,7 +87,14 @@ export function AssetParamsPanel() {
             params={editingClip?.params ?? {}}
           />
         </div>
-        <div className="asset-name">{plugin?.name ?? "--"}</div>
+        <div className="asset-name">
+          {plugin?.name ?? "--"}
+          {editingClip && (
+            <span className={`asset-edit-badge ${editingIsNext ? "next" : "live"}`}>
+              {editingIsNext ? "NEXT" : "LIVE"}
+            </span>
+          )}
+        </div>
         <div className="asset-layer-info">
           L{selectedLayer + 1}
           {editingClip ? ` · clip ${editingClipIdx + 1}/${layer!.clips.length}` : ""}
@@ -100,7 +102,17 @@ export function AssetParamsPanel() {
       </div>
 
       <div className="asset-params">
-        <div className="param-section-title">Params</div>
+        <div className="param-section-title">
+          <span>Params</span>
+          <button
+            className="asset-default-btn"
+            onClick={onSetAsDefault}
+            disabled={!editingClip || savingDefaults}
+            title="Save current params as the plugin's manifest defaults"
+          >
+            {savingDefaults ? "…" : "SET AS DEFAULT"}
+          </button>
+        </div>
         {!editingClip && (
           <div className="param-empty">no clip selected</div>
         )}
@@ -277,9 +289,11 @@ function ParamControl({
     return (
       <div className="param-row">
         <span className="param-label">{def.key}</span>
-        <button className="param-step-btn" onClick={() => onChange(num - step)}>◀</button>
-        <span className="param-step-val">{displayVal}</span>
-        <button className="param-step-btn" onClick={() => onChange(num + step)}>▶</button>
+        <div className="param-step-group">
+          <button className="param-step-btn" onClick={() => onChange(num - step)}>◀</button>
+          <span className="param-step-val">{displayVal}</span>
+          <button className="param-step-btn" onClick={() => onChange(num + step)}>▶</button>
+        </div>
         <MidiLearnButton targetId={midiTargetId} label={midiLabel} group="Clip Params" />
       </div>
     );
@@ -317,6 +331,26 @@ function ParamControl({
           ))}
         </select>
         <MidiLearnButton targetId={midiTargetId} label={midiLabel} group="Clip Params" />
+      </div>
+    );
+  }
+
+  if (def.type === "color") {
+    const hex = typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value)
+      ? value
+      : typeof def.default === "string"
+        ? def.default
+        : "#000000";
+    return (
+      <div className="param-row">
+        <span className="param-label">{def.key}</span>
+        <input
+          type="color"
+          className="param-color"
+          value={hex}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <span className="param-val">{hex}</span>
       </div>
     );
   }

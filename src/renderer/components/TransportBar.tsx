@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import type { TransitionType } from "../../shared/types";
 import { MidiLearnButton } from "./MidiLearnButton";
@@ -8,6 +8,8 @@ const TRANSITIONS: Array<{ type: TransitionType; label: string }> = [
   { type: "crossfade", label: "FADE" },
   { type: "dissolve", label: "DSLV" },
   { type: "wipe", label: "WIPE" },
+  { type: "blackout", label: "BLK" },
+  { type: "whiteout", label: "WHT" },
 ];
 
 export function TransportBar() {
@@ -20,17 +22,10 @@ export function TransportBar() {
 
   return (
     <div className="transport">
-      <div className="transport-transition">
-        {TRANSITIONS.map((t) => (
-          <button
-            key={t.type}
-            className={`btn-trans ${transitionType === t.type ? "active" : ""}`}
-            onClick={() => setTransitionType(t.type)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <TransitionDropdown
+        value={transitionType}
+        onChange={setTransitionType}
+      />
       <div className="go-section">
         <button className="btn-go" onClick={() => commitGo()}>
           G O
@@ -59,6 +54,65 @@ export function TransportBar() {
       >
         FULLSCREEN
       </button>
+    </div>
+  );
+}
+
+/**
+ * Custom dropdown that opens UPWARD — we live at the bottom of the window,
+ * so a regular <select> would either get clipped or cover GO/TAP. Items
+ * stack upward from the selected value with the current pick highlighted.
+ */
+function TransitionDropdown({
+  value,
+  onChange,
+}: {
+  value: TransitionType;
+  onChange: (next: TransitionType) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  const current = TRANSITIONS.find((t) => t.type === value) ?? TRANSITIONS[0];
+  return (
+    <div className="transition-dropdown" ref={wrapRef}>
+      <button
+        className={`btn-trans active ${open ? "open" : ""}`}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {current.label}
+        <span className="trans-caret">▲</span>
+      </button>
+      {open && (
+        <div className="transition-dropdown-menu">
+          {TRANSITIONS.map((t) => (
+            <button
+              key={t.type}
+              className={`transition-dropdown-item ${t.type === value ? "active" : ""}`}
+              onClick={() => {
+                onChange(t.type);
+                setOpen(false);
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

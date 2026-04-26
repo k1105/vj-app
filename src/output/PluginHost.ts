@@ -5,6 +5,8 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { Pass, FullScreenQuad } from "three/addons/postprocessing/Pass.js";
+// Loaded lazily inside BuiltinSplatPlugin so the gaussian-splats-3d bundle
+// is only paid for when a `splat` plugin actually mounts.
 import { disposeObject3D, disposeVideo } from "../core/dispose";
 import { createRenderTarget } from "../core/texture";
 import type { LayerState, ParamValue, PluginMeta } from "../shared/types";
@@ -81,7 +83,13 @@ interface MountedPlugin {
   // For canvas/video outputs, we keep the CanvasTexture/VideoTexture here.
   // A `three`-type plugin uses renderTarget.texture instead.
   directTexture: THREE.Texture | null;
+  /** Lerped float-param values, smoothed each frame toward clip.params. */
+  smoothed: Record<string, number>;
 }
+
+// Smoothing time constant (seconds) for float clip params — kept in sync
+// with the postfx-side constant in Composer.ts.
+const PARAM_SMOOTH_TAU_SEC = 0.06;
 
 /**
  * BuiltinVideoPlugin — driver for outputType:"video" plugins.
@@ -199,6 +207,174 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
   }
 }
 
+/**
+ * BuiltinSplatPlugin — driver for outputType:"splat" plugins.
+ *
+ * Loads a Gaussian Splatting scene (.splat / .ply / .ksplat) via
+ * @mkkellogg/gaussian-splats-3d's DropInViewer (a THREE.Group) and exposes
+ * a small set of camera params so the scene can be flown around like a
+ * regular VJ asset.
+ *
+ * Params (all optional, sensible defaults):
+ *   posX/posY/posZ         camera position
+ *   targetX/targetY/targetZ camera lookAt point
+ *   fov                    vertical field of view (degrees)
+ *   orbitSpeed             passive rotation around the target Y axis (rad/s)
+ */
+class BuiltinSplatPlugin implements MaterialPluginInstance {
+  private group: THREE.Group | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private viewer: any = null;
+  private hostScene: THREE.Scene | null = null;
+  private hostCamera: THREE.PerspectiveCamera | null = null;
+  private orbit = 0;
+  // Set true the moment dispose() runs so any in-flight async setup work
+  // (dynamic import, addSplatScene) bails out before mutating GPU state.
+  private disposed = false;
+
+  constructor(private readonly url: string) {}
+
+  setup(ctx: PluginSetupContext): void {
+    this.hostScene = ctx.scene;
+    this.hostCamera = ctx.camera;
+    // Lazy import keeps the heavy bundle out of the main entry chunk.
+    void import(
+      /* @vite-ignore */ "@mkkellogg/gaussian-splats-3d"
+    )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((mod: any) => {
+        if (this.disposed || !this.hostScene) return;
+        const dropIn = new mod.DropInViewer({
+          // CPU-side sort. The GPU sort path opens a parallel WebGL context
+          // that doesn't share state with our off-screen render target —
+          // when active, the splat renders but its output never reaches our
+          // pipeline, leaving the layer black.
+          gpuAcceleratedSort: false,
+          sharedMemoryForWorkers: false,
+          sphericalHarmonicsDegree: 0,
+        });
+        this.viewer = dropIn;
+        this.group = dropIn as unknown as THREE.Group;
+        // SHARP / most 3DGS outputs use OpenCV camera convention
+        // (y down, z forward). Three.js uses y up, z toward viewer.
+        // A 180° rotation about X aligns the two so the splat appears in
+        // front of our default camera.
+        this.group.rotation.x = Math.PI;
+        this.hostScene.add(this.group);
+        console.log(`[splat] loading ${this.url}`);
+        const t0 = performance.now();
+        // Don't pass progressiveLoad — it's only valid for .splat/.ksplat,
+        // and SHARP-generated assets are .ply.
+        const promise = dropIn.addSplatScene(this.url);
+        // Some lib versions return an AbortablePromise; fall back gracefully.
+        Promise.resolve(promise)
+          .then(() => {
+            const dt = ((performance.now() - t0) / 1000).toFixed(2);
+            if (this.disposed) {
+              console.log(`[splat] load finished after dispose (${dt}s) — releasing`);
+              this.cleanupViewer();
+              return;
+            }
+            const splatMesh =
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (dropIn as any).splatMesh ?? (dropIn as any).viewer?.splatMesh;
+            const inViewer = splatMesh ? splatMesh.parent === dropIn : false;
+            console.log(
+              `[splat] loaded in ${dt}s · splatMesh=${!!splatMesh} attached=${inViewer}`,
+            );
+            if (splatMesh) {
+              // Splat meshes use shader-based instancing without a standard
+              // bounding box, so Three's frustum culling treats them as
+              // empty and skips rendering. Force them to always draw.
+              splatMesh.frustumCulled = false;
+              splatMesh.traverse((child: THREE.Object3D) => {
+                child.frustumCulled = false;
+              });
+            }
+          })
+          .catch((err: unknown) =>
+            console.error(`[splat] addSplatScene failed:`, err),
+          );
+      })
+      .catch((err) => {
+        console.error(`[splat] dynamic import failed:`, err);
+      });
+  }
+
+  private cleanupViewer(): void {
+    const viewer = this.viewer;
+    const group = this.group;
+    const scene = this.hostScene;
+    if (group && scene) scene.remove(group);
+    if (viewer) {
+      try {
+        if (typeof viewer.removeSplatScene === "function") {
+          // Best-effort: remove the loaded scene before disposing the viewer
+          // so any internal sort workers / GPU buffers tied to it release.
+          const result = viewer.removeSplatScene(0);
+          if (result && typeof result.then === "function") {
+            result.catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.warn(`[splat] removeSplatScene threw:`, err);
+      }
+      try {
+        if (typeof viewer.dispose === "function") viewer.dispose();
+      } catch (err) {
+        console.warn(`[splat] viewer.dispose threw:`, err);
+      }
+    }
+    this.group = null;
+    this.viewer = null;
+  }
+
+  update({ params, global }: PluginUpdateContext): void {
+    const camera = this.hostCamera;
+    if (!camera) return;
+    const dt = Math.max(0, (global?.delta ?? 16) * 0.001);
+    const orbitSpeed = num(params.orbitSpeed, 0);
+    this.orbit += orbitSpeed * dt;
+
+    const targetX = num(params.targetX, 0);
+    const targetY = num(params.targetY, 0);
+    const targetZ = num(params.targetZ, 0);
+    const posX = num(params.posX, 0);
+    const posY = num(params.posY, 1);
+    const posZ = num(params.posZ, 3);
+
+    // Apply orbit as a rotation around the target's Y axis. Cheap per-frame
+    // transform — keeps the user's pos params as the "base" position.
+    const c = Math.cos(this.orbit);
+    const s = Math.sin(this.orbit);
+    const dx = posX - targetX;
+    const dz = posZ - targetZ;
+    camera.position.set(
+      targetX + dx * c - dz * s,
+      posY,
+      targetZ + dx * s + dz * c,
+    );
+    camera.lookAt(targetX, targetY, targetZ);
+
+    const fov = num(params.fov, 50);
+    if (Math.abs(camera.fov - fov) > 0.01) {
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+    }
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    this.cleanupViewer();
+    this.hostScene = null;
+    this.hostCamera = null;
+  }
+}
+
+function num(v: ParamValue | undefined, fallback: number): number {
+  return typeof v === "number" ? v : fallback;
+}
+
 export class PluginHost {
   private mounted = new Map<string, MountedPlugin>();
   private metas = new Map<string, PluginMeta>();
@@ -258,6 +434,41 @@ export class PluginHost {
     camera.position.set(0, 0, 3);
     const renderTarget = createRenderTarget(this.width, this.height);
 
+    // outputType === "splat" uses a built-in Gaussian-Splatting driver.
+    if (meta.outputType === "splat") {
+      if (!meta.splatUrl) {
+        throw new Error(`splat plugin ${id} has no splatUrl`);
+      }
+      const instance = new BuiltinSplatPlugin(meta.splatUrl);
+      instance.setup({
+        THREE,
+        renderer: this.renderer,
+        scene,
+        camera,
+        width: this.width,
+        height: this.height,
+        GLTFLoader,
+        RoomEnvironment,
+        EffectComposer,
+        RenderPass,
+        OutputPass,
+        Pass,
+        FullScreenQuad,
+      });
+      this.mounted.set(id, {
+        id,
+        meta,
+        instance,
+        scene,
+        camera,
+        renderTarget,
+        objectUrl: null,
+        directTexture: null,
+        smoothed: {},
+      });
+      return;
+    }
+
     // outputType === "video" uses a built-in player — no JS source needed.
     if (meta.outputType === "video") {
       if (!meta.videoUrl) {
@@ -294,6 +505,7 @@ export class PluginHost {
         renderTarget,
         objectUrl: null,
         directTexture,
+        smoothed: {},
       });
       return;
     }
@@ -366,6 +578,7 @@ export class PluginHost {
       renderTarget,
       objectUrl,
       directTexture,
+      smoothed: {},
     });
   }
 
@@ -390,6 +603,10 @@ export class PluginHost {
    * texture as dirty via the update() call.
    */
   renderAll(global: GlobalUniforms, layers: LayerState[]): void {
+    // Lerp coefficient for float-param smoothing. delta is in ms.
+    const dtSec = Math.max(0, global.delta) * 0.001;
+    const k =
+      dtSec > 0 ? 1 - Math.exp(-dtSec / PARAM_SMOOTH_TAU_SEC) : 1;
     // Prefer the active clip's params; during a transition the plugin may
     // only appear in NEXT, so fall back to nextClipIdx — otherwise the TO
     // side renders with empty params (all manifest defaults).
@@ -415,8 +632,21 @@ export class PluginHost {
           }
         }
       }
+      // Smooth float params toward their target each frame; int / bool /
+      // enum / strings / camera / color stay raw so discrete behaviour
+      // (snap, toggle, dropdown selection) isn't blurred.
+      const smoothedParams: Record<string, ParamValue> = { ...params };
+      for (const def of m.meta.params) {
+        if (def.type !== "float") continue;
+        const target = params[def.key];
+        if (typeof target !== "number") continue;
+        const cur = m.smoothed[def.key];
+        const next = cur === undefined ? target : cur + (target - cur) * k;
+        m.smoothed[def.key] = next;
+        smoothedParams[def.key] = next;
+      }
       try {
-        m.instance.update({ global, params });
+        m.instance.update({ global, params: smoothedParams });
       } catch (err) {
         console.warn(`[PluginHost] update() threw for ${m.id}:`, err);
       }

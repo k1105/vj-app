@@ -78,6 +78,7 @@ export async function createTextAsset(
     author: "user",
     version: "0.1.0",
     outputType: "canvas" as const,
+    category: "text",
     entry: TEMPLATE_ENTRY,
     params,
   };
@@ -124,6 +125,7 @@ export async function migrateAllTextAssets(): Promise<number> {
         ? (textsDef!.default as unknown[]).map((t) => String(t))
         : [];
       manifest.params = applyUserValues(schema, existingTexts);
+      if (typeof manifest.category !== "string") manifest.category = "text";
       await fs.writeFile(
         manifestPath,
         JSON.stringify(manifest, null, 2) + "\n",

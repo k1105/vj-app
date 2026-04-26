@@ -27,7 +27,14 @@ export function resolveTargetRange(targetId: string): TargetRange | null {
     const key = rest.slice(colonIdx + 1);
     const plugin = vj.plugins.find((p) => p.id === pluginId);
     const def = plugin?.params.find((p) => p.key === key);
-    if (!def || def.type === "bool" || def.type === "enum") return null;
+    if (
+      !def ||
+      def.type === "bool" ||
+      def.type === "enum" ||
+      def.type === "strings" ||
+      def.type === "camera" ||
+      def.type === "color"
+    ) return null;
     return {
       min: def.min ?? 0,
       max: def.max ?? 1,
@@ -48,7 +55,14 @@ export function resolveTargetRange(targetId: string): TargetRange | null {
     const clip = layer.clips[clipIdx];
     const plugin = vj.plugins.find((p) => p.id === clip?.pluginId);
     const def = plugin?.params.find((p) => p.key === key);
-    if (!def || def.type === "bool" || def.type === "enum") return null;
+    if (
+      !def ||
+      def.type === "bool" ||
+      def.type === "enum" ||
+      def.type === "strings" ||
+      def.type === "camera" ||
+      def.type === "color"
+    ) return null;
     return {
       min: def.min ?? 0,
       max: def.max ?? 1,

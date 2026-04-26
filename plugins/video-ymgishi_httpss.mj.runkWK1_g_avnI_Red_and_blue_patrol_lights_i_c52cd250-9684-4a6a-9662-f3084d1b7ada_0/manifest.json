@@ -1,10 +1,10 @@
 {
-  "name": "1-4",
+  "name": "ymgishi_httpss.mj.runkWK1_g_avnI_Red_and_blue_patrol_lights_i_c52cd250-9684-4a6a-9662-f3084d1b7ada_0",
   "author": "yt-dlp",
   "outputType": "video",
-  "videoFile": "../../materials/videos/ymgishi_STYLE_Low-poly_PlayStation_1_era_3D_game_graphics_cir_6cac9c3d-ae0b-4e1d-9e60-9ca5705127eb_0.mp4",
+  "videoFile": "../../materials/videos/ymgishi_httpss.mj.runkWK1_g_avnI_Red_and_blue_patrol_lights_i_c52cd250-9684-4a6a-9662-f3084d1b7ada_0.mp4",
   "thumbnail": "thumbnail.jpg",
-  "duration": 5.208333,
+  "duration": 5.041667,
   "params": [
     {
       "key": "playing",
@@ -35,5 +35,6 @@
       "max": 6,
       "step": 1
     }
-  ]
+  ],
+  "category": "映像"
 }

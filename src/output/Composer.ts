@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { easeCubicIn } from "d3-ease";
 import type { LayerState, PluginMeta, VJState } from "../shared/types";
 import { PluginHost, type GlobalUniforms } from "./PluginHost";
 
@@ -34,7 +35,27 @@ interface PostFXEntry {
   pluginId: string;
   material: THREE.ShaderMaterial;
   paramKeys: string[];
+  /** Per-key type lookup so we only smooth float params (int/bool/etc snap). */
+  paramTypes: Record<string, string>;
+  /** Last lerped value pushed to each `u_<key>` uniform. */
+  smoothed: Record<string, number>;
+  /** Timestamp of the previous syncPostFX tick — for time-based lerp. */
+  lastSyncMs: number;
+  /**
+   * Per-pass double-buffered render targets. Each frame, one is sampled as
+   * `uPrev` (last frame's output) and the other is written to (this frame's
+   * output). They swap every frame via `flip`. Avoids needing a separate
+   * texture-to-texture copy.
+   */
+  rtA: THREE.WebGLRenderTarget;
+  rtB: THREE.WebGLRenderTarget;
+  flip: boolean;
 }
+
+// Smoothing time constant (seconds): roughly the time taken to cover ~63%
+// of the distance to a new target. Short enough to feel responsive on a
+// drag, long enough to filter MIDI / sync-step jumps.
+const PARAM_SMOOTH_TAU_SEC = 0.06;
 
 /**
  * Composer — owns the single WebGLRenderer and drives the render loop.
@@ -71,11 +92,18 @@ export class Composer {
   private presentQuad: THREE.Mesh;
   private presentMaterial: THREE.ShaderMaterial;
 
-  // Full-screen white overlay for the flash effect. Rendered additively on top
-  // of every frame so it works regardless of which render path is active.
+  // Flash effect: invert the framebuffer for FLASH_DURATION_MS. We snapshot
+  // the current screen into a FramebufferTexture, then re-render via a quad
+  // that mixes the original colour with its invert.
   private flashScene: THREE.Scene;
   private flashMaterial: THREE.ShaderMaterial;
-  private static readonly FLASH_DURATION_MS = 350;
+  private flashCaptureTexture: THREE.FramebufferTexture | null = null;
+  private static readonly FLASH_DURATION_MS = 120;
+  // Flash-zoom: short, sharply-damped ring so the camera punch feels
+  // crisp without leaving a lingering wobble.
+  private static readonly FLASH_ZOOM_DURATION_MS = 240;
+  private static readonly FLASH_ZOOM_AMPLITUDE = 0.04; // ±4 % of frame
+  private static readonly FLASH_ZOOM_OSCILLATIONS = 1.25;
 
   // PostFX state: built materials keyed by pluginId, plus a lazy-load guard.
   private postfxMaterials = new Map<string, PostFXEntry>();
@@ -127,6 +155,9 @@ export class Composer {
         uOpacity:    { value: [0, 0, 0, 0] },
         uBlend:      { value: [0, 0, 0, 0] },
         uActive:     { value: [0, 0, 0, 0] },
+        // Per-layer texAspect / canvasAspect — used to apply CSS-`cover` UV
+        // remap so video textures keep their aspect ratio. 1.0 = no remap.
+        uLayerAspect:{ value: [1, 1, 1, 1] },
         uTime:       { value: 0 },
         uZoomScale:  { value: 1.0 },
         // When uBaseActive=1, the composite starts from uBase instead of
@@ -148,7 +179,17 @@ export class Composer {
         uniform float uOpacity[4];
         uniform int uBlend[4];
         uniform int uActive[4];
+        uniform float uLayerAspect[4];
         uniform float uTime;
+
+        // CSS background-size:cover. r = texAspect / canvasAspect.
+        //   r > 1 → texture is wider; sample a centred horizontal slice.
+        //   r < 1 → texture is taller; sample a centred vertical slice.
+        vec2 coverUV(vec2 uv, float r) {
+          if (r > 1.0)        return vec2((uv.x - 0.5) / r + 0.5, uv.y);
+          if (r > 0.0001)     return vec2(uv.x, (uv.y - 0.5) * r + 0.5);
+          return uv;
+        }
 
         vec4 applyBlend(vec4 acc, vec4 src, float opacity, int mode) {
           float a = clamp(src.a * opacity, 0.0, 1.0);
@@ -167,10 +208,10 @@ export class Composer {
         }
 
         vec4 sampleLayer(int idx) {
-          if (idx == 0) return texture2D(uLayer0, vUv);
-          if (idx == 1) return texture2D(uLayer1, vUv);
-          if (idx == 2) return texture2D(uLayer2, vUv);
-          return texture2D(uLayer3, vUv);
+          if (idx == 0) return texture2D(uLayer0, coverUV(vUv, uLayerAspect[0]));
+          if (idx == 1) return texture2D(uLayer1, coverUV(vUv, uLayerAspect[1]));
+          if (idx == 2) return texture2D(uLayer2, coverUV(vUv, uLayerAspect[2]));
+          return texture2D(uLayer3, coverUV(vUv, uLayerAspect[3]));
         }
 
         void main() {
@@ -204,6 +245,9 @@ export class Composer {
         uTo:        { value: this.blackTexture as THREE.Texture },
         uProgress:  { value: 0 },
         uZoomScale: { value: 1.0 },
+        // 0 = crossfade, 1 = dissolve, 2 = wipe,
+        // 3 = blackout (FROM → black → TO), 4 = whiteout (FROM → white → TO).
+        uType:      { value: 0 },
       },
       vertexShader: ZOOM_VERTEX_SHADER,
       fragmentShader: /* glsl */ `
@@ -212,10 +256,36 @@ export class Composer {
         uniform sampler2D uFrom;
         uniform sampler2D uTo;
         uniform float uProgress;
+        uniform int uType;
+
+        float hash21(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
+
         void main() {
+          float p = clamp(uProgress, 0.0, 1.0);
           vec4 a = texture2D(uFrom, vUv);
           vec4 b = texture2D(uTo, vUv);
-          gl_FragColor = mix(a, b, clamp(uProgress, 0.0, 1.0));
+          if (uType == 1) {
+            // dissolve: each pixel switches once it crosses its random threshold
+            float t = hash21(floor(vUv * 1024.0));
+            gl_FragColor = t < p ? b : a;
+          } else if (uType == 2) {
+            // wipe: soft-edged horizontal sweep, left → right
+            float edge = vUv.x;
+            float w = 0.04;
+            float k = smoothstep(p - w, p + w, edge);
+            gl_FragColor = mix(b, a, k);
+          } else if (uType == 3 || uType == 4) {
+            // blackout / whiteout: FROM → solid → TO across two halves.
+            vec3 hold = uType == 4 ? vec3(1.0) : vec3(0.0);
+            vec4 mid = vec4(hold, 1.0);
+            gl_FragColor = p < 0.5
+              ? mix(a, mid, p * 2.0)
+              : mix(mid, b, (p - 0.5) * 2.0);
+          } else {
+            gl_FragColor = mix(a, b, p);
+          }
         }
       `,
     });
@@ -245,21 +315,32 @@ export class Composer {
     );
     this.presentScene.add(this.presentQuad);
 
-    // ── Flash overlay: additive white over everything ────────────────────
+    // ── Flash invert pass ───────────────────────────────────────────────
+    // Samples a snapshot of the framebuffer (uTex) and blends original ↔
+    // its invert by uFlash. uTex is bound at render time after the snapshot.
     this.flashScene = new THREE.Scene();
     this.flashMaterial = new THREE.ShaderMaterial({
-      uniforms: { uFlash: { value: 0 } },
+      uniforms: {
+        uFlash: { value: 0 },
+        uTex: { value: null },
+      },
       vertexShader: POSTFX_VERTEX_SHADER,
       fragmentShader: /* glsl */ `
         precision highp float;
+        varying vec2 vUv;
+        uniform sampler2D uTex;
         uniform float uFlash;
         void main() {
-          gl_FragColor = vec4(uFlash, uFlash, uFlash, uFlash);
+          vec4 c = texture2D(uTex, vUv);
+          // Rec.709 luma → grayscale, push contrast around 0.5, then invert.
+          float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+          float boosted = clamp((l - 0.5) * 2.8 + 0.5, 0.0, 1.0);
+          vec3 invGray = vec3(1.0 - boosted);
+          gl_FragColor = vec4(mix(c.rgb, invGray, clamp(uFlash, 0.0, 1.0)), c.a);
         }
       `,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NoBlending,
       depthWrite: false,
-      transparent: true,
     });
     const flashQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.flashMaterial);
     this.flashScene.add(flashQuad);
@@ -332,10 +413,12 @@ export class Composer {
     if (this.rtTo) this.rtTo.setSize(w, h);
     if (this.rtPingA) this.rtPingA.setSize(w, h);
     if (this.rtPingB) this.rtPingB.setSize(w, h);
-    // Resolution uniforms on postfx materials need to follow the window.
+    // Resolution uniforms + per-pass feedback RTs need to follow the window.
     for (const entry of this.postfxMaterials.values()) {
       const u = entry.material.uniforms.uResolution;
       if (u) (u.value as THREE.Vector2).set(w, h);
+      entry.rtA.setSize(w, h);
+      entry.rtB.setSize(w, h);
     }
   }
 
@@ -381,6 +464,9 @@ export class Composer {
       const paramKeys = meta.params.map((p) => p.key);
       const uniforms: Record<string, THREE.IUniform> = {
         uTex: { value: this.blackTexture as THREE.Texture },
+        // Last frame's output of this pass — for feedback shaders (Droste,
+        // trails). Black on the first frame.
+        uPrev: { value: this.blackTexture as THREE.Texture },
         uResolution: {
           value: new THREE.Vector2(window.innerWidth, window.innerHeight),
         },
@@ -399,7 +485,25 @@ export class Composer {
         fragmentShader: source,
       });
 
-      this.postfxMaterials.set(pluginId, { pluginId, material, paramKeys });
+      const rtA = this.makeRT();
+      const rtB = this.makeRT();
+      const paramTypes: Record<string, string> = {};
+      const smoothed: Record<string, number> = {};
+      for (const p of meta.params) {
+        paramTypes[p.key] = p.type;
+        if (typeof p.default === "number") smoothed[p.key] = p.default;
+      }
+      this.postfxMaterials.set(pluginId, {
+        pluginId,
+        material,
+        paramKeys,
+        paramTypes,
+        smoothed,
+        lastSyncMs: 0,
+        rtA,
+        rtB,
+        flip: false,
+      });
       console.log(`[Composer] loaded postfx ${pluginId}`);
     } catch (err) {
       console.error(`[Composer] loadPostFX failed for ${pluginId}:`, err);
@@ -412,6 +516,8 @@ export class Composer {
     const entry = this.postfxMaterials.get(pluginId);
     if (!entry) return;
     entry.material.dispose();
+    entry.rtA.dispose();
+    entry.rtB.dispose();
     this.postfxMaterials.delete(pluginId);
   }
 
@@ -434,12 +540,32 @@ export class Composer {
       entry.material.uniforms.uBeat.value = beat;
       entry.material.uniforms.uBar.value = bar;
       entry.material.uniforms.uBpm.value = bpm;
+      const dtMs = entry.lastSyncMs > 0 ? timeMs - entry.lastSyncMs : 0;
+      entry.lastSyncMs = timeMs;
+      const k =
+        dtMs > 0
+          ? 1 - Math.exp(-(dtMs * 0.001) / PARAM_SMOOTH_TAU_SEC)
+          : 1;
       for (const key of entry.paramKeys) {
         const val = slot.params[key];
         const uniform = entry.material.uniforms[`u_${key}`];
         if (!uniform) continue;
-        if (typeof val === "number") uniform.value = val;
-        else if (typeof val === "boolean") uniform.value = val ? 1 : 0;
+        if (typeof val === "boolean") {
+          uniform.value = val ? 1 : 0;
+          continue;
+        }
+        if (typeof val !== "number") continue;
+        // Only float params get lerped — int / step controls are meant to
+        // snap, and shaders that read them as discrete values would break.
+        if (entry.paramTypes[key] === "float") {
+          const cur = entry.smoothed[key] ?? val;
+          const next = cur + (val - cur) * k;
+          entry.smoothed[key] = next;
+          uniform.value = next;
+        } else {
+          entry.smoothed[key] = val;
+          uniform.value = val;
+        }
       }
     }
     // Drop materials that have been removed from state entirely.
@@ -492,12 +618,16 @@ export class Composer {
       this.displayMaterial.uniforms.uTime.value = elapsed;
       this.syncPostFX(elapsed * 1000, beat, bar, this.state?.bpm ?? 128);
 
-      // ── Flash-zoom: compute scale before rendering so all paths use it ──
+      // ── Flash-zoom: short sine ring damped by a cubic-in envelope on the
+      // remaining time so the wobble decays fast and doesn't induce motion
+      // sickness with frequent flashes.
       if (this.state?.flashAt != null) {
         const flashElapsed = Date.now() - this.state.flashAt;
-        if (flashElapsed < Composer.FLASH_DURATION_MS) {
-          const ft = flashElapsed / Composer.FLASH_DURATION_MS;
-          this.zoomScale = 1 + 0.06 * Math.pow(1 - ft, 2); // 6% punch, quadratic decay
+        if (flashElapsed < Composer.FLASH_ZOOM_DURATION_MS) {
+          const ft = flashElapsed / Composer.FLASH_ZOOM_DURATION_MS;
+          const envelope = easeCubicIn(1 - ft); // (1-ft)^3 — fast initial decay
+          const wave = Math.sin(ft * Composer.FLASH_ZOOM_OSCILLATIONS * Math.PI * 2);
+          this.zoomScale = 1 + Composer.FLASH_ZOOM_AMPLITUDE * envelope * wave;
         } else {
           this.zoomScale = 1;
         }
@@ -527,16 +657,19 @@ export class Composer {
         srcRt: THREE.WebGLRenderTarget,
       ): THREE.WebGLRenderTarget => {
         let src = srcRt;
-        let dst = (src === this.rtPingA ? this.rtPingB : this.rtPingA)!;
         for (let i = 0; i < activePostFX.length; i++) {
           const entry = activePostFX[i];
+          // Per-pass double buffer: write to one RT, sample the other (last
+          // frame's output) as uPrev. Swap which is which every frame.
+          const writeRT = entry.flip ? entry.rtB : entry.rtA;
+          const readRT  = entry.flip ? entry.rtA : entry.rtB;
           entry.material.uniforms.uTex.value = src.texture;
+          entry.material.uniforms.uPrev.value = readRT.texture;
           this.presentQuad.material = entry.material;
-          this.renderer.setRenderTarget(dst);
+          this.renderer.setRenderTarget(writeRT);
           this.renderer.render(this.presentScene, this.displayCamera);
-          const tmp = src;
-          src = dst;
-          dst = tmp;
+          src = writeRT;
+          entry.flip = !entry.flip;
         }
         return src;
       };
@@ -547,6 +680,7 @@ export class Composer {
       const detachChainSamplers = () => {
         for (const entry of activePostFX) {
           entry.material.uniforms.uTex.value = this.blackTexture;
+          entry.material.uniforms.uPrev.value = this.blackTexture;
         }
         this.presentMaterial.uniforms.uTex.value = this.blackTexture;
         this.displayMaterial.uniforms.uBase.value = this.blackTexture;
@@ -570,29 +704,86 @@ export class Composer {
           (now - (transition!.startedAt as number)) / transition!.duration,
           1,
         );
-        // Boundary doesn't apply during transitions — keep the v1 behavior
-        // of postfx-ing the whole mixed result.
-        this.displayMaterial.uniforms.uBaseActive.value = 0;
-        this.setCompositeSlots(this.state.layers, transition!.fromActive);
-        this.renderer.setRenderTarget(this.rtFrom);
-        this.renderer.render(this.displayScene, this.displayCamera);
-        this.setCompositeSlots(this.state.layers, transition!.toActive);
-        this.renderer.setRenderTarget(this.rtTo);
-        this.renderer.render(this.displayScene, this.displayCamera);
-        this.mixMaterial.uniforms.uFrom.value = this.rtFrom!.texture;
-        this.mixMaterial.uniforms.uTo.value = this.rtTo!.texture;
-        this.mixMaterial.uniforms.uProgress.value = progress;
+        const fromActive = transition!.fromActive;
+        const toActive = transition!.toActive;
+        const transitionTypeId =
+          transition!.type === "dissolve"
+            ? 1
+            : transition!.type === "wipe"
+              ? 2
+              : transition!.type === "blackout"
+                ? 3
+                : transition!.type === "whiteout"
+                  ? 4
+                  : 0;
+        this.mixMaterial.uniforms.uType.value = transitionTypeId;
 
-        if (activePostFX.length > 0) {
+        if (
+          activePostFX.length > 0 &&
+          boundary > 0 &&
+          boundary < MAX_LAYERS
+        ) {
+          // ── Boundary-aware transition ───────────────────────────────────
+          // Pass A: mix(from, to) of below-boundary layers → postfx chain.
+          // Pass B: mix(from, to) of above-boundary layers, composited on
+          //         top of the postfxed result via uBase. Both sides honour
+          //         the FROM/TO transition independently.
           this.ensurePingPongTargets();
+          this.displayMaterial.uniforms.uBaseActive.value = 0;
+          this.setCompositeSlots(this.state.layers, fromActive, (i) => i >= boundary);
+          this.renderer.setRenderTarget(this.rtFrom);
+          this.renderer.render(this.displayScene, this.displayCamera);
+          this.setCompositeSlots(this.state.layers, toActive, (i) => i >= boundary);
+          this.renderer.setRenderTarget(this.rtTo);
+          this.renderer.render(this.displayScene, this.displayCamera);
+          this.mixMaterial.uniforms.uFrom.value = this.rtFrom!.texture;
+          this.mixMaterial.uniforms.uTo.value = this.rtTo!.texture;
+          this.mixMaterial.uniforms.uProgress.value = progress;
           this.renderer.setRenderTarget(this.rtPingA);
           this.renderer.render(this.mixScene, this.displayCamera);
-          const finalRt = runPostFXChain(this.rtPingA!);
-          presentToScreen(finalRt);
-          detachChainSamplers();
-        } else {
+          const postfxedRt = runPostFXChain(this.rtPingA!);
+
+          // Above-boundary layers composite on top of the postfxed result.
+          this.displayMaterial.uniforms.uBase.value = postfxedRt.texture;
+          this.displayMaterial.uniforms.uBaseActive.value = 1;
+          this.setCompositeSlots(this.state.layers, fromActive, (i) => i < boundary);
+          this.renderer.setRenderTarget(this.rtFrom);
+          this.renderer.render(this.displayScene, this.displayCamera);
+          this.setCompositeSlots(this.state.layers, toActive, (i) => i < boundary);
+          this.renderer.setRenderTarget(this.rtTo);
+          this.renderer.render(this.displayScene, this.displayCamera);
+          this.displayMaterial.uniforms.uBaseActive.value = 0;
+
+          this.mixMaterial.uniforms.uFrom.value = this.rtFrom!.texture;
+          this.mixMaterial.uniforms.uTo.value = this.rtTo!.texture;
+          this.mixMaterial.uniforms.uProgress.value = progress;
           this.renderer.setRenderTarget(null);
           this.renderer.render(this.mixScene, this.displayCamera);
+          detachChainSamplers();
+        } else {
+          // No boundary split: composite all layers, then optionally postfx.
+          this.displayMaterial.uniforms.uBaseActive.value = 0;
+          this.setCompositeSlots(this.state.layers, fromActive);
+          this.renderer.setRenderTarget(this.rtFrom);
+          this.renderer.render(this.displayScene, this.displayCamera);
+          this.setCompositeSlots(this.state.layers, toActive);
+          this.renderer.setRenderTarget(this.rtTo);
+          this.renderer.render(this.displayScene, this.displayCamera);
+          this.mixMaterial.uniforms.uFrom.value = this.rtFrom!.texture;
+          this.mixMaterial.uniforms.uTo.value = this.rtTo!.texture;
+          this.mixMaterial.uniforms.uProgress.value = progress;
+
+          if (activePostFX.length > 0 && boundary === 0) {
+            this.ensurePingPongTargets();
+            this.renderer.setRenderTarget(this.rtPingA);
+            this.renderer.render(this.mixScene, this.displayCamera);
+            const finalRt = runPostFXChain(this.rtPingA!);
+            presentToScreen(finalRt);
+            detachChainSamplers();
+          } else {
+            this.renderer.setRenderTarget(null);
+            this.renderer.render(this.mixScene, this.displayCamera);
+          }
         }
       } else if (
         this.state &&
@@ -654,16 +845,30 @@ export class Composer {
         this.renderer.render(this.displayScene, this.displayCamera);
       }
 
-      // Flash overlay — applied on top of every render path.
+      // Flash invert — snapshot the just-rendered framebuffer, then redraw
+      // it through the invert shader.
       if (this.state?.flashAt != null) {
         const elapsed = Date.now() - this.state.flashAt;
         if (elapsed < Composer.FLASH_DURATION_MS) {
           const t = elapsed / Composer.FLASH_DURATION_MS;
-          // Sharp attack (instant), quadratic decay.
-          this.flashMaterial.uniforms.uFlash.value = Math.pow(1 - t, 2);
+          // Hold at full strength, then snap off near the end (almost no fade).
+          const strength = 1 - Math.pow(t, 8);
+
+          // Allocate / resize the snapshot texture to match the drawing buffer.
+          const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+          const w = Math.max(1, Math.floor(size.x));
+          const h = Math.max(1, Math.floor(size.y));
+          const cap = this.flashCaptureTexture;
+          if (!cap || cap.image.width !== w || cap.image.height !== h) {
+            cap?.dispose();
+            this.flashCaptureTexture = new THREE.FramebufferTexture(w, h);
+          }
+
           this.renderer.setRenderTarget(null);
-          // Disable autoClear so the flash overlay doesn't wipe the frame
-          // that was just rendered by the main composite/postfx path.
+          this.renderer.copyFramebufferToTexture(this.flashCaptureTexture!);
+
+          this.flashMaterial.uniforms.uTex.value = this.flashCaptureTexture;
+          this.flashMaterial.uniforms.uFlash.value = strength;
           this.renderer.autoClear = false;
           this.renderer.render(this.flashScene, this.displayCamera);
           this.renderer.autoClear = true;
@@ -691,6 +896,34 @@ export class Composer {
     const slotOpacity = [0, 0, 0, 0];
     const slotBlend = [0, 0, 0, 0];
     const slotActive = [0, 0, 0, 0];
+    const slotAspect = [1, 1, 1, 1];
+
+    const canvas = this.renderer.domElement;
+    const canvasAspect =
+      canvas.height > 0 ? canvas.width / canvas.height : 1;
+    const textureAspect = (tex: THREE.Texture): number => {
+      const img = tex.image as
+        | (HTMLVideoElement & { videoWidth: number; videoHeight: number })
+        | (HTMLCanvasElement & { width: number; height: number })
+        | { width?: number; height?: number }
+        | null
+        | undefined;
+      if (!img) return canvasAspect;
+      if (typeof HTMLVideoElement !== "undefined" && img instanceof HTMLVideoElement) {
+        if (img.videoWidth > 0 && img.videoHeight > 0) {
+          return img.videoWidth / img.videoHeight;
+        }
+        return canvasAspect;
+      }
+      if (typeof HTMLCanvasElement !== "undefined" && img instanceof HTMLCanvasElement) {
+        if (img.width > 0 && img.height > 0) return img.width / img.height;
+        return canvasAspect;
+      }
+      // RenderTarget textures and DataTextures expose width/height directly.
+      const w = (img as { width?: number }).width ?? 0;
+      const h = (img as { height?: number }).height ?? 0;
+      return w > 0 && h > 0 ? w / h : canvasAspect;
+    };
 
     const bounded = layers.slice(0, MAX_LAYERS);
     const anySolo = bounded.some((l) => l.solo);
@@ -709,6 +942,7 @@ export class Composer {
       slotOpacity[i] = layer.opacity;
       slotBlend[i] = BLEND_MODE[layer.blend] ?? 0;
       slotActive[i] = 1;
+      slotAspect[i] = canvasAspect > 0 ? textureAspect(tex) / canvasAspect : 1;
     }
 
     const u = this.displayMaterial.uniforms;
@@ -719,6 +953,7 @@ export class Composer {
     u.uOpacity.value = slotOpacity;
     u.uBlend.value = slotBlend;
     u.uActive.value = slotActive;
+    u.uLayerAspect.value = slotAspect;
   }
 
   stop(): void {
@@ -738,9 +973,14 @@ export class Composer {
     this.rtTo?.dispose();
     this.rtPingA?.dispose();
     this.rtPingB?.dispose();
-    for (const entry of this.postfxMaterials.values()) entry.material.dispose();
+    for (const entry of this.postfxMaterials.values()) {
+      entry.material.dispose();
+      entry.rtA.dispose();
+      entry.rtB.dispose();
+    }
     this.postfxMaterials.clear();
     this.flashMaterial.dispose();
+    this.flashCaptureTexture?.dispose();
     this.blackTexture.dispose();
     this.renderer.dispose();
   }
