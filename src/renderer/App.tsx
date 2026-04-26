@@ -27,10 +27,43 @@ export function App() {
   const toggleMidiMap = useMidiMapPanelStore((s) => s.toggle);
 
   useEffect(() => {
-    loadPlugins();
-    const off = window.vj.onPluginsChanged(() => loadPlugins());
-    return off;
+    // Restore the persisted scene first so loadPlugins' default-seed
+    // doesn't overwrite the user's saved postfx arrangement.
+    let off: (() => void) | null = null;
+    (async () => {
+      try {
+        const saved = await window.vj.getSetting("scene");
+        if (saved) useVJStore.getState().restoreScene(saved);
+      } catch (err) {
+        console.error("[scene] restore failed:", err);
+      }
+      await loadPlugins();
+      off = window.vj.onPluginsChanged(() => loadPlugins());
+    })();
+    return () => {
+      off?.();
+    };
   }, [loadPlugins]);
+
+  // Persist the scene-relevant slice of state. Debounced so dragging
+  // sliders doesn't hammer disk; the trailing edge captures the final
+  // value. Realtime fields (beatAnchor, audio, flashAt, transition
+  // timestamps) are intentionally excluded — they shouldn't survive a
+  // restart.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      void window.vj.setSetting("scene", {
+        version: 1,
+        layers: state.layers,
+        postfx: state.postfx,
+        postfxBoundary: state.postfxBoundary,
+        transitionType: state.transition.type,
+        transitionDuration: state.transition.duration,
+        bpm: state.bpm,
+      });
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [state]);
 
   useEffect(() => {
     initMidi();

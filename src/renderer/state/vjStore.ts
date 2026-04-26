@@ -108,6 +108,14 @@ interface VJStoreShape {
   selectedPostFXSlot: number;
   selectPostFXSlot: (slotIdx: number) => void;
   /**
+   * Restore the scene (layers / postfx / boundary / transition / bpm)
+   * from electron-store on launch. Only writes recognized fields so a
+   * stale save with extra junk doesn't corrupt anything. Marks the
+   * postfx default-seed flag so loadPlugins() won't overwrite the
+   * restored slots.
+   */
+  restoreScene: (saved: unknown) => void;
+  /**
    * BPM source mode. AUTO = mic-driven realtime detector writes state.bpm.
    * MANUAL = user controls via TAP / MIDI. In AUTO, TAP only nudges the
    * beat phase (beatAnchor); BPM stays driven by the detector.
@@ -234,6 +242,35 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
   selectedPostFXSlot: 0,
   selectPostFXSlot: (slotIdx) =>
     set(() => ({ selectedPostFXSlot: Math.max(0, Math.min(POSTFX_SLOT_COUNT - 1, slotIdx)) })),
+  restoreScene: (saved) => {
+    if (!saved || typeof saved !== "object") return;
+    const obj = saved as Record<string, unknown>;
+    set((s) => {
+      const next: VJState = { ...s.state };
+      if (Array.isArray(obj.layers)) next.layers = obj.layers as VJState["layers"];
+      if (Array.isArray(obj.postfx)) {
+        // Pad / clip to POSTFX_SLOT_COUNT so a stale save can't shrink the rack.
+        const slots = (obj.postfx as PostFXSlot[]).slice(0, POSTFX_SLOT_COUNT);
+        while (slots.length < POSTFX_SLOT_COUNT) slots.push(emptySlot());
+        next.postfx = slots;
+      }
+      if (typeof obj.postfxBoundary === "number") next.postfxBoundary = obj.postfxBoundary;
+      if (typeof obj.transitionType === "string") {
+        next.transition = {
+          ...s.state.transition,
+          type: obj.transitionType as VJState["transition"]["type"],
+          duration: typeof obj.transitionDuration === "number"
+            ? obj.transitionDuration
+            : s.state.transition.duration,
+        };
+      }
+      if (typeof obj.bpm === "number") next.bpm = obj.bpm;
+      return { state: next };
+    });
+    // Restored postfx counts as "user-arranged" — block the default seed
+    // in the next loadPlugins so we don't overwrite the restore.
+    postfxSeeded = true;
+  },
   bpmAutoMode: false,
   bpmDetected: null,
   bpmConfidence: 0,
