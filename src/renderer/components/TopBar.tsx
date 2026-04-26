@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import type { LayerClip, LayerState, PluginMeta } from "../../shared/types";
 import { PostFXEditor } from "./PostFXBar";
-import { AudioMeters } from "./AudioMeters";
 import { AssetPreview } from "./AssetPreview";
 
 // CSS mix-blend-mode doesn't have a native `add`, but `plus-lighter` /
@@ -135,7 +134,6 @@ export function TopBar() {
       </div>
       <div className="master-panel">
         <PostFXEditor />
-        <AudioMeters />
       </div>
     </div>
   );

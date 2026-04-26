@@ -130,6 +130,8 @@ interface VJStoreShape {
   bpmStable: boolean;
   setBpmAutoMode: (on: boolean) => void;
   setDetectedBpm: (tempo: number, confidence: number, stable: boolean) => void;
+  /** Per-frame audio band update from the analyser (all 0..1). */
+  setAudio: (volume: number, bass: number, mid: number, high: number) => void;
   /** Set the postfx application boundary. Clamped to [0, layers.length]. */
   setPostfxBoundary: (n: number) => void;
   /** Set a single param on an active clip. Immediately broadcasts. */
@@ -284,6 +286,9 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
   bpmConfidence: 0,
   bpmStable: false,
   setBpmAutoMode: (on) => set(() => ({ bpmAutoMode: on, ...(on ? {} : { bpmDetected: null, bpmConfidence: 0, bpmStable: false }) })),
+  setAudio: (volume, bass, mid, high) => {
+    set((s) => ({ state: { ...s.state, audio: { volume, bass, mid, high } } }));
+  },
   setDetectedBpm: (tempo, confidence, stable) => {
     set((s) => {
       // Only write into state.bpm when AUTO is active. Otherwise keep the

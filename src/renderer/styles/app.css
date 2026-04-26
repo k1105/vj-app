@@ -97,7 +97,7 @@ body {
 
 .app {
   display: grid;
-  grid-template-rows: min-content 1fr auto;
+  grid-template-rows: min-content 1fr auto auto;
   height: 100vh;
   background: var(--bg-primary);
 }
@@ -2060,50 +2060,45 @@ input[type="range"]::-moz-range-thumb {
 /* ─────────────────────────────────────────────
    Audio Meters — lives in Master panel (bottom half)
    ───────────────────────────────────────────── */
-.audio-meters {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-.audio-meters-header {
+/* Horizontal AUDIO strip across the bottom (above TransportBar). */
+.audio-meters-strip {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  height: var(--header-h);
+  gap: 10px;
+  padding: 4px 12px;
   background: var(--bg-panel);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1.8px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 1.2px;
+  flex-shrink: 0;
+  height: 24px;
+}
+.audio-meters-label {
   color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 1.8px;
 }
 .audio-meters-status {
   color: var(--text-muted);
   font-weight: 500;
-  letter-spacing: 0.8px;
-  font-size: 8px;
+  text-transform: uppercase;
 }
-.audio-meters-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 12px 10px;
+.audio-meters-status.live {
+  color: var(--live);
 }
-.audio-meter {
+.audio-meter-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex: 1 1 0;
+  min-width: 0;
 }
-.audio-meter-label {
-  font-size: 8px;
-  font-family: var(--font-mono);
+.audio-meter-row > span {
   color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 0.8px;
-  width: 40px;
+  width: 28px;
   flex-shrink: 0;
 }
 .audio-meter-bar {
@@ -2114,16 +2109,17 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 1px;
   overflow: hidden;
   position: relative;
+  min-width: 0;
 }
 .audio-meter-fill {
   height: 100%;
+  width: 0;
   background: linear-gradient(
     90deg,
     var(--live) 0%,
     var(--accent) 70%,
     var(--danger) 100%
   );
-  transition: width 0.05s linear;
 }
 
 /* ── MIDI Learn ─────────────────────────────────────────────── */

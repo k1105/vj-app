@@ -13,6 +13,12 @@ interface DetectorOpts {
    * unlatches when they drift out again.
    */
   onUpdate: (tempo: number, confidence: number, stable: boolean) => void;
+  /**
+   * Fires once per animation frame with band energy from the same mic
+   * stream. All values are 0..1. `bass` covers ~0–500 Hz, `mid` ~500 Hz–
+   * 2.5 kHz, `high` the rest; `volume` is the broadband average.
+   */
+  onBands?: (volume: number, bass: number, mid: number, high: number) => void;
   /** Fired on permission / device errors. */
   onError?: (err: Error) => void;
 }
@@ -53,6 +59,8 @@ export async function startBpmDetector(opts: DetectorOpts): Promise<BpmDetectorH
   let stream: MediaStream | null = null;
   let source: MediaStreamAudioSourceNode | null = null;
   let analyzer: BpmAnalyzer | null = null;
+  let bandsAnalyser: AnalyserNode | null = null;
+  let bandsRaf = 0;
 
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -69,6 +77,42 @@ export async function startBpmDetector(opts: DetectorOpts): Promise<BpmDetectorH
     });
     source = audioCtx.createMediaStreamSource(stream);
     source.connect(analyzer.node);
+
+    // Parallel band analyser on the same source. Independent of the BPM
+    // worklet — it just reads frequency magnitudes per frame.
+    if (opts.onBands) {
+      const bandsNode = audioCtx.createAnalyser();
+      bandsNode.fftSize = 256;
+      bandsNode.smoothingTimeConstant = 0.6;
+      source.connect(bandsNode);
+      const buf = new Uint8Array(bandsNode.frequencyBinCount);
+      const N = buf.length;
+      const bassEnd = Math.max(1, Math.floor(N * 0.05)); // ~ <500 Hz at 24 kHz Nyquist
+      const midEnd = Math.max(bassEnd + 1, Math.floor(N * 0.25)); // ~ <2.5 kHz
+      let raf = 0;
+      const tick = () => {
+        bandsNode.getByteFrequencyData(buf);
+        let sumAll = 0, sumBass = 0, sumMid = 0, sumHigh = 0;
+        for (let i = 0; i < N; i++) {
+          const v = buf[i];
+          sumAll += v;
+          if (i < bassEnd) sumBass += v;
+          else if (i < midEnd) sumMid += v;
+          else sumHigh += v;
+        }
+        const inv255 = 1 / 255;
+        opts.onBands!(
+          (sumAll / N) * inv255,
+          (sumBass / bassEnd) * inv255,
+          (sumMid / (midEnd - bassEnd)) * inv255,
+          (sumHigh / (N - midEnd)) * inv255,
+        );
+        raf = requestAnimationFrame(tick);
+      };
+      tick();
+      bandsRaf = raf;
+      bandsAnalyser = bandsNode;
+    }
     // Note: do NOT connect to audioCtx.destination — that would pipe the mic
     // straight to the speakers and feedback through the room.
 
@@ -97,6 +141,8 @@ export async function startBpmDetector(opts: DetectorOpts): Promise<BpmDetectorH
     });
   } catch (err) {
     // Clean up partial setup before re-throwing / reporting.
+    if (bandsRaf) cancelAnimationFrame(bandsRaf);
+    try { bandsAnalyser?.disconnect(); } catch { /* */ }
     try { source?.disconnect(); } catch { /* */ }
     try { analyzer?.disconnect(); } catch { /* */ }
     if (stream) for (const t of stream.getTracks()) t.stop();
@@ -106,12 +152,15 @@ export async function startBpmDetector(opts: DetectorOpts): Promise<BpmDetectorH
   }
 
   const stop = async () => {
+    if (bandsRaf) cancelAnimationFrame(bandsRaf);
+    try { bandsAnalyser?.disconnect(); } catch { /* */ }
     try { source?.disconnect(); } catch { /* */ }
     try { analyzer?.disconnect(); } catch { /* */ }
     if (stream) for (const t of stream.getTracks()) t.stop();
     if (audioCtx) await audioCtx.close().catch(() => undefined);
     source = null;
     analyzer = null;
+    bandsAnalyser = null;
     stream = null;
     audioCtx = null;
   };

@@ -8,6 +8,7 @@ import { AssetsPanel } from "./components/AssetsPanel";
 import { LayerStack } from "./components/LayerStack";
 import { AssetParamsPanel } from "./components/AssetParamsPanel";
 import { PostFXSlotsRow } from "./components/PostFXBar";
+import { AudioMeters } from "./components/AudioMeters";
 import { TransportBar } from "./components/TransportBar";
 import { MidiMapPanel } from "./components/midiMap/MidiMapPanel";
 import { useMidiMapPanelStore } from "./state/midiMapPanelStore";
@@ -24,6 +25,7 @@ export function App() {
   const bpmAutoMode = useVJStore((s) => s.bpmAutoMode);
   const setBpmAutoMode = useVJStore((s) => s.setBpmAutoMode);
   const setDetectedBpm = useVJStore((s) => s.setDetectedBpm);
+  const setAudio = useVJStore((s) => s.setAudio);
   const toggleMidiMap = useMidiMapPanelStore((s) => s.toggle);
 
   useEffect(() => {
@@ -81,6 +83,7 @@ export function App() {
     let cancelled = false;
     startBpmDetector({
       onUpdate: (tempo, conf, stable) => setDetectedBpm(tempo, conf, stable),
+      onBands: (vol, bass, mid, high) => setAudio(vol, bass, mid, high),
       onError: (err) => {
         console.error("[BPM] detector error:", err);
         // Drop back to MANUAL so the UI doesn't lie about being live.
@@ -98,7 +101,7 @@ export function App() {
       cancelled = true;
       handle?.stop();
     };
-  }, [bpmAutoMode, setDetectedBpm, setBpmAutoMode]);
+  }, [bpmAutoMode, setDetectedBpm, setAudio, setBpmAutoMode]);
 
   // Push state to output window (debounced inside the store)
   useEffect(() => {
@@ -158,6 +161,7 @@ export function App() {
         </div>
         <AssetParamsPanel />
       </div>
+      <AudioMeters />
       <TransportBar />
       <MidiMapPanel />
     </div>
