@@ -257,8 +257,8 @@ body {
 .master-panel {
   border-left: 1px solid var(--border-strong);
   padding: 0;
-  display: grid;
-  grid-template-rows: 1fr auto;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
@@ -1256,9 +1256,11 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  /* Hard-cap the stack so adding more enabled slots scrolls inside the
-     panel instead of pushing the whole top-bar taller. */
-  max-height: 20vh;
+  /* Fill the master panel's full height now that AudioMeters has
+     moved out; once the assigned slots' editors don't fit, the stack
+     scrolls inside the panel. */
+  flex: 1 1 auto;
+  min-height: 0;
   border-top: 1px solid var(--border-subtle);
 }
 .postfx-empty-assign {
