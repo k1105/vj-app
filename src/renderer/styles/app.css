@@ -224,6 +224,15 @@ body {
   background: var(--live);
   color: #001a0d;
 }
+.preview-box.next.disabled {
+  opacity: 0.45;
+  filter: saturate(0.3);
+}
+.preview-box.next.disabled .preview-placeholder {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
 .preview-box.next .preview-badge {
   background: var(--border-strong);
   color: var(--info);

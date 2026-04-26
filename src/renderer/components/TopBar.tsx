@@ -42,6 +42,7 @@ function textLabelForClip(plugin: PluginMeta, clip: LayerClip): string {
 export function TopBar() {
   const layers = useVJStore((s) => s.state.layers);
   const plugins = useVJStore((s) => s.plugins);
+  const stageMode = useVJStore((s) => s.stageMode);
 
   const [liveSrc, setLiveSrc] = useState<string>("");
 
@@ -121,10 +122,16 @@ export function TopBar() {
           <div className="preview-placeholder">waiting for output…</div>
         )}
       </div>
-      <div className="preview-box next">
+      <div className={`preview-box next${stageMode ? "" : " disabled"}`}>
         <div className="preview-label">NEXT OUT</div>
         <div className="preview-badge">NEXT</div>
-        <div className="preview-stack">{renderedLayers(true)}</div>
+        {stageMode ? (
+          <div className="preview-stack">{renderedLayers(true)}</div>
+        ) : (
+          <div className="preview-placeholder">
+            STAGE OFF — press S to stage edits
+          </div>
+        )}
       </div>
       <div className="master-panel">
         <PostFXEditor />
