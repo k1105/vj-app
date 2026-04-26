@@ -137,7 +137,7 @@ interface VJStoreShape {
 
 // Default PostFX slot assignment, seeded once on the first plugin load if
 // the user hasn't already arranged their own. Order = chain order.
-const DEFAULT_POSTFX_SEEDS = ["droste", "thermal", "mirror", "glitch", "kaleidoscope"];
+const DEFAULT_POSTFX_SEEDS = ["droste", "thermal", "mirror", "glitch", "kaleidoscope", "drift"];
 let postfxSeeded = false;
 
 // throttle-with-trailing-edge broadcaster
