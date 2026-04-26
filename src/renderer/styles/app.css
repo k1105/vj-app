@@ -287,12 +287,14 @@ body {
      (the slider track). */
   grid-template-rows: 16px auto;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 0;
   column-gap: 6px;
   row-gap: 3px;
 }
 /* MIDI learn slot — leftmost column, spans both rows for a tall click
-   target. Shows the mapped CC number when bound, "●" while listening. */
+   target. Shows the mapped CC number when bound, "●" while listening.
+   Flush against the section edge (no row gaps, no border-radius) so
+   stacked rows form one continuous click strip. */
 .param-row > .midi-rec-slot {
   grid-column: 1;
   grid-row: 1 / -1;
@@ -301,20 +303,22 @@ body {
   padding: 0;
   background: var(--bg-inset);
   border: 1px solid var(--border);
-  border-radius: 2px;
+  border-radius: 0;
   color: var(--text-dim);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   cursor: pointer;
-  transition: color 0.1s, border-color 0.1s, background 0.1s;
+  transition: color 0.08s, border-color 0.08s, background 0.08s, box-shadow 0.08s;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .param-row > .midi-rec-slot:hover {
-  color: var(--text);
-  border-color: var(--border-strong);
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 6px var(--accent-dim);
 }
 .param-row > .midi-rec-slot.mapped {
   color: var(--live);
@@ -1299,7 +1303,9 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 1px;
 }
 .asset-section .asset-params {
-  padding: 8px 12px;
+  /* No top / bottom / left padding so the rec-slot column sits flush
+     against the section edge; right padding kept for sync (~) breathing. */
+  padding: 0 8px 0 0;
 }
 /* PostFX stacked editor sections */
 .postfx-editor-stack {
@@ -1931,10 +1937,12 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 0 6px var(--live);
 }
 .postfx-rack-params {
-  padding: 8px 10px;
+  /* No top / bottom / left padding so the rec-slot column sits flush
+     against the section edge; right padding kept for sync (~) breathing. */
+  padding: 0 8px 0 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
   min-height: 40px;
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-inset);
