@@ -182,18 +182,31 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
     return;
   }
 
-  if (targetId.startsWith("postfx:")) {
-    // format: "postfx:{pluginId}:{key}"
-    const rest = targetId.slice("postfx:".length);
-    const colonIdx = rest.indexOf(":");
-    if (colonIdx === -1) return;
-    const pluginId = rest.slice(0, colonIdx);
-    const key = rest.slice(colonIdx + 1);
-    const plugin = vj.plugins.find((p) => p.id === pluginId);
-    const def = plugin?.params.find((p) => p.key === key);
-    const min = def?.min ?? 0;
-    const max = def?.max ?? 1;
-    vj.setPostFXParam(pluginId, key, min + (rawValue / 127) * (max - min));
+  if (targetId.startsWith("postfx-slot:")) {
+    // format:
+    //   "postfx-slot:{slotIdx}:bypass"    — toggle slot enabled (button)
+    //   "postfx-slot:{slotIdx}:param:{key}" — set slot param (CC)
+    const rest = targetId.slice("postfx-slot:".length);
+    const firstColon = rest.indexOf(":");
+    if (firstColon === -1) return;
+    const slotIdx = parseInt(rest.slice(0, firstColon), 10);
+    if (isNaN(slotIdx)) return;
+    const tail = rest.slice(firstColon + 1);
+    if (tail === "bypass") {
+      if (!isNoteOff) vj.togglePostFXSlot(slotIdx);
+      return;
+    }
+    if (tail.startsWith("param:")) {
+      const key = tail.slice("param:".length);
+      const slot = vj.state.postfx[slotIdx];
+      if (!slot?.pluginId) return;
+      const plugin = vj.plugins.find((p) => p.id === slot.pluginId);
+      const def = plugin?.params.find((p) => p.key === key);
+      const min = def?.min ?? 0;
+      const max = def?.max ?? 1;
+      vj.setPostFXSlotParam(slotIdx, key, min + (rawValue / 127) * (max - min));
+      return;
+    }
     return;
   }
 

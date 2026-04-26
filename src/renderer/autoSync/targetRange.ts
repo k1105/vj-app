@@ -19,13 +19,19 @@ export function resolveTargetRange(targetId: string): TargetRange | null {
     return { min: 0, max: 1, set: (v) => vj.setLayerOpacity(idx, v) };
   }
 
-  if (targetId.startsWith("postfx:")) {
-    const rest = targetId.slice("postfx:".length);
-    const colonIdx = rest.indexOf(":");
-    if (colonIdx === -1) return null;
-    const pluginId = rest.slice(0, colonIdx);
-    const key = rest.slice(colonIdx + 1);
-    const plugin = vj.plugins.find((p) => p.id === pluginId);
+  if (targetId.startsWith("postfx-slot:")) {
+    // "postfx-slot:{slotIdx}:param:{key}"
+    const rest = targetId.slice("postfx-slot:".length);
+    const firstColon = rest.indexOf(":");
+    if (firstColon === -1) return null;
+    const slotIdx = parseInt(rest.slice(0, firstColon), 10);
+    if (isNaN(slotIdx)) return null;
+    const tail = rest.slice(firstColon + 1);
+    if (!tail.startsWith("param:")) return null;
+    const key = tail.slice("param:".length);
+    const slot = vj.state.postfx[slotIdx];
+    if (!slot?.pluginId) return null;
+    const plugin = vj.plugins.find((p) => p.id === slot.pluginId);
     const def = plugin?.params.find((p) => p.key === key);
     if (
       !def ||
@@ -38,7 +44,7 @@ export function resolveTargetRange(targetId: string): TargetRange | null {
     return {
       min: def.min ?? 0,
       max: def.max ?? 1,
-      set: (v) => vj.setPostFXParam(pluginId, key, v),
+      set: (v) => vj.setPostFXSlotParam(slotIdx, key, v),
     };
   }
 

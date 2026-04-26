@@ -144,6 +144,15 @@ export interface TransitionState {
   toActive: number[];
 }
 
+export interface PostFXSlot {
+  /** null = empty slot (skipped by Composer). */
+  pluginId: string | null;
+  enabled: boolean;
+  params: Record<string, ParamValue>;
+}
+
+export const POSTFX_SLOT_COUNT = 8;
+
 export interface VJState {
   bpm: number;
   /**
@@ -160,7 +169,13 @@ export interface VJState {
   layers: LayerState[];
   selectedLayer: number;
   transition: TransitionState;
-  postfx: Array<{ pluginId: string; enabled: boolean; params: Record<string, ParamValue> }>;
+  /**
+   * 8 fixed PostFX slots. Each slot may hold a plugin (or be empty), and the
+   * slot order defines the chain order. Slot positions are stable so MIDI
+   * mappings (per slot) stay valid even if the user swaps the assigned
+   * plugin in that slot.
+   */
+  postfx: PostFXSlot[];
   /**
    * PostFX application boundary. PostFX runs on `layers[postfxBoundary..N-1]`;
    * layers above the boundary composite on top of the postfx'd result without

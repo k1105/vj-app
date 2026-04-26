@@ -549,6 +549,7 @@ export class Composer {
     if (!this.state) return;
     const wanted = new Set<string>();
     for (const slot of this.state.postfx) {
+      if (!slot.pluginId) continue;
       wanted.add(slot.pluginId);
       const entry = this.postfxMaterials.get(slot.pluginId);
       if (!entry) {
@@ -665,8 +666,8 @@ export class Composer {
       const activePostFX =
         this.state
           ? this.state.postfx
-              .filter((p) => p.enabled)
-              .map((p) => this.postfxMaterials.get(p.pluginId))
+              .filter((p) => p.enabled && p.pluginId)
+              .map((p) => this.postfxMaterials.get(p.pluginId as string))
               .filter((e): e is PostFXEntry => !!e)
           : [];
 

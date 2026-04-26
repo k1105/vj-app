@@ -3,11 +3,17 @@ import type {
   LayerState,
   ParamValue,
   PluginMeta,
+  PostFXSlot,
   TransitionType,
   VJState,
 } from "../../shared/types";
+import { POSTFX_SLOT_COUNT } from "../../shared/types";
 
 const DEFAULT_TRANSITION_DURATION_MS = 1000;
+
+const emptySlot = (): PostFXSlot => ({ pluginId: null, enabled: false, params: {} });
+const makeSlots = (): PostFXSlot[] =>
+  Array.from({ length: POSTFX_SLOT_COUNT }, () => emptySlot());
 
 const makeLayer = (id: number): LayerState => ({
   id,
@@ -35,7 +41,7 @@ const initialState: VJState = {
     fromActive: [-1, -1, -1, -1],
     toActive: [-1, -1, -1, -1],
   },
-  postfx: [],
+  postfx: makeSlots(),
   postfxBoundary: 0,
   flashAt: null,
 };
@@ -90,16 +96,16 @@ interface VJStoreShape {
    * and snaps beatAnchor to the latest tap so beat 0 lines up with it.
    */
   tap: () => void;
-  /** Flip a postfx slot's enabled flag. Lazy-inserts if not present. */
-  togglePostFX: (pluginId: string) => void;
+  /** Flip slot[slotIdx].enabled. Slots with null pluginId stay disabled. */
+  togglePostFXSlot: (slotIdx: number) => void;
+  /** Assign / unassign a plugin in slot[slotIdx]. Seeds default params. */
+  setPostFXSlotPlugin: (slotIdx: number, pluginId: string | null) => void;
+  /** Set a single param on slot[slotIdx]. */
+  setPostFXSlotParam: (slotIdx: number, key: string, value: ParamValue) => void;
+  /** Clear slot[slotIdx] (pluginId=null, enabled=false, params={}). */
+  clearPostFXSlot: (slotIdx: number) => void;
   /** Set the postfx application boundary. Clamped to [0, layers.length]. */
   setPostfxBoundary: (n: number) => void;
-  /** Set a single param on an existing postfx slot. No-op if not present. */
-  setPostFXParam: (
-    pluginId: string,
-    key: string,
-    value: ParamValue,
-  ) => void;
   /** Set a single param on an active clip. Immediately broadcasts. */
   setClipParam: (
     layerIdx: number,
@@ -496,23 +502,54 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
     }, duration);
   },
 
-  togglePostFX: (pluginId) => {
+  togglePostFXSlot: (slotIdx) => {
     set((s) => {
-      const existing = s.state.postfx.find((p) => p.pluginId === pluginId);
-      let postfx;
-      if (existing) {
-        postfx = s.state.postfx.map((p) =>
-          p.pluginId === pluginId ? { ...p, enabled: !p.enabled } : p,
-        );
-      } else {
-        // Seed with default params from the plugin manifest.
+      const slot = s.state.postfx[slotIdx];
+      if (!slot || !slot.pluginId) return s;
+      const postfx = s.state.postfx.map((p, i) =>
+        i === slotIdx ? { ...p, enabled: !p.enabled } : p,
+      );
+      return { state: { ...s.state, postfx } };
+    });
+  },
+
+  setPostFXSlotPlugin: (slotIdx, pluginId) => {
+    set((s) => {
+      const slot = s.state.postfx[slotIdx];
+      if (!slot) return s;
+      // Seed default params from the new plugin manifest. Empty when clearing.
+      let params: Record<string, ParamValue> = {};
+      if (pluginId) {
         const plugin = s.plugins.find((p) => p.id === pluginId);
-        const params: Record<string, ParamValue> = {};
         for (const def of plugin?.params ?? []) {
           params[def.key] = def.default;
         }
-        postfx = [...s.state.postfx, { pluginId, enabled: true, params }];
       }
+      const postfx = s.state.postfx.map((p, i) =>
+        i === slotIdx
+          ? { pluginId, enabled: pluginId ? p.enabled : false, params }
+          : p,
+      );
+      return { state: { ...s.state, postfx } };
+    });
+  },
+
+  setPostFXSlotParam: (slotIdx, key, value) => {
+    set((s) => {
+      const slot = s.state.postfx[slotIdx];
+      if (!slot || !slot.pluginId) return s;
+      const postfx = s.state.postfx.map((p, i) =>
+        i === slotIdx ? { ...p, params: { ...p.params, [key]: value } } : p,
+      );
+      return { state: { ...s.state, postfx } };
+    });
+  },
+
+  clearPostFXSlot: (slotIdx) => {
+    set((s) => {
+      const slot = s.state.postfx[slotIdx];
+      if (!slot) return s;
+      const postfx = s.state.postfx.map((p, i) => (i === slotIdx ? emptySlot() : p));
       return { state: { ...s.state, postfx } };
     });
   },
@@ -523,15 +560,6 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
       const clamped = Math.max(0, Math.min(max, Math.round(n)));
       if (clamped === s.state.postfxBoundary) return s;
       return { state: { ...s.state, postfxBoundary: clamped } };
-    });
-  },
-
-  setPostFXParam: (pluginId, key, value) => {
-    set((s) => {
-      const postfx = s.state.postfx.map((p) =>
-        p.pluginId === pluginId ? { ...p, params: { ...p.params, [key]: value } } : p,
-      );
-      return { state: { ...s.state, postfx } };
     });
   },
 

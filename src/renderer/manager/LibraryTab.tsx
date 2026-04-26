@@ -46,7 +46,9 @@ export function LibraryTab({ kind = "material" }: LibraryTabProps = {}) {
           for (const clip of layer.clips) ids.add(clip.pluginId);
         }
       } else if (kind === "postfx") {
-        for (const p of state.postfx) ids.add(p.pluginId);
+        for (const p of state.postfx) {
+          if (p.pluginId) ids.add(p.pluginId);
+        }
       }
       setInUse(ids);
     });
