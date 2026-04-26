@@ -390,9 +390,11 @@ export class Composer {
           // Sweep the entire ramp ~5 times per second.
           float shift = uTime * 5.0;
           vec3 thermal = thermalRamp(l + shift);
-          // Strobe: first half of each cycle = thermal, second half = white.
-          float white = step(0.5, uPhase);
-          vec3 final = mix(thermal, vec3(1.0), white * 0.92);
+          // Strobe: white only in the last ~25% of each cycle so the
+          // thermal sweep dominates the look. Smoothstep softens the
+          // edges so the flash reads as a pulse, not a hard shutter.
+          float white = smoothstep(0.75, 0.95, uPhase);
+          vec3 final = mix(thermal, vec3(1.0), white * 0.85);
           gl_FragColor = vec4(final, c.a);
         }
       `,
