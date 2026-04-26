@@ -141,11 +141,20 @@ function pulsePhysicalForAddress(address: MidiAddress): void {
   }
 }
 
+// Last value per target — used to detect press edges. Momentary buttons
+// fire press (127) AND release (0) in the same physical gesture; without
+// edge detection, toggle-style targets (bypass / stage) would fire twice
+// per press and cancel themselves out.
+const lastTriggerValue = new Map<string, number>();
+function isPressEdge(targetId: string, rawValue: number): boolean {
+  const prev = lastTriggerValue.get(targetId) ?? 0;
+  lastTriggerValue.set(targetId, rawValue);
+  return prev <= 0 && rawValue > 0;
+}
+
 function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): void {
   const vj = useVJStore.getState();
 
-  // Note velocity=0 is note-off — skip it for trigger targets.
-  // CC value=0 from a toggle button IS a real button press, so don't skip it.
   const isNoteOff = addrType === "note" && rawValue === 0;
 
   // Touching a MIDI control on a sync-active target turns sync off (matches
@@ -155,11 +164,11 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
   // "release" is the new universal commit. "go" stays as a legacy alias —
   // both fire releaseStage if currently staging, no-op otherwise.
   if (targetId === "go" || targetId === "release") {
-    if (!isNoteOff && vj.stageMode) vj.releaseStage();
+    if (isPressEdge(targetId, rawValue) && vj.stageMode) vj.releaseStage();
     return;
   }
   if (targetId === "stage") {
-    if (!isNoteOff) {
+    if (isPressEdge(targetId, rawValue)) {
       if (vj.stageMode) vj.cancelStage();
       else vj.enterStage();
     }
@@ -167,12 +176,12 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
   }
 
   if (targetId === "tap") {
-    if (!isNoteOff) vj.tap();
+    if (isPressEdge(targetId, rawValue)) vj.tap();
     return;
   }
 
   if (targetId === "flash") {
-    if (!isNoteOff) vj.triggerFlash();
+    if (isPressEdge(targetId, rawValue)) vj.triggerFlash();
     return;
   }
 
@@ -193,7 +202,7 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
     if (isNaN(slotIdx)) return;
     const tail = rest.slice(firstColon + 1);
     if (tail === "bypass") {
-      if (!isNoteOff) vj.togglePostFXSlot(slotIdx);
+      if (isPressEdge(targetId, rawValue)) vj.togglePostFXSlot(slotIdx);
       return;
     }
     if (tail.startsWith("param:")) {
