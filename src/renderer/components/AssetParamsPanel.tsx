@@ -126,7 +126,7 @@ const LayerSection = forwardRef<HTMLDivElement, LayerSectionProps>(
       g.type === "range" ? !!(g.start.primary || g.end.primary) : !!g.def.primary;
     const [showAll, setShowAll] = useState(false);
     const groupsToRender = hasPrimary && !showAll ? allGroups.filter(isPrimaryGroup) : allGroups;
-    const hiddenCount = allGroups.length - groupsToRender.length;
+    const secondaryCount = allGroups.filter((g) => !isPrimaryGroup(g)).length;
 
     return (
       <div
@@ -186,7 +186,7 @@ const LayerSection = forwardRef<HTMLDivElement, LayerSectionProps>(
           {visibleParams.length === 0 && (
             <div className="param-empty">no params</div>
           )}
-          {hasPrimary && hiddenCount > 0 && (
+          {hasPrimary && secondaryCount > 0 && (
             <button
               className="param-more-btn"
               onClick={(e) => {
@@ -194,7 +194,7 @@ const LayerSection = forwardRef<HTMLDivElement, LayerSectionProps>(
                 setShowAll((v) => !v);
               }}
             >
-              {showAll ? "▴ LESS" : `▾ ${hiddenCount} MORE`}
+              {showAll ? "▴ LESS" : `▾ ${secondaryCount} MORE`}
             </button>
           )}
         </div>

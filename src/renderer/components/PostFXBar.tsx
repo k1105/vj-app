@@ -223,8 +223,8 @@ function SlotParams({
   // If the plugin opted into primary/secondary, hide secondaries behind
   // a per-section expander. Otherwise show every param (back-compat).
   const hasPrimary = params.some((p) => p.primary);
+  const secondaryCount = params.filter((p) => !p.primary).length;
   const visible = hasPrimary && !showAll ? params.filter((p) => p.primary) : params;
-  const hiddenCount = params.length - visible.length;
   return (
     <div className="postfx-rack-params">
       {visible.map((def) => {
@@ -291,7 +291,7 @@ function SlotParams({
           </div>
         );
       })}
-      {hasPrimary && hiddenCount > 0 && (
+      {hasPrimary && secondaryCount > 0 && (
         <button
           className="param-more-btn"
           onClick={(e) => {
@@ -299,7 +299,7 @@ function SlotParams({
             setShowAll((v) => !v);
           }}
         >
-          {showAll ? "▴ LESS" : `▾ ${hiddenCount} MORE`}
+          {showAll ? "▴ LESS" : `▾ ${secondaryCount} MORE`}
         </button>
       )}
     </div>
