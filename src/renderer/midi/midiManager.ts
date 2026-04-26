@@ -141,15 +141,16 @@ function pulsePhysicalForAddress(address: MidiAddress): void {
   }
 }
 
-// Last value per target — used to detect press edges. Momentary buttons
-// fire press (127) AND release (0) in the same physical gesture; without
-// edge detection, toggle-style targets (bypass / stage) would fire twice
-// per press and cancel themselves out.
+// Last value per target — used to debounce trigger handlers. Fire on
+// any value change (rising OR falling): a toggle-mode button on the
+// LCXL3 sends 127 on one press and 0 on the next, so "every transition
+// is a press" matches the physical reality. Repeats (same value twice)
+// are ignored so spurious refires don't pile up.
 const lastTriggerValue = new Map<string, number>();
-function isPressEdge(targetId: string, rawValue: number): boolean {
-  const prev = lastTriggerValue.get(targetId) ?? 0;
+function isEdge(targetId: string, rawValue: number): boolean {
+  const prev = lastTriggerValue.get(targetId);
   lastTriggerValue.set(targetId, rawValue);
-  return prev <= 0 && rawValue > 0;
+  return prev !== rawValue;
 }
 
 function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): void {
@@ -164,11 +165,11 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
   // "release" is the new universal commit. "go" stays as a legacy alias —
   // both fire releaseStage if currently staging, no-op otherwise.
   if (targetId === "go" || targetId === "release") {
-    if (isPressEdge(targetId, rawValue) && vj.stageMode) vj.releaseStage();
+    if (isEdge(targetId, rawValue) && vj.stageMode) vj.releaseStage();
     return;
   }
   if (targetId === "stage") {
-    if (isPressEdge(targetId, rawValue)) {
+    if (isEdge(targetId, rawValue)) {
       if (vj.stageMode) vj.cancelStage();
       else vj.enterStage();
     }
@@ -176,12 +177,12 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
   }
 
   if (targetId === "tap") {
-    if (isPressEdge(targetId, rawValue)) vj.tap();
+    if (isEdge(targetId, rawValue)) vj.tap();
     return;
   }
 
   if (targetId === "flash") {
-    if (isPressEdge(targetId, rawValue)) vj.triggerFlash();
+    if (isEdge(targetId, rawValue)) vj.triggerFlash();
     return;
   }
 
@@ -202,7 +203,7 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
     if (isNaN(slotIdx)) return;
     const tail = rest.slice(firstColon + 1);
     if (tail === "bypass") {
-      if (isPressEdge(targetId, rawValue)) vj.togglePostFXSlot(slotIdx);
+      if (isEdge(targetId, rawValue)) vj.togglePostFXSlot(slotIdx);
       return;
     }
     if (tail.startsWith("param:")) {
