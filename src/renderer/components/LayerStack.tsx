@@ -197,10 +197,15 @@ function LayerRow(props: {
       onDragOver={onDragOver}
       onClick={onSelect}
     >
-      <div
-        className={`layer-indicator ${
-          layer.opacity > 0 && !layer.mute && layer.activeClipIdx >= 0 ? "active" : ""
-        }`}
+      <input
+        type="range"
+        className="layer-opacity-vertical"
+        min={0}
+        max={100}
+        value={Math.round(layer.opacity * 100)}
+        onChange={(e) => onOpacityChange(parseInt(e.target.value) / 100)}
+        onClick={(e) => e.stopPropagation()}
+        title={`opacity ${Math.round(layer.opacity * 100)}%`}
       />
       <div className="layer-label">L{idx + 1}</div>
       <div className="material-grid">
@@ -281,16 +286,6 @@ function LayerRow(props: {
         >
           S
         </button>
-        <input
-          type="range"
-          className="opacity-slider"
-          min={0}
-          max={100}
-          value={Math.round(layer.opacity * 100)}
-          onChange={(e) => onOpacityChange(parseInt(e.target.value) / 100)}
-          onClick={(e) => e.stopPropagation()}
-        />
-        <span className="opacity-val">{Math.round(layer.opacity * 100)}%</span>
         <MidiLearnButton
           targetId={`layer-opacity-${idx}`}
           label={`L${idx + 1} Opacity`}

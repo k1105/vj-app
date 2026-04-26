@@ -835,12 +835,33 @@ input[type="range"]::-moz-range-thumb {
 /* ─────── Layer Row ─────── */
 .layer-row {
   display: flex;
-  align-items: center;
-  padding: 8px 12px;
+  align-items: stretch;
+  padding: 0 12px 0 0;
   border-bottom: 1px solid var(--border-subtle);
   gap: 10px;
   transition: background 0.1s;
   position: relative;
+}
+.layer-row > .layer-label,
+.layer-row > .material-grid,
+.layer-row > .layer-controls {
+  align-self: center;
+}
+/* Vertical opacity slider that spans the layer row's full height. The
+   primary control surface is MIDI; the slider is mostly a live readout
+   plus an occasional touch-up control. */
+.layer-opacity-vertical {
+  appearance: slider-vertical;
+  -webkit-appearance: slider-vertical;
+  writing-mode: vertical-lr;
+  direction: rtl; /* low at bottom, high at top */
+  width: 14px;
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  cursor: ns-resize;
 }
 .layer-row::before {
   content: "";
