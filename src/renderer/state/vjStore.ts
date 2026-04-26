@@ -606,7 +606,13 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
       const postfx = s.state.postfx.map((p, i) =>
         i === slotIdx ? { ...p, enabled: !p.enabled } : p,
       );
-      return { state: { ...s.state, postfx } };
+      // Toggling a slot's bypass also focuses it — keeps the editor
+      // pane in sync with whatever the user just acted on (whether via
+      // mouse, MIDI, or wherever).
+      return {
+        state: { ...s.state, postfx },
+        selectedPostFXSlot: slotIdx,
+      };
     });
   },
 
