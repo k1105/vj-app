@@ -188,6 +188,20 @@ function SlotHeader({
   onToggle: () => void;
   onClear: () => void;
 }) {
+  const [savingDefaults, setSavingDefaults] = useState(false);
+  const onSetAsDefault = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!slot.pluginId || savingDefaults) return;
+    setSavingDefaults(true);
+    try {
+      await window.vj.setPluginDefaults("postfx", slot.pluginId, slot.params);
+    } catch (err) {
+      console.error("[PostFX] setPluginDefaults failed:", err);
+      alert(`Set as Default failed: ${(err as Error).message}`);
+    } finally {
+      setSavingDefaults(false);
+    }
+  };
   return (
     <div className="postfx-section-header">
       <span className="postfx-section-num">{slotIdx + 1}</span>
@@ -203,6 +217,14 @@ function SlotHeader({
       <span className="postfx-section-status">
         {slot.enabled ? "LIVE" : "BYPASS"}
       </span>
+      <button
+        className="asset-default-btn"
+        onClick={onSetAsDefault}
+        disabled={savingDefaults}
+        title="Save current params as the plugin's manifest defaults"
+      >
+        {savingDefaults ? "…" : "SET AS DEFAULT"}
+      </button>
       <button
         className="postfx-slot-clear"
         onClick={(e) => {
