@@ -6,12 +6,34 @@ export interface BpmDetectorHandle {
 }
 
 interface DetectorOpts {
-  /** Fired on every analysis tick — the running estimate. */
-  onBpm: (tempo: number, confidence: number) => void;
-  /** Fired when the analyzer reports a stable tempo. */
-  onStable?: (tempo: number, confidence: number) => void;
+  /**
+   * Fired on every analysis tick. `tempo` is the smoothed (median) running
+   * estimate; `stable` reflects our rolling-window stability check, which
+   * latches when recent readings stay within tolerance for long enough and
+   * unlatches when they drift out again.
+   */
+  onUpdate: (tempo: number, confidence: number, stable: boolean) => void;
   /** Fired on permission / device errors. */
   onError?: (err: Error) => void;
+}
+
+// Rolling-window smoothing & stability. The library's `bpmStable` requires
+// 20 s of identical readings which mic input rarely satisfies — we run our
+// own check instead: take the median of the last N readings, consider it
+// stable when their spread stays small for at least MIN_SPAN_MS.
+const HISTORY_SIZE = 12;
+const STABLE_TOLERANCE_BPM = 2.0;
+const STABLE_MIN_READINGS = 6;
+const STABLE_MIN_SPAN_MS = 3000;
+
+interface Reading { tempo: number; count: number; t: number; }
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2
+    ? sorted[mid]
+    : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 /**
@@ -37,22 +59,42 @@ export async function startBpmDetector(opts: DetectorOpts): Promise<BpmDetectorH
     audioCtx = new AudioContext();
     if (audioCtx.state === "suspended") await audioCtx.resume();
 
-    analyzer = await createRealtimeBpmAnalyzer(audioCtx);
+    // continuousAnalysis: keep refining after the first stable detection.
+    // stabilizationTime is dropped to 5 s mostly so the library's internal
+    // bookkeeping doesn't lock into an early bad guess; our own rolling
+    // median is the actual stability signal we surface.
+    analyzer = await createRealtimeBpmAnalyzer(audioCtx, {
+      continuousAnalysis: true,
+      stabilizationTime: 5000,
+    });
     source = audioCtx.createMediaStreamSource(stream);
     source.connect(analyzer.node);
     // Note: do NOT connect to audioCtx.destination — that would pipe the mic
     // straight to the speakers and feedback through the room.
 
+    const history: Reading[] = [];
+
     analyzer.on("bpm", (data) => {
       const top = data.bpm?.[0];
-      if (top) opts.onBpm(top.tempo, top.count ?? 0);
+      if (!top) return;
+      const now = performance.now();
+      history.push({ tempo: top.tempo, count: top.count ?? 0, t: now });
+      if (history.length > HISTORY_SIZE) history.shift();
+
+      // Smoothed running estimate = median of recent readings.
+      const med = median(history.map((r) => r.tempo));
+
+      // Stability: enough recent readings AND tight spread AND wide enough time span.
+      let stable = false;
+      if (history.length >= STABLE_MIN_READINGS) {
+        const recent = history.slice(-STABLE_MIN_READINGS);
+        const recentTempos = recent.map((r) => r.tempo);
+        const spread = Math.max(...recentTempos) - Math.min(...recentTempos);
+        const span = recent[recent.length - 1].t - recent[0].t;
+        stable = spread <= STABLE_TOLERANCE_BPM && span >= STABLE_MIN_SPAN_MS;
+      }
+      opts.onUpdate(med, top.count ?? 0, stable);
     });
-    if (opts.onStable) {
-      analyzer.on("bpmStable", (data) => {
-        const top = data.bpm?.[0];
-        if (top) opts.onStable!(top.tempo, top.count ?? 0);
-      });
-    }
   } catch (err) {
     // Clean up partial setup before re-throwing / reporting.
     try { source?.disconnect(); } catch { /* */ }

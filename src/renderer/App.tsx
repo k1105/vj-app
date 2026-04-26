@@ -46,8 +46,7 @@ export function App() {
     let handle: BpmDetectorHandle | null = null;
     let cancelled = false;
     startBpmDetector({
-      onBpm: (tempo, conf) => setDetectedBpm(tempo, conf, false),
-      onStable: (tempo, conf) => setDetectedBpm(tempo, conf, true),
+      onUpdate: (tempo, conf, stable) => setDetectedBpm(tempo, conf, stable),
       onError: (err) => {
         console.error("[BPM] detector error:", err);
         // Drop back to MANUAL so the UI doesn't lie about being live.
