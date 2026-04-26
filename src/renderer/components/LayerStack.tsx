@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useVJStore } from "../state/vjStore";
 import type { LayerState, PluginMeta } from "../../shared/types";
 import { MidiLearnButton } from "./MidiLearnButton";
@@ -197,15 +198,9 @@ function LayerRow(props: {
       onDragOver={onDragOver}
       onClick={onSelect}
     >
-      <input
-        type="range"
-        className="layer-opacity-vertical"
-        min={0}
-        max={100}
-        value={Math.round(layer.opacity * 100)}
-        onChange={(e) => onOpacityChange(parseInt(e.target.value) / 100)}
-        onClick={(e) => e.stopPropagation()}
-        title={`opacity ${Math.round(layer.opacity * 100)}%`}
+      <VerticalOpacityLine
+        value={layer.opacity}
+        onChange={onOpacityChange}
       />
       <div className="layer-label">L{idx + 1}</div>
       <div className="material-grid">
@@ -293,6 +288,54 @@ function LayerRow(props: {
         />
         <AutoSyncButton targetId={`layer-opacity-${idx}`} />
       </div>
+    </div>
+  );
+}
+
+/**
+ * Compact vertical opacity track — a thin line that fills from the bottom
+ * up to the current value. Click anywhere on it to jump; press-and-drag
+ * up/down to scrub. Designed to take essentially no horizontal space:
+ * the GUI is here for readout, the real driver is MIDI.
+ */
+function VerticalOpacityLine({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const setFromPointer = (clientY: number) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const ratio = 1 - Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    onChange(ratio);
+  };
+  return (
+    <div
+      ref={ref}
+      className="layer-opacity-line"
+      title={`opacity ${Math.round(value * 100)}%`}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setFromPointer(e.clientY);
+      }}
+      onPointerMove={(e) => {
+        if (e.buttons === 0) return;
+        setFromPointer(e.clientY);
+      }}
+      onPointerUp={(e) => {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div
+        className="layer-opacity-line-fill"
+        style={{ height: `${Math.round(value * 100)}%` }}
+      />
     </div>
   );
 }

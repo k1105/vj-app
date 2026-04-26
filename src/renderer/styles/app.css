@@ -847,21 +847,42 @@ input[type="range"]::-moz-range-thumb {
 .layer-row > .layer-controls {
   align-self: center;
 }
-/* Vertical opacity slider that spans the layer row's full height. The
-   primary control surface is MIDI; the slider is mostly a live readout
-   plus an occasional touch-up control. */
-.layer-opacity-vertical {
-  appearance: slider-vertical;
-  -webkit-appearance: slider-vertical;
-  writing-mode: vertical-lr;
-  direction: rtl; /* low at bottom, high at top */
-  width: 14px;
+/* lil-gui-style vertical opacity track. Thin line, fills from the bottom
+   up to the current value. ~6 px hit area for usability, but only ~2 px
+   of visible track so it barely takes any horizontal space. The primary
+   control surface is MIDI; this is mostly a live readout. */
+.layer-opacity-line {
+  position: relative;
+  width: 6px;
   align-self: stretch;
-  margin: 0;
-  padding: 0;
   flex-shrink: 0;
-  background: transparent;
   cursor: ns-resize;
+  background: transparent;
+  /* Visual track: a 2 px line in the middle of the hit area. */
+  background-image: linear-gradient(
+    to right,
+    transparent calc(50% - 1px),
+    var(--border-strong) calc(50% - 1px),
+    var(--border-strong) calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+.layer-opacity-line:hover {
+  background-image: linear-gradient(
+    to right,
+    transparent calc(50% - 1px),
+    var(--text-dim) calc(50% - 1px),
+    var(--text-dim) calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+.layer-opacity-line-fill {
+  position: absolute;
+  left: calc(50% - 1px);
+  width: 2px;
+  bottom: 0;
+  background: var(--live);
+  pointer-events: none;
 }
 .layer-row::before {
   content: "";
