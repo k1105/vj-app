@@ -54,6 +54,7 @@ export function TransportBar() {
         <MidiLearnButton targetId="tap" label="TAP" group="Transport" />
         <span className="bpm">{bpm.toFixed(1)}</span>
         <span className="bpm-label">BPM</span>
+        <BpmModeToggle />
         <BeatPulse />
       </div>
       <div className="transport-spacer" />
@@ -127,6 +128,37 @@ function TransitionDropdown({
             </button>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * MANUAL ↔ AUTO toggle. AUTO turns on the mic-driven BPM detector; the
+ * detected tempo writes into state.bpm. In AUTO, TAP only nudges phase
+ * (beat alignment), not tempo. Confidence-ish display from analyzer count.
+ */
+function BpmModeToggle() {
+  const auto = useVJStore((s) => s.bpmAutoMode);
+  const setAuto = useVJStore((s) => s.setBpmAutoMode);
+  const detected = useVJStore((s) => s.bpmDetected);
+  const stable = useVJStore((s) => s.bpmStable);
+  return (
+    <div className="bpm-mode">
+      <button
+        className={`btn-bpm-mode ${auto ? "auto" : "manual"}`}
+        onClick={() => setAuto(!auto)}
+        title={auto ? "click → MANUAL (TAP for tempo)" : "click → AUTO (mic-driven detection)"}
+      >
+        {auto ? "AUTO" : "MANUAL"}
+      </button>
+      {auto && (
+        <span
+          className={`bpm-auto-status ${stable ? "stable" : "listening"}`}
+          title={detected != null ? `detector: ${detected.toFixed(1)} BPM` : "listening…"}
+        >
+          {detected != null ? (stable ? "●" : "◌") : "◌"}
+        </span>
       )}
     </div>
   );

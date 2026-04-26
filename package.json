@@ -15,6 +15,7 @@
     "@mkkellogg/gaussian-splats-3d": "^0.4.7",
     "d3-ease": "^3.0.1",
     "electron-store": "^10.0.0",
+    "realtime-bpm-analyzer": "^5.0.12",
     "three": "^0.169.0",
     "zustand": "^4.5.5"
   },

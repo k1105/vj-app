@@ -107,6 +107,20 @@ interface VJStoreShape {
   /** Currently focused postfx slot (drives editor highlight + scroll). */
   selectedPostFXSlot: number;
   selectPostFXSlot: (slotIdx: number) => void;
+  /**
+   * BPM source mode. AUTO = mic-driven realtime detector writes state.bpm.
+   * MANUAL = user controls via TAP / MIDI. In AUTO, TAP only nudges the
+   * beat phase (beatAnchor); BPM stays driven by the detector.
+   */
+  bpmAutoMode: boolean;
+  /** Latest detector output. null when AUTO is off or no estimate yet. */
+  bpmDetected: number | null;
+  /** Detector "count" / confidence-ish from the latest event. */
+  bpmConfidence: number;
+  /** Whether the latest detector fire was a `bpmStable` (vs. running estimate). */
+  bpmStable: boolean;
+  setBpmAutoMode: (on: boolean) => void;
+  setDetectedBpm: (tempo: number, confidence: number, stable: boolean) => void;
   /** Set the postfx application boundary. Clamped to [0, layers.length]. */
   setPostfxBoundary: (n: number) => void;
   /** Set a single param on an active clip. Immediately broadcasts. */
@@ -215,6 +229,27 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
   selectedPostFXSlot: 0,
   selectPostFXSlot: (slotIdx) =>
     set(() => ({ selectedPostFXSlot: Math.max(0, Math.min(POSTFX_SLOT_COUNT - 1, slotIdx)) })),
+  bpmAutoMode: false,
+  bpmDetected: null,
+  bpmConfidence: 0,
+  bpmStable: false,
+  setBpmAutoMode: (on) => set(() => ({ bpmAutoMode: on, ...(on ? {} : { bpmDetected: null, bpmConfidence: 0, bpmStable: false }) })),
+  setDetectedBpm: (tempo, confidence, stable) => {
+    set((s) => {
+      // Only write into state.bpm when AUTO is active. Otherwise keep the
+      // detector value cached for telemetry but don't override user input.
+      if (!s.bpmAutoMode) {
+        return { bpmDetected: tempo, bpmConfidence: confidence, bpmStable: stable };
+      }
+      const rounded = Math.max(30, Math.min(300, Math.round(tempo)));
+      return {
+        bpmDetected: tempo,
+        bpmConfidence: confidence,
+        bpmStable: stable,
+        state: { ...s.state, bpm: rounded },
+      };
+    });
+  },
 
   enterStage: () => {
     const s = get();
@@ -591,6 +626,8 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
     }
     // Every tap resets beatAnchor so the beat phase starts on the tap.
     set((s) => ({ state: { ...s.state, beatAnchor: now } }));
+    // In AUTO mode the detector owns BPM; TAP only nudges phase.
+    if (get().bpmAutoMode) return;
     // BPM is calculated only once we have a full TAP_COUNT window of taps.
     if (tapHistory.length < TAP_COUNT) return;
     const intervals: number[] = [];

@@ -1627,6 +1627,49 @@ input[type="range"]::-moz-range-thumb {
   letter-spacing: 1.2px;
   font-weight: 600;
 }
+.bpm-mode {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 4px;
+}
+.btn-bpm-mode {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+  padding: 3px 8px;
+  border-radius: 2px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  transition: filter 0.1s;
+}
+.btn-bpm-mode:hover { filter: brightness(1.15); }
+.btn-bpm-mode.auto {
+  background: var(--live);
+  border-color: var(--live);
+  color: #001a0d;
+}
+.btn-bpm-mode.manual {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+.bpm-auto-status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--live);
+}
+.bpm-auto-status.listening {
+  color: var(--text-dim);
+  animation: bpm-listening-pulse 1s infinite;
+}
+.bpm-auto-status.stable { color: var(--live); }
+@keyframes bpm-listening-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
 .bpm-pulse {
   width: 7px;
   height: 7px;

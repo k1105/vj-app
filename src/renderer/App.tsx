@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useVJStore } from "./state/vjStore";
 import { initMidi } from "./midi/midiManager";
 import { startAutoSyncDriver } from "./autoSync/autoSyncDriver";
+import { startBpmDetector, type BpmDetectorHandle } from "./audio/bpmDetector";
 import { TopBar } from "./components/TopBar";
 import { AssetsPanel } from "./components/AssetsPanel";
 import { LayerStack } from "./components/LayerStack";
@@ -19,6 +20,9 @@ export function App() {
   const enterStage = useVJStore((s) => s.enterStage);
   const releaseStage = useVJStore((s) => s.releaseStage);
   const cancelStage = useVJStore((s) => s.cancelStage);
+  const bpmAutoMode = useVJStore((s) => s.bpmAutoMode);
+  const setBpmAutoMode = useVJStore((s) => s.setBpmAutoMode);
+  const setDetectedBpm = useVJStore((s) => s.setDetectedBpm);
   const toggleMidiMap = useMidiMapPanelStore((s) => s.toggle);
 
   useEffect(() => {
@@ -34,6 +38,34 @@ export function App() {
   useEffect(() => {
     return startAutoSyncDriver();
   }, []);
+
+  // BPM auto-detect: start when bpmAutoMode flips on, stop when it flips off.
+  // Mic permission is requested on the first enable.
+  useEffect(() => {
+    if (!bpmAutoMode) return;
+    let handle: BpmDetectorHandle | null = null;
+    let cancelled = false;
+    startBpmDetector({
+      onBpm: (tempo, conf) => setDetectedBpm(tempo, conf, false),
+      onStable: (tempo, conf) => setDetectedBpm(tempo, conf, true),
+      onError: (err) => {
+        console.error("[BPM] detector error:", err);
+        // Drop back to MANUAL so the UI doesn't lie about being live.
+        setBpmAutoMode(false);
+      },
+    })
+      .then((h) => {
+        if (cancelled) return h.stop();
+        handle = h;
+      })
+      .catch(() => {
+        // Already reported via onError above.
+      });
+    return () => {
+      cancelled = true;
+      handle?.stop();
+    };
+  }, [bpmAutoMode, setDetectedBpm, setBpmAutoMode]);
 
   // Push state to output window (debounced inside the store)
   useEffect(() => {
