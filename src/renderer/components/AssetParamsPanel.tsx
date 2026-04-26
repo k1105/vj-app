@@ -117,6 +117,16 @@ const LayerSection = forwardRef<HTMLDivElement, LayerSectionProps>(
 
     const visibleParams = (plugin?.params ?? []).filter((d) => d.type !== "strings");
     const labelPrefix = `L${layerIdx + 1} ${plugin?.name ?? "?"}`;
+    const allGroups = groupParams(visibleParams);
+    // If any param of this plugin opts into primary, only those groups are
+    // shown by default; the rest are hidden behind a "MORE" expander.
+    // Range pairs count as primary when either end is primary.
+    const hasPrimary = visibleParams.some((p) => p.primary);
+    const isPrimaryGroup = (g: ParamGroup) =>
+      g.type === "range" ? !!(g.start.primary || g.end.primary) : !!g.def.primary;
+    const [showAll, setShowAll] = useState(false);
+    const groupsToRender = hasPrimary && !showAll ? allGroups.filter(isPrimaryGroup) : allGroups;
+    const hiddenCount = allGroups.length - groupsToRender.length;
 
     return (
       <div
@@ -144,7 +154,7 @@ const LayerSection = forwardRef<HTMLDivElement, LayerSectionProps>(
           </button>
         </div>
         <div className="asset-params">
-          {groupParams(visibleParams).map((group) => {
+          {groupsToRender.map((group) => {
             if (group.type === "range") {
               const { start, end } = group;
               return (
@@ -175,6 +185,17 @@ const LayerSection = forwardRef<HTMLDivElement, LayerSectionProps>(
           })}
           {visibleParams.length === 0 && (
             <div className="param-empty">no params</div>
+          )}
+          {hasPrimary && hiddenCount > 0 && (
+            <button
+              className="param-more-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAll((v) => !v);
+              }}
+            >
+              {showAll ? "▴ LESS" : `▾ ${hiddenCount} MORE`}
+            </button>
           )}
         </div>
       </div>

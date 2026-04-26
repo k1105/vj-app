@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import type { ParamDef, PostFXSlot } from "../../shared/types";
 import { POSTFX_SLOT_COUNT } from "../../shared/types";
@@ -216,12 +216,18 @@ function SlotParams({
   params: ParamDef[];
   onParamChange: (key: string, value: number | boolean) => void;
 }) {
+  const [showAll, setShowAll] = useState(false);
   if (params.length === 0) {
     return <div className="postfx-rack-empty">no params</div>;
   }
+  // If the plugin opted into primary/secondary, hide secondaries behind
+  // a per-section expander. Otherwise show every param (back-compat).
+  const hasPrimary = params.some((p) => p.primary);
+  const visible = hasPrimary && !showAll ? params.filter((p) => p.primary) : params;
+  const hiddenCount = params.length - visible.length;
   return (
     <div className="postfx-rack-params">
-      {params.map((def) => {
+      {visible.map((def) => {
         if (def.type === "bool") {
           const cur = slot.params[def.key];
           const on =
@@ -285,6 +291,17 @@ function SlotParams({
           </div>
         );
       })}
+      {hasPrimary && hiddenCount > 0 && (
+        <button
+          className="param-more-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowAll((v) => !v);
+          }}
+        >
+          {showAll ? "▴ LESS" : `▾ ${hiddenCount} MORE`}
+        </button>
+      )}
     </div>
   );
 }

@@ -51,6 +51,13 @@ export interface ParamDef {
   max?: number;
   step?: number;
   options?: string[];
+  /**
+   * When any param of a plugin sets `primary: true`, only those params
+   * are shown by default in the controller; the rest are hidden behind
+   * a per-section "MORE" expander. If no param is marked primary, all
+   * params remain visible (backward compatible).
+   */
+  primary?: boolean;
 }
 
 export interface PluginMeta {

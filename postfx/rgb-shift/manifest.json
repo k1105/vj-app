@@ -3,7 +3,7 @@
   "author": "vj-app",
   "entry": "shader.frag",
   "params": [
-    { "key": "amount", "type": "float", "default": 0.3, "min": 0, "max": 1 },
+    { "key": "amount", "type": "float", "default": 0.3, "min": 0, "max": 1, "primary": true },
     { "key": "angle", "type": "float", "default": 0, "min": 0, "max": 1 }
   ]
 }

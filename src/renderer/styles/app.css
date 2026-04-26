@@ -1268,6 +1268,24 @@ input[type="range"]::-moz-range-thumb {
 .postfx-section .postfx-rack-params {
   border-top: none;
 }
+.param-more-btn {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  border-radius: 2px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: color 0.1s, border-color 0.1s;
+}
+.param-more-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
 /* param slider — overrides the generic range style for the narrower panel */
 .param-slider {
   flex: 1;

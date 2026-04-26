@@ -3,7 +3,7 @@
   "author": "vj-app",
   "entry": "shader.frag",
   "params": [
-    { "key": "count",   "type": "int",  "default": 2, "min": 1, "max": 8, "step": 1 },
+    { "key": "count",   "type": "int",  "default": 2, "min": 1, "max": 8, "step": 1, "primary": true },
     { "key": "mirrorH", "type": "bool", "default": false },
     { "key": "mirrorV", "type": "bool", "default": false }
   ]
