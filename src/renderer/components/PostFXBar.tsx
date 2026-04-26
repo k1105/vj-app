@@ -98,11 +98,19 @@ export function PostFXRack() {
             }
           >
             <option value="">— empty —</option>
-            {available.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
+            {available
+              .filter(
+                (p) =>
+                  // Hide plugins already assigned to a different slot.
+                  !postfx.some(
+                    (s, i) => i !== selectedSlot && s.pluginId === p.id,
+                  ),
+              )
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
           </select>
           {slot?.pluginId && (
             <button
