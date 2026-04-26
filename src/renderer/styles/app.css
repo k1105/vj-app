@@ -1268,6 +1268,52 @@ input[type="range"]::-moz-range-thumb {
 .postfx-section .postfx-rack-params {
   border-top: none;
 }
+/* Click-to-learn param label. Click → REC mode; the next physical
+   control bound binds here, replacing any prior binding of the same
+   knob (one knob = one target, so reassignments are silent and fast). */
+.midi-learn-label {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  user-select: none;
+}
+.midi-learn-label:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+.midi-learn-label.mapped {
+  color: var(--live);
+}
+.midi-learn-label.learning {
+  background: var(--accent);
+  color: #1a0d00;
+  border-color: var(--accent);
+  animation: midi-learn-pulse 0.8s infinite;
+}
+.midi-learn-label.pulse {
+  background: var(--live-dim);
+}
+.midi-learn-rec {
+  font-size: 9px;
+  color: #1a0d00;
+}
+.midi-learn-text { font: inherit; }
+.midi-learn-addr {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--live);
+  opacity: 0.85;
+  letter-spacing: 0.4px;
+}
+@keyframes midi-learn-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.25); }
+}
 .param-more-btn {
   align-self: flex-start;
   background: transparent;

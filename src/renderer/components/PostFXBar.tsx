@@ -3,6 +3,7 @@ import { useVJStore } from "../state/vjStore";
 import type { ParamDef, PostFXSlot } from "../../shared/types";
 import { POSTFX_SLOT_COUNT } from "../../shared/types";
 import { MidiLearnButton } from "./MidiLearnButton";
+import { MidiLearnLabel } from "./MidiLearnLabel";
 import { AutoSyncButton } from "./AutoSyncButton";
 
 /**
@@ -238,7 +239,13 @@ function SlotParams({
               : false;
           return (
             <div key={def.key} className="postfx-rack-param-row">
-              <span className="postfx-rack-param-label">{def.key}</span>
+              <MidiLearnLabel
+                targetId={`postfx-slot:${slotIdx}:param:${def.key}`}
+                label={`Slot ${slotIdx + 1} · ${def.key}`}
+                text={def.key}
+                group="PostFX"
+                className="postfx-rack-param-label"
+              />
               <button
                 className={`param-toggle ${on ? "on" : ""}`}
                 onClick={(e) => {
@@ -263,7 +270,13 @@ function SlotParams({
         const isInt = def.type === "int";
         return (
           <div key={def.key} className="postfx-rack-param-row">
-            <span className="postfx-rack-param-label">{def.key}</span>
+            <MidiLearnLabel
+              targetId={`postfx-slot:${slotIdx}:param:${def.key}`}
+              label={`Slot ${slotIdx + 1} · ${def.key}`}
+              text={def.key}
+              group="PostFX"
+              className="postfx-rack-param-label"
+            />
             <input
               type="range"
               min={0}
@@ -280,11 +293,6 @@ function SlotParams({
             <span className="postfx-rack-param-val">
               {isInt ? Math.round(value).toString() : value.toFixed(2)}
             </span>
-            <MidiLearnButton
-              targetId={`postfx-slot:${slotIdx}:param:${def.key}`}
-              label={`Slot ${slotIdx + 1} · ${def.key}`}
-              group="PostFX"
-            />
             <AutoSyncButton
               targetId={`postfx-slot:${slotIdx}:param:${def.key}`}
             />
