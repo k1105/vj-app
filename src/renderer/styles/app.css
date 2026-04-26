@@ -314,7 +314,11 @@ body {
   grid-column: 3;
   grid-row: 1 / -1;
   align-self: stretch;
-  height: auto;
+  /* Explicit min-height — `align-self: stretch` alone wasn't expanding
+     the button against the existing min-height: 16px floor. */
+  min-height: 36px;
+  width: 22px;
+  font-size: 14px;
 }
 .param-val {
   font-size: 10px;
