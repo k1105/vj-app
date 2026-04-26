@@ -43,6 +43,20 @@ const initialState: VJState = {
 interface VJStoreShape {
   state: VJState;
   plugins: PluginMeta[];
+  /**
+   * STAGE mode. When true, the Output is frozen on `liveSnapshot` while the
+   * Controller continues to mutate `state` freely. A subsequent release/GO
+   * snaps the staged `state` to the Output. Realtime fields (bpm, audio,
+   * flash...) are passed through to Output even in STAGE so timing stays sync.
+   */
+  stageMode: boolean;
+  liveSnapshot: VJState | null;
+  /** Enter STAGE mode: snapshot current state and freeze Output until release. */
+  enterStage: () => void;
+  /** Release STAGE: push `state` to Output and exit stage mode. v1: instant snap. */
+  releaseStage: () => void;
+  /** Cancel STAGE: revert `state` to the snapshot (preserves realtime fields). */
+  cancelStage: () => void;
   loadPlugins: () => Promise<void>;
   /**
    * Append a clip to a layer's bin. The new clip is staged as NEXT. If the
@@ -119,9 +133,81 @@ const TAP_MIN_MS = 100;
 let tapHistory: number[] = [];
 let lastTapTime = 0;
 
+// Compose the state to send to Output. Returns `state` directly when LIVE.
+// In STAGE mode the snapshot's "scene composition" fields freeze, but
+// realtime fields (bpm/beatAnchor/audio/flashAt + cached beat/bar) flow
+// through so timing & analysis stay in sync.
+function buildBroadcastState(
+  state: VJState,
+  stageMode: boolean,
+  snap: VJState | null,
+): VJState {
+  if (!stageMode || !snap) return state;
+  return {
+    ...snap,
+    bpm: state.bpm,
+    beatAnchor: state.beatAnchor,
+    beat: state.beat,
+    bar: state.bar,
+    audio: state.audio,
+    flashAt: state.flashAt,
+  };
+}
+
 export const useVJStore = create<VJStoreShape>((set, get) => ({
   state: initialState,
   plugins: [],
+  stageMode: false,
+  liveSnapshot: null,
+
+  enterStage: () => {
+    const s = get();
+    if (s.stageMode) return;
+    // Cancel any in-flight commitGo timeout — its scheduled effect would
+    // mutate `state` after we entered STAGE, which the user doesn't expect.
+    if (pendingTransitionCommit !== null) {
+      window.clearTimeout(pendingTransitionCommit);
+      pendingTransitionCommit = null;
+    }
+    set({ stageMode: true, liveSnapshot: structuredClone(s.state) });
+    get().broadcastState();
+  },
+
+  releaseStage: () => {
+    const s = get();
+    if (!s.stageMode) return;
+    if (pendingTransitionCommit !== null) {
+      window.clearTimeout(pendingTransitionCommit);
+      pendingTransitionCommit = null;
+    }
+    // v1: instant snap. Transition support on release is a follow-up.
+    set((s2) => ({
+      stageMode: false,
+      liveSnapshot: null,
+      state: {
+        ...s2.state,
+        transition: { ...s2.state.transition, startedAt: null },
+      },
+    }));
+    get().broadcastState();
+  },
+
+  cancelStage: () => {
+    const s = get();
+    if (!s.stageMode || !s.liveSnapshot) return;
+    // Revert scene fields to snapshot, keep realtime fields current.
+    const restored: VJState = {
+      ...s.liveSnapshot,
+      bpm: s.state.bpm,
+      beatAnchor: s.state.beatAnchor,
+      beat: s.state.beat,
+      bar: s.state.bar,
+      audio: s.state.audio,
+      flashAt: s.state.flashAt,
+    };
+    set({ state: restored, stageMode: false, liveSnapshot: null });
+    get().broadcastState();
+  },
 
   loadPlugins: async () => {
     const plugins = await window.vj.listPlugins();
@@ -419,18 +505,24 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
   },
 
   broadcastState: () => {
+    const send = () => {
+      const s = get();
+      window.vj.sendStateUpdate(
+        buildBroadcastState(s.state, s.stageMode, s.liveSnapshot),
+      );
+    };
     if (broadcastTimer !== null) {
       // Already throttling — mark that a trailing send is needed
       broadcastPending = true;
       return;
     }
     // First call in this window: send immediately
-    window.vj.sendStateUpdate(get().state);
+    send();
     broadcastTimer = window.setTimeout(() => {
       broadcastTimer = null;
       if (broadcastPending) {
         broadcastPending = false;
-        window.vj.sendStateUpdate(get().state);
+        send();
       }
     }, 16);
   },

@@ -19,6 +19,13 @@ export function TransportBar() {
   const commitGo = useVJStore((s) => s.commitGo);
   const tap = useVJStore((s) => s.tap);
   const triggerFlash = useVJStore((s) => s.triggerFlash);
+  const stageMode = useVJStore((s) => s.stageMode);
+  const enterStage = useVJStore((s) => s.enterStage);
+  const releaseStage = useVJStore((s) => s.releaseStage);
+  const cancelStage = useVJStore((s) => s.cancelStage);
+
+  // GO doubles as RELEASE while staging.
+  const onGo = () => (stageMode ? releaseStage() : commitGo());
 
   return (
     <div className="transport">
@@ -26,9 +33,22 @@ export function TransportBar() {
         value={transitionType}
         onChange={setTransitionType}
       />
+      <div className="stage-section">
+        <button
+          className={`btn-stage ${stageMode ? "active" : ""}`}
+          onClick={() => (stageMode ? cancelStage() : enterStage())}
+          title={stageMode ? "click to cancel staging" : "freeze output, edit, then release"}
+        >
+          {stageMode ? "STAGED" : "STAGE"}
+        </button>
+        <MidiLearnButton targetId="stage" label="STAGE" group="Transport" />
+      </div>
       <div className="go-section">
-        <button className="btn-go" onClick={() => commitGo()}>
-          G O
+        <button
+          className={`btn-go ${stageMode ? "release" : ""}`}
+          onClick={onGo}
+        >
+          {stageMode ? "RELEASE" : "G O"}
         </button>
         <MidiLearnButton targetId="go" label="GO" group="Transport" />
       </div>

@@ -16,6 +16,10 @@ export function App() {
   const tap = useVJStore((s) => s.tap);
   const commitGo = useVJStore((s) => s.commitGo);
   const state = useVJStore((s) => s.state);
+  const stageMode = useVJStore((s) => s.stageMode);
+  const enterStage = useVJStore((s) => s.enterStage);
+  const releaseStage = useVJStore((s) => s.releaseStage);
+  const cancelStage = useVJStore((s) => s.cancelStage);
   const toggleMidiMap = useMidiMapPanelStore((s) => s.toggle);
 
   useEffect(() => {
@@ -58,18 +62,30 @@ export function App() {
         tap();
       } else if (e.code === "Space") {
         e.preventDefault();
-        commitGo();
+        // While staging, Space releases. Otherwise it triggers GO.
+        if (useVJStore.getState().stageMode) releaseStage();
+        else commitGo();
       } else if (e.key === "m" || e.key === "M") {
         e.preventDefault();
         toggleMidiMap();
+      } else if (e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        // 'S' toggles staging. Re-press cancels (revert).
+        if (useVJStore.getState().stageMode) cancelStage();
+        else enterStage();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [tap, commitGo, toggleMidiMap]);
+  }, [tap, commitGo, toggleMidiMap, enterStage, releaseStage, cancelStage]);
 
   return (
-    <div className="app">
+    <div className={`app${stageMode ? " stage-active" : ""}`}>
+      {stageMode && (
+        <div className="stage-banner">
+          STAGE — Output frozen. Press RELEASE / Space to commit, S to cancel.
+        </div>
+      )}
       <TopBar />
       <div className="middle">
         <AssetsPanel />
