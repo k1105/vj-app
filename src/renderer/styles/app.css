@@ -274,6 +274,10 @@ body {
 .param-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
+  /* Row 1 fixed so the sync button's min-height can't bleed extra
+     space onto the label row. Any overflow gets absorbed by row 2
+     (the slider track). */
+  grid-template-rows: 16px auto;
   align-items: center;
   margin-bottom: 8px;
   column-gap: 6px;
