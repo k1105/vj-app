@@ -262,6 +262,12 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
     const s = get();
     const layer = s.state.layers[layerIdx];
     if (!layer) return;
+    // No duplicates per layer — if the asset already exists, just trigger it.
+    const existing = layer.clips.findIndex((c) => c.pluginId === pluginId);
+    if (existing >= 0) {
+      get().triggerClip(layerIdx, existing);
+      return;
+    }
     const meta = s.plugins.find((p) => p.id === pluginId);
     const params: Record<string, ParamValue> = {};
     for (const def of meta?.params ?? []) params[def.key] = def.default;
@@ -348,6 +354,9 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
       if (!src) return s;
       const clip = src.clips[fromClipIdx];
       if (!clip) return s;
+      // Block moves that would create a duplicate on the destination layer.
+      const dst = s.state.layers[toLayer];
+      if (dst?.clips.some((c) => c.pluginId === clip.pluginId)) return s;
 
       const layers = s.state.layers.map((l, i) => {
         if (i === fromLayer) {
