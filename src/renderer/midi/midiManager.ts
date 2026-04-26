@@ -152,8 +152,17 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
   // the user's mental model: physical input takes over).
   if (!isNoteOff) useAutoSyncStore.getState().disable(targetId);
 
-  if (targetId === "go") {
-    if (!isNoteOff) vj.commitGo();
+  // "release" is the new universal commit. "go" stays as a legacy alias —
+  // both fire releaseStage if currently staging, no-op otherwise.
+  if (targetId === "go" || targetId === "release") {
+    if (!isNoteOff && vj.stageMode) vj.releaseStage();
+    return;
+  }
+  if (targetId === "stage") {
+    if (!isNoteOff) {
+      if (vj.stageMode) vj.cancelStage();
+      else vj.enterStage();
+    }
     return;
   }
 

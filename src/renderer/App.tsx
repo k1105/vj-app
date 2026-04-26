@@ -14,7 +14,6 @@ export function App() {
   const loadPlugins = useVJStore((s) => s.loadPlugins);
   const broadcastState = useVJStore((s) => s.broadcastState);
   const tap = useVJStore((s) => s.tap);
-  const commitGo = useVJStore((s) => s.commitGo);
   const state = useVJStore((s) => s.state);
   const stageMode = useVJStore((s) => s.stageMode);
   const enterStage = useVJStore((s) => s.enterStage);
@@ -62,9 +61,8 @@ export function App() {
         tap();
       } else if (e.code === "Space") {
         e.preventDefault();
-        // While staging, Space releases. Otherwise it triggers GO.
+        // Space releases the stage. No-op outside STAGE (immediate-fire model).
         if (useVJStore.getState().stageMode) releaseStage();
-        else commitGo();
       } else if (e.key === "m" || e.key === "M") {
         e.preventDefault();
         toggleMidiMap();
@@ -77,7 +75,7 @@ export function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [tap, commitGo, toggleMidiMap, enterStage, releaseStage, cancelStage]);
+  }, [tap, toggleMidiMap, enterStage, releaseStage, cancelStage]);
 
   return (
     <div className={`app${stageMode ? " stage-active" : ""}`}>

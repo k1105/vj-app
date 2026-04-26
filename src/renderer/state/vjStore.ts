@@ -133,6 +133,50 @@ const TAP_MIN_MS = 100;
 let tapHistory: number[] = [];
 let lastTapTime = 0;
 
+// Compute transition meta for an immediate-fire trigger on one layer.
+// In STAGE mode, no transition is scheduled (Output is frozen). For "cut",
+// no fade is needed. For other types, build a one-layer transition where
+// only `layerIdx` differs between fromActive and toActive.
+function computeLayerTransition(
+  state: VJState,
+  layerIdx: number,
+  fromIdx: number,
+  toIdx: number,
+  stageMode: boolean,
+): {
+  transition: VJState["transition"] | null;
+  scheduleClear: boolean;
+  duration: number;
+} {
+  const type = state.transition.type;
+  const noFade = stageMode || type === "cut" || fromIdx < 0 || fromIdx === toIdx;
+  if (noFade) {
+    return {
+      transition: { ...state.transition, startedAt: null },
+      scheduleClear: false,
+      duration: 0,
+    };
+  }
+  if (pendingTransitionCommit !== null) {
+    window.clearTimeout(pendingTransitionCommit);
+    pendingTransitionCommit = null;
+  }
+  const fromActive = state.layers.map((l) => l.activeClipIdx);
+  const toActive = state.layers.map((l, i) => (i === layerIdx ? toIdx : l.activeClipIdx));
+  const duration = state.transition.duration || DEFAULT_TRANSITION_DURATION_MS;
+  return {
+    transition: {
+      ...state.transition,
+      startedAt: Date.now(),
+      duration,
+      fromActive,
+      toActive,
+    },
+    scheduleClear: true,
+    duration,
+  };
+}
+
 // Compose the state to send to Output. Returns `state` directly when LIVE.
 // In STAGE mode the snapshot's "scene composition" fields freeze, but
 // realtime fields (bpm/beatAnchor/audio/flashAt + cached beat/bar) flow
@@ -215,35 +259,64 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
   },
 
   addClip: (layerIdx, pluginId) => {
-    set((s) => {
-      const layers = s.state.layers.map((l, i) => {
-        if (i !== layerIdx) return l;
-        // Seed clip params with manifest defaults so controls show correct initial values.
-        const meta = s.plugins.find((p) => p.id === pluginId);
-        const params: Record<string, ParamValue> = {};
-        for (const def of meta?.params ?? []) params[def.key] = def.default;
-        const clips = [...l.clips, { pluginId, params }];
-        const newIdx = clips.length - 1;
-        // First drop into an empty layer auto-plays; later drops stage NEXT only.
-        const wasEmpty = l.activeClipIdx === -1;
-        return {
-          ...l,
-          clips,
-          activeClipIdx: wasEmpty ? newIdx : l.activeClipIdx,
-          nextClipIdx: newIdx,
-        };
-      });
-      return { state: { ...s.state, layers, selectedLayer: layerIdx } };
-    });
+    const s = get();
+    const layer = s.state.layers[layerIdx];
+    if (!layer) return;
+    const meta = s.plugins.find((p) => p.id === pluginId);
+    const params: Record<string, ParamValue> = {};
+    for (const def of meta?.params ?? []) params[def.key] = def.default;
+    const newClips = [...layer.clips, { pluginId, params }];
+    const newIdx = newClips.length - 1;
+    const fromIdx = layer.activeClipIdx;
+    const txInfo = computeLayerTransition(s.state, layerIdx, fromIdx, newIdx, s.stageMode);
+
+    set((s2) => ({
+      state: {
+        ...s2.state,
+        layers: s2.state.layers.map((l, i) =>
+          i === layerIdx
+            ? { ...l, clips: newClips, activeClipIdx: newIdx, nextClipIdx: newIdx }
+            : l,
+        ),
+        selectedLayer: layerIdx,
+        transition: txInfo.transition ?? s2.state.transition,
+      },
+    }));
+    if (txInfo.scheduleClear) {
+      pendingTransitionCommit = window.setTimeout(() => {
+        pendingTransitionCommit = null;
+        set((s3) => ({
+          state: { ...s3.state, transition: { ...s3.state.transition, startedAt: null } },
+        }));
+      }, txInfo.duration);
+    }
   },
 
   triggerClip: (layerIdx, clipIdx) => {
-    set((s) => {
-      const layers = s.state.layers.map((l, i) =>
-        i === layerIdx ? { ...l, nextClipIdx: clipIdx } : l,
-      );
-      return { state: { ...s.state, layers, selectedLayer: layerIdx } };
-    });
+    const s = get();
+    const layer = s.state.layers[layerIdx];
+    if (!layer) return;
+    const fromIdx = layer.activeClipIdx;
+    const txInfo = computeLayerTransition(s.state, layerIdx, fromIdx, clipIdx, s.stageMode);
+
+    set((s2) => ({
+      state: {
+        ...s2.state,
+        layers: s2.state.layers.map((l, i) =>
+          i === layerIdx ? { ...l, activeClipIdx: clipIdx, nextClipIdx: clipIdx } : l,
+        ),
+        selectedLayer: layerIdx,
+        transition: txInfo.transition ?? s2.state.transition,
+      },
+    }));
+    if (txInfo.scheduleClear) {
+      pendingTransitionCommit = window.setTimeout(() => {
+        pendingTransitionCommit = null;
+        set((s3) => ({
+          state: { ...s3.state, transition: { ...s3.state.transition, startedAt: null } },
+        }));
+      }, txInfo.duration);
+    }
   },
 
   removeClip: (layerIdx, clipIdx) => {

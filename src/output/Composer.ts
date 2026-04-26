@@ -365,14 +365,23 @@ export class Composer {
   updateState(state: VJState): void {
     this.state = state;
     // Reconcile on any change to which plugin ids are referenced anywhere
-    // (active or next) — ensures GO transitions are snappy.
-    const key = state.layers
-      .map((l) => {
-        const active = l.clips[l.activeClipIdx]?.pluginId ?? "";
-        const next = l.clips[l.nextClipIdx]?.pluginId ?? "";
-        return `${active}/${next}:${l.mute ? 1 : 0}`;
-      })
-      .join("|");
+    // (active / next / transition.fromActive). Without pinning fromActive
+    // here, an immediate-fire trigger would unmount the outgoing plugin
+    // before the crossfade finishes.
+    const txActive = state.transition?.startedAt != null;
+    const fromKey = txActive
+      ? state.layers
+          .map((l, i) => l.clips[state.transition.fromActive[i] ?? -1]?.pluginId ?? "")
+          .join(",")
+      : "";
+    const key =
+      state.layers
+        .map((l) => {
+          const active = l.clips[l.activeClipIdx]?.pluginId ?? "";
+          const next = l.clips[l.nextClipIdx]?.pluginId ?? "";
+          return `${active}/${next}:${l.mute ? 1 : 0}`;
+        })
+        .join("|") + `|tx:${txActive ? 1 : 0}|from:${fromKey}`;
     if (key !== this.lastReconcileKey) {
       this.lastReconcileKey = key;
       this.reconcileDirty = true;
@@ -387,12 +396,22 @@ export class Composer {
     this.reconcileDirty = false;
 
     const wanted = new Set<string>();
-    for (const layer of this.state.layers) {
+    const txActive = this.state.transition?.startedAt != null;
+    for (let i = 0; i < this.state.layers.length; i++) {
+      const layer = this.state.layers[i];
       if (layer.mute) continue;
       const active = layer.clips[layer.activeClipIdx];
       if (active) wanted.add(active.pluginId);
       const next = layer.clips[layer.nextClipIdx];
       if (next) wanted.add(next.pluginId);
+      // Pin the outgoing plugin while a transition is running so the
+      // crossfade's "from" side stays available even after activeClipIdx
+      // has already been advanced (immediate-fire model).
+      if (txActive) {
+        const fromIdx = this.state.transition.fromActive[i] ?? -1;
+        const fromClip = layer.clips[fromIdx];
+        if (fromClip) wanted.add(fromClip.pluginId);
+      }
     }
 
     this.host
