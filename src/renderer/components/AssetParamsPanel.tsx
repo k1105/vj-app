@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import { MidiLearnButton } from "./MidiLearnButton";
 import { AutoSyncButton } from "./AutoSyncButton";
 import { AssetPreview } from "./AssetPreview";
-import type { ParamDef } from "../../shared/types";
+import type { LayerState, ParamDef, PluginMeta } from "../../shared/types";
 
 type ParamGroup =
   | { type: "range"; start: ParamDef; end: ParamDef }
@@ -29,127 +29,158 @@ function groupParams(params: ParamDef[]): ParamGroup[] {
   return groups;
 }
 
+/**
+ * Asset Parameters — stacks every layer's active clip so all live params
+ * are simultaneously editable. Layers without an active clip are skipped.
+ * Muted layers render dimmed but stay editable. Selection just
+ * highlights + scrolls to the matching section.
+ */
 export function AssetParamsPanel() {
+  const layers = useVJStore((s) => s.state.layers);
   const selectedLayer = useVJStore((s) => s.state.selectedLayer);
-  const layer = useVJStore((s) => s.state.layers[selectedLayer]);
   const plugins = useVJStore((s) => s.plugins);
-  const setClipParam = useVJStore((s) => s.setClipParam);
+  const sectionRefs = useRef<Array<HTMLDivElement | null>>([]);
 
-  // Edit the most-recently-selected clip on this layer: NEXT if a different
-  // clip is queued, otherwise LIVE. Lets the user pre-configure params on a
-  // clip before pressing GO — clicking a thumb queues it as NEXT and the
-  // panel follows the queue.
-  const activeIdx = layer?.activeClipIdx ?? -1;
-  const nextIdx = layer?.nextClipIdx ?? -1;
-  const editingClipIdx = nextIdx >= 0 ? nextIdx : activeIdx;
-  const editingIsNext = nextIdx >= 0 && nextIdx !== activeIdx;
-  const editingClip = editingClipIdx >= 0 ? layer?.clips[editingClipIdx] : null;
-  const plugin = plugins.find((p) => p.id === editingClip?.pluginId);
+  useEffect(() => {
+    const el = sectionRefs.current[selectedLayer];
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selectedLayer]);
 
-  const setValue = (key: string, value: number | boolean | string) => {
-    if (editingClipIdx < 0) return;
-    setClipParam(selectedLayer, editingClipIdx, key, value);
-  };
-
-  const [savingDefaults, setSavingDefaults] = useState(false);
-  const onSetAsDefault = async () => {
-    if (!plugin || !editingClip) return;
-    setSavingDefaults(true);
-    try {
-      await window.vj.setPluginDefaults(plugin.kind, plugin.id, editingClip.params);
-    } catch (err) {
-      console.error("[AssetParamsPanel] setPluginDefaults failed:", err);
-      alert(`Set as Default failed: ${(err as Error).message}`);
-    } finally {
-      setSavingDefaults(false);
-    }
-  };
-
-  // Array-valued params (e.g. "strings") are filtered out before reaching
-  // ParamControl, so narrowing here is safe.
-  const currentVal = (def: ParamDef): number | boolean | string => {
-    const v = editingClip?.params[def.key];
-    if (v !== undefined && !Array.isArray(v)) return v;
-    return def.default as number | boolean | string;
-  };
-
-  const visibleParams = (plugin?.params ?? []).filter((d) => d.type !== "strings");
+  const visibleLayers = layers
+    .map((layer, idx) => ({ layer, idx }))
+    .filter(({ layer }) => layer.activeClipIdx >= 0 && layer.clips[layer.activeClipIdx]);
 
   return (
     <div className="asset-panel">
       <div className="asset-panel-header">
         <span className="asset-panel-title-text">Asset Parameters</span>
       </div>
-      <div className="asset-preview-wrap">
-        <div className="asset-preview-frame">
-          <AssetPreview
-            plugin={plugin ?? null}
-            params={editingClip?.params ?? {}}
+      <div className="asset-stack">
+        {visibleLayers.length === 0 && (
+          <div className="param-empty">no active clips on any layer</div>
+        )}
+        {visibleLayers.map(({ layer, idx }) => (
+          <LayerSection
+            key={idx}
+            ref={(el) => {
+              sectionRefs.current[idx] = el;
+            }}
+            layer={layer}
+            layerIdx={idx}
+            plugin={plugins.find((p) => p.id === layer.clips[layer.activeClipIdx]?.pluginId) ?? null}
+            isSelected={selectedLayer === idx}
           />
-        </div>
-        <div className="asset-name">
-          {plugin?.name ?? "--"}
-          {editingClip && (
-            <span className={`asset-edit-badge ${editingIsNext ? "next" : "live"}`}>
-              {editingIsNext ? "NEXT" : "LIVE"}
-            </span>
-          )}
-        </div>
-        <div className="asset-layer-info">
-          L{selectedLayer + 1}
-          {editingClip ? ` · clip ${editingClipIdx + 1}/${layer!.clips.length}` : ""}
-        </div>
+        ))}
       </div>
+    </div>
+  );
+}
 
-      <div className="asset-params">
-        <div className="param-section-title">
-          <span>Params</span>
+interface LayerSectionProps {
+  layer: LayerState;
+  layerIdx: number;
+  plugin: PluginMeta | null;
+  isSelected: boolean;
+}
+
+const LayerSection = forwardRef<HTMLDivElement, LayerSectionProps>(
+  function LayerSection({ layer, layerIdx, plugin, isSelected }, ref) {
+    const setClipParam = useVJStore((s) => s.setClipParam);
+    const selectLayer = useVJStore((s) => s.selectLayer);
+    const clipIdx = layer.activeClipIdx;
+    const clip = layer.clips[clipIdx];
+    const [savingDefaults, setSavingDefaults] = useState(false);
+
+    const setValue = (key: string, value: number | boolean | string) => {
+      if (clipIdx < 0) return;
+      setClipParam(layerIdx, clipIdx, key, value);
+    };
+
+    const onSetAsDefault = async () => {
+      if (!plugin || !clip) return;
+      setSavingDefaults(true);
+      try {
+        await window.vj.setPluginDefaults(plugin.kind, plugin.id, clip.params);
+      } catch (err) {
+        console.error("[AssetParamsPanel] setPluginDefaults failed:", err);
+        alert(`Set as Default failed: ${(err as Error).message}`);
+      } finally {
+        setSavingDefaults(false);
+      }
+    };
+
+    const currentVal = (def: ParamDef): number | boolean | string => {
+      const v = clip?.params[def.key];
+      if (v !== undefined && !Array.isArray(v)) return v;
+      return def.default as number | boolean | string;
+    };
+
+    const visibleParams = (plugin?.params ?? []).filter((d) => d.type !== "strings");
+    const labelPrefix = `L${layerIdx + 1} ${plugin?.name ?? "?"}`;
+
+    return (
+      <div
+        ref={ref}
+        className={`asset-section ${isSelected ? "selected" : ""} ${layer.mute ? "muted" : ""}`}
+        onClick={() => selectLayer(layerIdx)}
+      >
+        <div className="asset-section-header">
+          <span className="asset-section-layer">L{layerIdx + 1}</span>
+          <div className="asset-section-preview">
+            <AssetPreview plugin={plugin} params={clip?.params ?? {}} />
+          </div>
+          <span className="asset-section-name">{plugin?.name ?? "?"}</span>
+          {layer.mute && <span className="asset-edit-badge muted">MUTED</span>}
           <button
             className="asset-default-btn"
-            onClick={onSetAsDefault}
-            disabled={!editingClip || savingDefaults}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSetAsDefault();
+            }}
+            disabled={!clip || savingDefaults}
             title="Save current params as the plugin's manifest defaults"
           >
             {savingDefaults ? "…" : "SET AS DEFAULT"}
           </button>
         </div>
-        {!editingClip && (
-          <div className="param-empty">no clip selected</div>
-        )}
-        {groupParams(visibleParams).map((group) => {
-          const labelPrefix = `L${selectedLayer + 1} ${plugin?.name ?? "?"}`;
-          if (group.type === "range") {
-            const { start, end } = group;
+        <div className="asset-params">
+          {groupParams(visibleParams).map((group) => {
+            if (group.type === "range") {
+              const { start, end } = group;
+              return (
+                <RangeControl
+                  key={`${start.key}-${end.key}`}
+                  startDef={start}
+                  endDef={end}
+                  startValue={currentVal(start)}
+                  endValue={currentVal(end)}
+                  onStartChange={(v) => setValue(start.key, v)}
+                  onEndChange={(v) => setValue(end.key, v)}
+                  midiStartId={`clip:${layerIdx}:${start.key}`}
+                  midiEndId={`clip:${layerIdx}:${end.key}`}
+                  labelPrefix={labelPrefix}
+                />
+              );
+            }
             return (
-              <RangeControl
-                key={`${start.key}-${end.key}`}
-                startDef={start}
-                endDef={end}
-                startValue={currentVal(start)}
-                endValue={currentVal(end)}
-                onStartChange={(v) => setValue(start.key, v)}
-                onEndChange={(v) => setValue(end.key, v)}
-                midiStartId={`clip:${selectedLayer}:${start.key}`}
-                midiEndId={`clip:${selectedLayer}:${end.key}`}
+              <ParamControl
+                key={group.def.key}
+                def={group.def}
+                value={currentVal(group.def)}
+                onChange={(v) => setValue(group.def.key, v)}
+                midiTargetId={`clip:${layerIdx}:${group.def.key}`}
                 labelPrefix={labelPrefix}
               />
             );
-          }
-          return (
-            <ParamControl
-              key={group.def.key}
-              def={group.def}
-              value={currentVal(group.def)}
-              onChange={(v) => setValue(group.def.key, v)}
-              midiTargetId={`clip:${selectedLayer}:${group.def.key}`}
-              labelPrefix={labelPrefix}
-            />
-          );
-        })}
+          })}
+          {visibleParams.length === 0 && (
+            <div className="param-empty">no params</div>
+          )}
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  },
+);
 
 /**
  * Two-thumb range slider for consecutive *Start / *End param pairs.
@@ -183,23 +214,18 @@ function RangeControl({
   const s = Math.max(min, Math.min(max, typeof startValue === "number" ? startValue : Number(startValue)));
   const e = Math.max(min, Math.min(max, typeof endValue === "number" ? endValue : Number(endValue)));
 
-  // Percentage positions for the fill bar
   const range = max - min;
   const leftPct = ((s - min) / range) * 100;
   const rightPct = ((e - min) / range) * 100;
 
-  const label =
-    startDef.key.slice(0, -5) || "range"; // e.g. "loopStart" → "loop"
-
-  // Loop range is a structural marker for the playhead window — controlling it
-  // via MIDI / sync would just scrub the loop boundaries, which isn't musical.
+  const label = startDef.key.slice(0, -5) || "range";
   const showAutoControls = label !== "loop";
 
   const fmt = (v: number) =>
     startDef.type === "int" ? String(Math.round(v)) : v.toFixed(1);
 
   return (
-    <div className="param-row param-range-row">
+    <div className="param-row param-range-row" onClick={(e) => e.stopPropagation()}>
       <span className="param-label">{label}</span>
       <div className="range2-wrap">
         <div className="range2-track">
@@ -208,7 +234,6 @@ function RangeControl({
             style={{ left: `${leftPct}%`, width: `${rightPct - leftPct}%` }}
           />
         </div>
-        {/* start thumb — lower z-index so end can pass over it */}
         <input
           type="range"
           className="range2-thumb range2-thumb-start"
@@ -221,7 +246,6 @@ function RangeControl({
             onStartChange(startDef.type === "int" ? Math.round(v) : v);
           }}
         />
-        {/* end thumb */}
         <input
           type="range"
           className="range2-thumb range2-thumb-end"
@@ -258,7 +282,6 @@ function RangeControl({
   );
 }
 
-/** Returns true when a param has a meaningful discrete step (≤ 12 positions). */
 function isStepParam(def: ParamDef): boolean {
   if (def.type === "bool" || def.type === "enum" || !def.step) return false;
   const range = (def.max ?? 1) - (def.min ?? 0);
@@ -283,11 +306,10 @@ function ParamControl({
   if (isStepParam(def)) {
     const num = typeof value === "number" ? value : Number(value);
     const step = def.step!;
-    // Display normalised to [0, 360) — the store value accumulates unboundedly
     const displayAngle = ((num % 360) + 360) % 360;
     const displayVal = String(Math.round(displayAngle));
     return (
-      <div className="param-row">
+      <div className="param-row" onClick={(e) => e.stopPropagation()}>
         <span className="param-label">{def.key}</span>
         <div className="param-step-group">
           <button className="param-step-btn" onClick={() => onChange(num - step)}>◀</button>
@@ -302,7 +324,7 @@ function ParamControl({
   if (def.type === "bool") {
     const on = value === true || value === 1;
     return (
-      <div className="param-row">
+      <div className="param-row" onClick={(e) => e.stopPropagation()}>
         <span className="param-label">{def.key}</span>
         <button
           className={`param-toggle ${on ? "on" : ""}`}
@@ -317,7 +339,7 @@ function ParamControl({
 
   if (def.type === "enum" && def.options) {
     return (
-      <div className="param-row">
+      <div className="param-row" onClick={(e) => e.stopPropagation()}>
         <span className="param-label">{def.key}</span>
         <select
           className="param-select"
@@ -342,7 +364,7 @@ function ParamControl({
         ? def.default
         : "#000000";
     return (
-      <div className="param-row">
+      <div className="param-row" onClick={(e) => e.stopPropagation()}>
         <span className="param-label">{def.key}</span>
         <input
           type="color"
@@ -357,7 +379,7 @@ function ParamControl({
 
   if (def.type === "camera") {
     return (
-      <div className="param-row">
+      <div className="param-row" onClick={(e) => e.stopPropagation()}>
         <span className="param-label">{def.key}</span>
         <CameraDeviceSelect
           value={typeof value === "string" ? value : ""}
@@ -367,7 +389,6 @@ function ParamControl({
     );
   }
 
-  // float / int
   const num = typeof value === "number" ? value : Number(value);
   const min = def.min ?? 0;
   const max = def.max ?? 1;
@@ -376,7 +397,7 @@ function ParamControl({
     def.type === "int" ? String(Math.round(num)) : num.toFixed(2);
 
   return (
-    <div className="param-row">
+    <div className="param-row" onClick={(e) => e.stopPropagation()}>
       <span className="param-label">{def.key}</span>
       <input
         type="range"
@@ -397,12 +418,6 @@ function ParamControl({
   );
 }
 
-/**
- * Dropdown of system-recognized video input devices. Labels are only
- * populated after camera permission is granted, so until the camera
- * plugin successfully opens a stream the entries fall back to a short
- * deviceId hash.
- */
 function CameraDeviceSelect({
   value,
   onChange,

@@ -104,6 +104,9 @@ interface VJStoreShape {
   setPostFXSlotParam: (slotIdx: number, key: string, value: ParamValue) => void;
   /** Clear slot[slotIdx] (pluginId=null, enabled=false, params={}). */
   clearPostFXSlot: (slotIdx: number) => void;
+  /** Currently focused postfx slot (drives editor highlight + scroll). */
+  selectedPostFXSlot: number;
+  selectPostFXSlot: (slotIdx: number) => void;
   /** Set the postfx application boundary. Clamped to [0, layers.length]. */
   setPostfxBoundary: (n: number) => void;
   /** Set a single param on an active clip. Immediately broadcasts. */
@@ -209,6 +212,9 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
   plugins: [],
   stageMode: false,
   liveSnapshot: null,
+  selectedPostFXSlot: 0,
+  selectPostFXSlot: (slotIdx) =>
+    set(() => ({ selectedPostFXSlot: Math.max(0, Math.min(POSTFX_SLOT_COUNT - 1, slotIdx)) })),
 
   enterStage: () => {
     const s = get();
