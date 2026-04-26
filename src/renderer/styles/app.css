@@ -853,32 +853,32 @@ input[type="range"]::-moz-range-thumb {
    control surface is MIDI; this is mostly a live readout. */
 .layer-opacity-line {
   position: relative;
-  width: 20px;
+  width: 60px;
   align-self: stretch;
   flex-shrink: 0;
   cursor: ns-resize;
-  /* Visual track: a 4 px line in the middle of the 20 px hit area. */
+  /* Visual track: a 12 px line in the middle of the 60 px hit area. */
   background-image: linear-gradient(
     to right,
-    transparent calc(50% - 2px),
-    var(--border-strong) calc(50% - 2px),
-    var(--border-strong) calc(50% + 2px),
-    transparent calc(50% + 2px)
+    transparent calc(50% - 6px),
+    var(--border-strong) calc(50% - 6px),
+    var(--border-strong) calc(50% + 6px),
+    transparent calc(50% + 6px)
   );
 }
 .layer-opacity-line:hover {
   background-image: linear-gradient(
     to right,
-    transparent calc(50% - 2px),
-    var(--text-dim) calc(50% - 2px),
-    var(--text-dim) calc(50% + 2px),
-    transparent calc(50% + 2px)
+    transparent calc(50% - 6px),
+    var(--text-dim) calc(50% - 6px),
+    var(--text-dim) calc(50% + 6px),
+    transparent calc(50% + 6px)
   );
 }
 .layer-opacity-line-fill {
   position: absolute;
-  left: calc(50% - 2px);
-  width: 4px;
+  left: calc(50% - 6px);
+  width: 12px;
   bottom: 0;
   background: var(--live);
   pointer-events: none;
