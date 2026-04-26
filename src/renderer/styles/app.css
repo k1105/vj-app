@@ -1200,7 +1200,7 @@ input[type="range"]::-moz-range-thumb {
   overflow-y: auto;
   /* Hard-cap the stack so adding more enabled slots scrolls inside the
      panel instead of pushing the whole top-bar taller. */
-  max-height: 32vh;
+  max-height: 20vh;
   border-top: 1px solid var(--border-subtle);
 }
 .postfx-empty-assign {
