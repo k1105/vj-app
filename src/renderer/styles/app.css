@@ -1198,6 +1198,9 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  /* Hard-cap the stack so adding more enabled slots scrolls inside the
+     panel instead of pushing the whole top-bar taller. */
+  max-height: 32vh;
   border-top: 1px solid var(--border-subtle);
 }
 .postfx-empty-assign {
