@@ -271,13 +271,13 @@ function SlotParams({
               ? def.default
               : false;
           return (
-            <div key={def.key} className="postfx-rack-param-row">
+            <div key={def.key} className="param-row">
               <MidiLearnLabel
                 targetId={`postfx-slot:${slotIdx}:param:${def.key}`}
                 label={`Slot ${slotIdx + 1} · ${def.key}`}
                 text={def.key}
                 group="PostFX"
-                className="postfx-rack-param-label"
+                className="param-label"
               />
               <button
                 className={`param-toggle ${on ? "on" : ""}`}
@@ -302,13 +302,13 @@ function SlotParams({
         const max = def.max ?? 1;
         const isInt = def.type === "int";
         return (
-          <div key={def.key} className="postfx-rack-param-row">
+          <div key={def.key} className="param-row">
             <MidiLearnLabel
               targetId={`postfx-slot:${slotIdx}:param:${def.key}`}
               label={`Slot ${slotIdx + 1} · ${def.key}`}
               text={def.key}
               group="PostFX"
-              className="postfx-rack-param-label"
+              className="param-label"
             />
             <input
               type="range"
@@ -321,9 +321,9 @@ function SlotParams({
                 onParamChange(def.key, isInt ? Math.round(raw) : raw);
               }}
               onClick={(e) => e.stopPropagation()}
-              className="postfx-rack-param-slider"
+              className="param-slider"
             />
-            <span className="postfx-rack-param-val">
+            <span className="param-val">
               {isInt ? Math.round(value).toString() : value.toFixed(2)}
             </span>
             <AutoSyncButton
