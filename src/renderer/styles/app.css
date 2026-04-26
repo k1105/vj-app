@@ -67,7 +67,6 @@ body {
 /* pro-tool numeric readouts everywhere */
 .bpm,
 .param-val,
-.opacity-val,
 .dl-status,
 .asset-name,
 .asset-layer-info,
@@ -264,15 +263,17 @@ body {
   overflow: hidden;
 }
 /*
- * Asset / PostFX param row: 2-row × 5-column grid.
- *   Row 1: label | inline control | value | MIDI | Sync
- *   Row 2: slider / select / range — spans the full width so it never gets
- *          squeezed by long labels or trailing buttons.
- * Compact inline controls (toggle / color / step group) stay in row 1.
+ * Asset / PostFX param row: 2-row × 3-column grid.
+ *   Row 1: label | value | sync (~) ─┐
+ *   Row 2: slider / select  spans 1-2 │ sync continues
+ * Sync (~) spans both rows so it gets a comfortable touch target —
+ * vertical-center across the full label-slider stack height.
+ * Compact inline controls (toggle / color / step group) sit on row 1
+ * col 2 in place of the value readout.
  */
 .param-row {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr) 44px 18px 18px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   margin-bottom: 8px;
   column-gap: 6px;
@@ -289,33 +290,31 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Sliders / selects break to a full-width second row. */
+.param-row > .param-val {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+}
+/* Sliders / selects fill row 2 across cols 1-2 (sync stays on col 3). */
 .param-row > .param-slider,
 .param-row > .param-select {
-  grid-column: 1 / -1;
+  grid-column: 1 / 3;
   grid-row: 2;
   min-width: 0;
 }
-/* Compact inline controls stay in row 1. */
+/* Compact inline controls sit in row 1 col 2 (where val would go). */
 .param-row > .param-toggle,
 .param-row > .param-color,
 .param-row > .param-step-group {
   grid-column: 2;
   grid-row: 1;
-  justify-self: start;
+  justify-self: end;
 }
-.param-row > .param-val {
-  grid-column: 3;
-  grid-row: 1;
-}
-.param-row > .midi-learn-btn { grid-column: 4; grid-row: 1; }
-/* Sync (~) spans both rows so it gets a comfortable touch target,
-   matching the visual height of label + slider stacked. */
 .param-row > .sync-btn {
-  grid-column: 5;
+  grid-column: 3;
   grid-row: 1 / -1;
-  height: 100%;
   align-self: stretch;
+  height: auto;
 }
 .param-val {
   font-size: 10px;
@@ -906,20 +905,6 @@ input[type="range"]::-moz-range-thumb {
 .layer-row:hover::before {
   background: var(--border-strong);
 }
-.layer-indicator {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  flex-shrink: 0;
-}
-.layer-indicator.active {
-  background: var(--live);
-}
-.layer-indicator.muted {
-  background: var(--danger);
-  opacity: 0.5;
-}
 .layer-label {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -1008,16 +993,6 @@ input[type="range"]::-moz-range-thumb {
   padding-left: 6px;
   border-left: 1px solid var(--border-subtle);
   margin-left: 2px;
-}
-.opacity-slider {
-  width: 80px;
-}
-.opacity-val {
-  font-size: 9px;
-  width: 30px;
-  text-align: right;
-  color: var(--live);
-  font-weight: 600;
 }
 .layer-blend {
   background: var(--bg-inset);
@@ -1949,34 +1924,6 @@ input[type="range"]::-moz-range-thumb {
   min-height: 40px;
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-inset);
-}
-.postfx-rack-param-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-}
-.postfx-rack-param-label {
-  font-size: 8px;
-  font-family: var(--font-mono);
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  width: 44px;
-  flex-shrink: 0;
-}
-.postfx-rack-param-slider {
-  flex: 1 1 0;
-  min-width: 0;
-  width: 0;
-}
-.postfx-rack-param-val {
-  font-size: 8px;
-  font-family: var(--font-mono);
-  color: var(--live);
-  font-weight: 600;
-  width: 28px;
-  text-align: right;
 }
 /* New 8-slot layout: a row of slots above, an editor below. */
 .postfx-slots-row {
