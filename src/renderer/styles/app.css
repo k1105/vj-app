@@ -402,6 +402,24 @@ input[type="range"]::-moz-range-thumb {
   overflow: hidden;
   background: var(--bg-primary);
 }
+.layers-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.layers-column > .layer-stack { flex: 1 1 auto; min-height: 0; }
+.postfx-slots-band {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+.postfx-slots-band .postfx-slots-row {
+  /* Inherits the 8-column grid; in the wider layer column each tile
+     becomes much easier to hit. */
+  padding: 6px 8px;
+}
 
 /* shared panel header look */
 .assets-header,

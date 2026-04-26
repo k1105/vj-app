@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import type { LayerClip, LayerState, PluginMeta } from "../../shared/types";
-import { PostFXRack } from "./PostFXBar";
+import { PostFXEditor } from "./PostFXBar";
 import { AudioMeters } from "./AudioMeters";
 import { AssetPreview } from "./AssetPreview";
 
@@ -127,7 +127,7 @@ export function TopBar() {
         <div className="preview-stack">{renderedLayers(true)}</div>
       </div>
       <div className="master-panel">
-        <PostFXRack />
+        <PostFXEditor />
         <AudioMeters />
       </div>
     </div>

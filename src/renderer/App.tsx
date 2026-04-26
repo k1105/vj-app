@@ -7,6 +7,7 @@ import { TopBar } from "./components/TopBar";
 import { AssetsPanel } from "./components/AssetsPanel";
 import { LayerStack } from "./components/LayerStack";
 import { AssetParamsPanel } from "./components/AssetParamsPanel";
+import { PostFXSlotsRow } from "./components/PostFXBar";
 import { TransportBar } from "./components/TransportBar";
 import { MidiMapPanel } from "./components/midiMap/MidiMapPanel";
 import { useMidiMapPanelStore } from "./state/midiMapPanelStore";
@@ -118,7 +119,10 @@ export function App() {
       <TopBar />
       <div className="middle">
         <AssetsPanel />
-        <LayerStack />
+        <div className="layers-column">
+          <PostFXSlotsRow />
+          <LayerStack />
+        </div>
         <AssetParamsPanel />
       </div>
       <TransportBar />

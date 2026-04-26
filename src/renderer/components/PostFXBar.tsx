@@ -7,37 +7,24 @@ import { MidiLearnLabel } from "./MidiLearnLabel";
 import { AutoSyncButton } from "./AutoSyncButton";
 
 /**
- * PostFX rack — 8 fixed slots. The slot row at the top drives assignment
- * + bypass + selection. Below it, every assigned slot renders its own
- * editor section so all live (and pre-staged) params are simultaneously
- * visible. Selection just highlights + scrolls to the matching section.
+ * Just the 8-tile selector row. Lives above LayerStack in the middle
+ * column so each tile gets the full layer-column width — easy to click,
+ * easy to read. Bypass / selection / MIDI-learn handles all live here.
  */
-export function PostFXRack() {
+export function PostFXSlotsRow() {
   const plugins = useVJStore((s) => s.plugins);
   const postfx = useVJStore((s) => s.state.postfx);
   const togglePostFXSlot = useVJStore((s) => s.togglePostFXSlot);
-  const setPostFXSlotPlugin = useVJStore((s) => s.setPostFXSlotPlugin);
-  const setPostFXSlotParam = useVJStore((s) => s.setPostFXSlotParam);
-  const clearPostFXSlot = useVJStore((s) => s.clearPostFXSlot);
   const selectedSlot = useVJStore((s) => s.selectedPostFXSlot);
   const selectSlot = useVJStore((s) => s.selectPostFXSlot);
-
   const available = plugins.filter((p) => p.kind === "postfx" && !p.hidden);
-  const slotRefs = useRef<Array<HTMLDivElement | null>>([]);
-
-  // Scroll the selected slot's editor into view when selection changes.
-  useEffect(() => {
-    const el = slotRefs.current[selectedSlot];
-    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [selectedSlot]);
 
   return (
-    <div className="postfx-rack">
+    <div className="postfx-slots-band">
       <div className="postfx-rack-header">
         <span>PostFX — 8 SLOTS</span>
         <span className="postfx-rack-hint">click slot ⇢ select · power ⇢ bypass</span>
       </div>
-
       <div className="postfx-slots-row">
         {Array.from({ length: POSTFX_SLOT_COUNT }, (_, i) => {
           const s = postfx[i];
@@ -78,56 +65,80 @@ export function PostFXRack() {
           );
         })}
       </div>
+    </div>
+  );
+}
 
-      <div className="postfx-editor-stack">
-        {/* If the selected slot is empty, show an inline assignment row at the top. */}
-        {!postfx[selectedSlot]?.pluginId && (
-          <EmptySlotAssign
-            slotIdx={selectedSlot}
-            available={available}
-            usedIds={new Set(postfx.map((s) => s.pluginId).filter(Boolean) as string[])}
-            onAssign={(id) => setPostFXSlotPlugin(selectedSlot, id)}
-          />
-        )}
-        {postfx.map((slot, i) =>
-          slot.pluginId ? (
-            <div
-              key={i}
-              ref={(el) => {
-                slotRefs.current[i] = el;
+/**
+ * The stacked editor — one section per assigned slot. Stays in the master
+ * panel (top right). Selection (driven by the slots row) highlights +
+ * scrolls the matching section.
+ */
+export function PostFXEditor() {
+  const plugins = useVJStore((s) => s.plugins);
+  const postfx = useVJStore((s) => s.state.postfx);
+  const togglePostFXSlot = useVJStore((s) => s.togglePostFXSlot);
+  const setPostFXSlotPlugin = useVJStore((s) => s.setPostFXSlotPlugin);
+  const setPostFXSlotParam = useVJStore((s) => s.setPostFXSlotParam);
+  const clearPostFXSlot = useVJStore((s) => s.clearPostFXSlot);
+  const selectedSlot = useVJStore((s) => s.selectedPostFXSlot);
+  const selectSlot = useVJStore((s) => s.selectPostFXSlot);
+  const available = plugins.filter((p) => p.kind === "postfx" && !p.hidden);
+  const slotRefs = useRef<Array<HTMLDivElement | null>>([]);
+
+  useEffect(() => {
+    const el = slotRefs.current[selectedSlot];
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selectedSlot]);
+
+  return (
+    <div className="postfx-editor-stack">
+      {!postfx[selectedSlot]?.pluginId && (
+        <EmptySlotAssign
+          slotIdx={selectedSlot}
+          available={available}
+          usedIds={new Set(postfx.map((s) => s.pluginId).filter(Boolean) as string[])}
+          onAssign={(id) => setPostFXSlotPlugin(selectedSlot, id)}
+        />
+      )}
+      {postfx.map((slot, i) =>
+        slot.pluginId ? (
+          <div
+            key={i}
+            ref={(el) => {
+              slotRefs.current[i] = el;
+            }}
+            className={`postfx-section ${slot.enabled ? "enabled" : "bypassed"} ${
+              selectedSlot === i ? "selected" : ""
+            }`}
+            onClick={() => selectSlot(i)}
+          >
+            <SlotHeader
+              slotIdx={i}
+              slot={slot}
+              pluginName={
+                available.find((p) => p.id === slot.pluginId)?.name ?? slot.pluginId
+              }
+              onToggle={() => togglePostFXSlot(i)}
+              onClear={() => clearPostFXSlot(i)}
+            />
+            <SlotParams
+              slotIdx={i}
+              slot={slot}
+              params={
+                available.find((p) => p.id === slot.pluginId)?.params ?? []
+              }
+              onParamChange={(key, value) => {
+                if (!slot.enabled) togglePostFXSlot(i);
+                setPostFXSlotParam(i, key, value);
               }}
-              className={`postfx-section ${slot.enabled ? "enabled" : "bypassed"} ${
-                selectedSlot === i ? "selected" : ""
-              }`}
-              onClick={() => selectSlot(i)}
-            >
-              <SlotHeader
-                slotIdx={i}
-                slot={slot}
-                pluginName={
-                  available.find((p) => p.id === slot.pluginId)?.name ?? slot.pluginId
-                }
-                onToggle={() => togglePostFXSlot(i)}
-                onClear={() => clearPostFXSlot(i)}
-              />
-              <SlotParams
-                slotIdx={i}
-                slot={slot}
-                params={
-                  available.find((p) => p.id === slot.pluginId)?.params ?? []
-                }
-                onParamChange={(key, value) => {
-                  if (!slot.enabled) togglePostFXSlot(i);
-                  setPostFXSlotParam(i, key, value);
-                }}
-              />
-            </div>
-          ) : null,
-        )}
-        {postfx.every((s) => !s.pluginId) && (
-          <div className="postfx-rack-empty">no slots assigned</div>
-        )}
-      </div>
+            />
+          </div>
+        ) : null,
+      )}
+      {postfx.every((s) => !s.pluginId) && (
+        <div className="postfx-rack-empty">no slots assigned</div>
+      )}
     </div>
   );
 }
