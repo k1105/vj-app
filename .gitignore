@@ -5,4 +5,6 @@ dist/
 *.log
 .vite/
 materials/videos/*.mp4
+materials/videos/.av1-backup/
 !materials/videos/.gitkeep
+*.ply
