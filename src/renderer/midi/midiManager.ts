@@ -186,6 +186,13 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
     return;
   }
 
+  // BURST: hold-style. Level-based (not edge) — value > 0 = on, 0 = off.
+  // A momentary button naturally toggles BURST on press / off on release.
+  if (targetId === "burst") {
+    vj.setBurst(rawValue > 0);
+    return;
+  }
+
   if (targetId.startsWith("layer-opacity-")) {
     const layerIdx = parseInt(targetId.slice("layer-opacity-".length), 10);
     if (!isNaN(layerIdx)) vj.setLayerOpacity(layerIdx, rawValue / 127);

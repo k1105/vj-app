@@ -18,6 +18,7 @@ export function TransportBar() {
   const setTransitionType = useVJStore((s) => s.setTransitionType);
   const tap = useVJStore((s) => s.tap);
   const triggerFlash = useVJStore((s) => s.triggerFlash);
+  const setBurst = useVJStore((s) => s.setBurst);
   const stageMode = useVJStore((s) => s.stageMode);
   const enterStage = useVJStore((s) => s.enterStage);
   const releaseStage = useVJStore((s) => s.releaseStage);
@@ -63,6 +64,23 @@ export function TransportBar() {
           FLASH
         </button>
         <MidiLearnButton targetId="flash" label="FLASH" group="Transport" />
+      </div>
+      <div className="flash-section">
+        <button
+          className="btn-burst"
+          onMouseDown={() => setBurst(true)}
+          onMouseUp={() => setBurst(false)}
+          onMouseLeave={() => setBurst(false)}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            setBurst(true);
+          }}
+          onTouchEnd={() => setBurst(false)}
+          title="hold for intense strobe"
+        >
+          BURST
+        </button>
+        <MidiLearnButton targetId="burst" label="BURST" group="Transport" />
       </div>
       <button
         className="btn-blackout"

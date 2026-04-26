@@ -322,6 +322,7 @@ export class Composer {
     this.flashMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uFlash: { value: 0 },
+        uWhite: { value: 0 },
         uTex: { value: null },
       },
       vertexShader: POSTFX_VERTEX_SHADER,
@@ -330,13 +331,16 @@ export class Composer {
         varying vec2 vUv;
         uniform sampler2D uTex;
         uniform float uFlash;
+        uniform float uWhite;
         void main() {
           vec4 c = texture2D(uTex, vUv);
           // Rec.709 luma → grayscale, push contrast around 0.5, then invert.
           float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
           float boosted = clamp((l - 0.5) * 2.8 + 0.5, 0.0, 1.0);
           vec3 invGray = vec3(1.0 - boosted);
-          gl_FragColor = vec4(mix(c.rgb, invGray, clamp(uFlash, 0.0, 1.0)), c.a);
+          vec3 base = mix(c.rgb, invGray, clamp(uFlash, 0.0, 1.0));
+          vec3 final = mix(base, vec3(1.0), clamp(uWhite, 0.0, 1.0));
+          gl_FragColor = vec4(final, c.a);
         }
       `,
       blending: THREE.NoBlending,
@@ -865,9 +869,35 @@ export class Composer {
         this.renderer.render(this.displayScene, this.displayCamera);
       }
 
-      // Flash invert — snapshot the just-rendered framebuffer, then redraw
-      // it through the invert shader.
-      if (this.state?.flashAt != null) {
+      // BURST takes priority over FLASH while held — a continuous strobe
+      // alternating between the inverted-luma view and a near-white wash
+      // at ~16 Hz. More aggressive than the one-shot flash decay.
+      if (this.state?.burstAt != null) {
+        const elapsed = Date.now() - this.state.burstAt;
+        const period = 60; // ms → ~16 Hz
+        const phase = (elapsed % period) / period;
+        const invertPhase = phase < 0.5;
+
+        const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+        const w = Math.max(1, Math.floor(size.x));
+        const h = Math.max(1, Math.floor(size.y));
+        const cap = this.flashCaptureTexture;
+        if (!cap || cap.image.width !== w || cap.image.height !== h) {
+          cap?.dispose();
+          this.flashCaptureTexture = new THREE.FramebufferTexture(w, h);
+        }
+        this.renderer.setRenderTarget(null);
+        this.renderer.copyFramebufferToTexture(this.flashCaptureTexture!);
+
+        this.flashMaterial.uniforms.uTex.value = this.flashCaptureTexture;
+        this.flashMaterial.uniforms.uFlash.value = invertPhase ? 1.0 : 0.0;
+        this.flashMaterial.uniforms.uWhite.value = invertPhase ? 0.0 : 0.95;
+        this.renderer.autoClear = false;
+        this.renderer.render(this.flashScene, this.displayCamera);
+        this.renderer.autoClear = true;
+      } else if (this.state?.flashAt != null) {
+        // Flash invert — snapshot the just-rendered framebuffer, then redraw
+        // it through the invert shader.
         const elapsed = Date.now() - this.state.flashAt;
         if (elapsed < Composer.FLASH_DURATION_MS) {
           const t = elapsed / Composer.FLASH_DURATION_MS;
@@ -889,6 +919,7 @@ export class Composer {
 
           this.flashMaterial.uniforms.uTex.value = this.flashCaptureTexture;
           this.flashMaterial.uniforms.uFlash.value = strength;
+          this.flashMaterial.uniforms.uWhite.value = 0;
           this.renderer.autoClear = false;
           this.renderer.render(this.flashScene, this.displayCamera);
           this.renderer.autoClear = true;

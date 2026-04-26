@@ -44,6 +44,7 @@ const initialState: VJState = {
   postfx: makeSlots(),
   postfxBoundary: 0,
   flashAt: null,
+  burstAt: null,
 };
 
 interface VJStoreShape {
@@ -140,6 +141,12 @@ interface VJStoreShape {
   ) => void;
   /** Set flashAt to now. Composer picks it up and decays the overlay per-frame. */
   triggerFlash: () => void;
+  /**
+   * Hold-style BURST. Sets burstAt to now while on, null on off.
+   * Composer drives a continuous high-frequency strobe (invert ↔ white)
+   * while burstAt is non-null.
+   */
+  setBurst: (on: boolean) => void;
   broadcastState: () => void;
 }
 
@@ -231,6 +238,7 @@ function buildBroadcastState(
     bar: state.bar,
     audio: state.audio,
     flashAt: state.flashAt,
+    burstAt: state.burstAt,
   };
 }
 
@@ -337,6 +345,7 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
       bar: s.state.bar,
       audio: s.state.audio,
       flashAt: s.state.flashAt,
+      burstAt: s.state.burstAt,
     };
     set({ state: restored, stageMode: false, liveSnapshot: null });
     get().broadcastState();
@@ -717,6 +726,10 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
 
   triggerFlash: () => {
     set((s) => ({ state: { ...s.state, flashAt: Date.now() } }));
+  },
+
+  setBurst: (on) => {
+    set((s) => ({ state: { ...s.state, burstAt: on ? Date.now() : null } }));
   },
 
   broadcastState: () => {

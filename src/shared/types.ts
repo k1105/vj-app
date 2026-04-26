@@ -191,6 +191,12 @@ export interface VJState {
   postfxBoundary: number;
   /** Epoch ms of the last flash trigger. null when never triggered. */
   flashAt: number | null;
+  /**
+   * Epoch ms when BURST was activated. Stays non-null while held; reset
+   * to null on release. Composer drives a continuous strobe while
+   * non-null (more aggressive than the one-shot flash decay).
+   */
+  burstAt: number | null;
 }
 
 export interface DownloadResult {
