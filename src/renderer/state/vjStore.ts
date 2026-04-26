@@ -135,6 +135,11 @@ interface VJStoreShape {
   broadcastState: () => void;
 }
 
+// Default PostFX slot assignment, seeded once on the first plugin load if
+// the user hasn't already arranged their own. Order = chain order.
+const DEFAULT_POSTFX_SEEDS = ["droste", "thermal", "mirror", "glitch", "kaleidoscope"];
+let postfxSeeded = false;
+
 // throttle-with-trailing-edge broadcaster
 // Sends immediately on the first call, then at most once per 16 ms.
 // A pending flag ensures the last value always gets sent even if calls
@@ -303,6 +308,20 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
   loadPlugins: async () => {
     const plugins = await window.vj.listPlugins();
     set({ plugins });
+    // Seed default PostFX assignments on the first successful load. Skip
+    // when the user already has anything in the rack, and only run once
+    // per session so a manual clear doesn't get silently re-seeded.
+    if (!postfxSeeded) {
+      postfxSeeded = true;
+      const s = get();
+      if (s.state.postfx.every((p) => !p.pluginId)) {
+        DEFAULT_POSTFX_SEEDS.forEach((id, i) => {
+          if (plugins.some((p) => p.id === id && p.kind === "postfx")) {
+            s.setPostFXSlotPlugin(i, id);
+          }
+        });
+      }
+    }
   },
 
   addClip: (layerIdx, pluginId) => {
