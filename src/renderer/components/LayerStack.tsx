@@ -1,8 +1,6 @@
 import { useRef } from "react";
 import { useVJStore } from "../state/vjStore";
 import type { LayerState, PluginMeta } from "../../shared/types";
-import { MidiLearnButton } from "./MidiLearnButton";
-import { AutoSyncButton } from "./AutoSyncButton";
 
 const BLEND_MODES: LayerState["blend"][] = ["normal", "add", "multiply", "screen"];
 
@@ -281,12 +279,6 @@ function LayerRow(props: {
         >
           S
         </button>
-        <MidiLearnButton
-          targetId={`layer-opacity-${idx}`}
-          label={`L${idx + 1} Opacity`}
-          group="Layers"
-        />
-        <AutoSyncButton targetId={`layer-opacity-${idx}`} />
       </div>
     </div>
   );

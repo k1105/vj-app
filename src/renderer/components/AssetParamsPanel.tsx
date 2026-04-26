@@ -151,7 +151,7 @@ const LayerSection = forwardRef<HTMLDivElement, LayerSectionProps>(
             disabled={!clip || savingDefaults}
             title="Save current params as the plugin's manifest defaults"
           >
-            {savingDefaults ? "…" : "SET AS DEFAULT"}
+            {savingDefaults ? "…" : "SAVE"}
           </button>
         </div>
         <div className="asset-params">

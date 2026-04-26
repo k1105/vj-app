@@ -223,7 +223,7 @@ function SlotHeader({
         disabled={savingDefaults}
         title="Save current params as the plugin's manifest defaults"
       >
-        {savingDefaults ? "…" : "SET AS DEFAULT"}
+        {savingDefaults ? "…" : "SAVE"}
       </button>
       <button
         className="postfx-slot-clear"
