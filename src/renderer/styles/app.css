@@ -108,6 +108,10 @@ body {
 .top-bar {
   display: grid;
   grid-template-columns: 1fr 1fr 280px;
+  /* Row height matches the 16:9 preview boxes so the master panel
+     never grows the top bar past the monitor height. The two preview
+     columns share half of (100vw − master col − bar padding). */
+  grid-template-rows: calc((100vw - 280px - 24px) / 2 * 9 / 16);
   gap: 0;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border-strong);
