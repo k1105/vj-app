@@ -277,7 +277,11 @@ body {
  */
 .param-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  /* col 1 = MIDI rec slot (click to learn, shows mapped CC#)
+     col 2 = label / slider span
+     col 3 = value
+     col 4 = sync (~) */
+  grid-template-columns: 26px minmax(0, 1fr) auto auto;
   /* Row 1 fixed so the sync button's min-height can't bleed extra
      space onto the label row. Any overflow gets absorbed by row 2
      (the slider track). */
@@ -287,8 +291,50 @@ body {
   column-gap: 6px;
   row-gap: 3px;
 }
-.param-label {
+/* MIDI learn slot — leftmost column, spans both rows for a tall click
+   target. Shows the mapped CC number when bound, "●" while listening. */
+.param-row > .midi-rec-slot {
   grid-column: 1;
+  grid-row: 1 / -1;
+  align-self: stretch;
+  min-height: 36px;
+  padding: 0;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s, background 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.param-row > .midi-rec-slot:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.param-row > .midi-rec-slot.mapped {
+  color: var(--live);
+  border-color: var(--live);
+  background: var(--live-dim);
+}
+.param-row > .midi-rec-slot.learning {
+  color: #1a0d00;
+  background: var(--accent);
+  border-color: var(--accent);
+  animation: midi-blink 0.6s ease-in-out infinite alternate;
+}
+.param-row > .midi-rec-slot.pulse {
+  color: #000;
+  background: var(--live);
+  border-color: var(--live);
+  transition: color 0s, border-color 0s, background 0s;
+}
+.param-label {
+  grid-column: 2;
   grid-row: 1;
   font-size: 10px;
   color: var(--info);
@@ -299,27 +345,27 @@ body {
   text-overflow: ellipsis;
 }
 .param-row > .param-val {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
   justify-self: end;
 }
-/* Sliders / selects fill row 2 across cols 1-2 (sync stays on col 3). */
+/* Sliders / selects fill row 2 across cols 2-3 (rec slot stays in col 1, sync col 4). */
 .param-row > .param-slider,
 .param-row > .param-select {
-  grid-column: 1 / 3;
+  grid-column: 2 / 4;
   grid-row: 2;
   min-width: 0;
 }
-/* Compact inline controls sit in row 1 col 2 (where val would go). */
+/* Compact inline controls sit in row 1 col 3 (where val would go). */
 .param-row > .param-toggle,
 .param-row > .param-color,
 .param-row > .param-step-group {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
   justify-self: end;
 }
 .param-row > .sync-btn {
-  grid-column: 3;
+  grid-column: 4;
   grid-row: 1 / -1;
   align-self: stretch;
   /* Explicit min-height — `align-self: stretch` alone wasn't expanding
@@ -1331,52 +1377,6 @@ input[type="range"]::-moz-range-thumb {
 }
 .postfx-section .postfx-rack-params {
   border-top: none;
-}
-/* Click-to-learn param label. Click → REC mode; the next physical
-   control bound binds here, replacing any prior binding of the same
-   knob (one knob = one target, so reassignments are silent and fast). */
-.midi-learn-label {
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 4px;
-  border-radius: 2px;
-  border: 1px solid transparent;
-  transition: background 0.1s, border-color 0.1s, color 0.1s;
-  user-select: none;
-}
-.midi-learn-label:hover {
-  border-color: var(--text-dim);
-  color: var(--text);
-}
-.midi-learn-label.mapped {
-  color: var(--live);
-}
-.midi-learn-label.learning {
-  background: var(--accent);
-  color: #1a0d00;
-  border-color: var(--accent);
-  animation: midi-learn-pulse 0.8s infinite;
-}
-.midi-learn-label.pulse {
-  background: var(--live-dim);
-}
-.midi-learn-rec {
-  font-size: 9px;
-  color: #1a0d00;
-}
-.midi-learn-text { font: inherit; }
-.midi-learn-addr {
-  font-family: var(--font-mono);
-  font-size: 8px;
-  color: var(--live);
-  opacity: 0.85;
-  letter-spacing: 0.4px;
-}
-@keyframes midi-learn-pulse {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.25); }
 }
 .param-more-btn {
   align-self: flex-start;

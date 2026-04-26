@@ -3,7 +3,7 @@ import { useVJStore } from "../state/vjStore";
 import type { ParamDef, PostFXSlot } from "../../shared/types";
 import { POSTFX_SLOT_COUNT } from "../../shared/types";
 import { MidiLearnButton } from "./MidiLearnButton";
-import { MidiLearnLabel } from "./MidiLearnLabel";
+import { MidiLearnSlot } from "./MidiLearnSlot";
 import { AutoSyncButton } from "./AutoSyncButton";
 
 /**
@@ -272,13 +272,12 @@ function SlotParams({
               : false;
           return (
             <div key={def.key} className="param-row">
-              <MidiLearnLabel
+              <MidiLearnSlot
                 targetId={`postfx-slot:${slotIdx}:param:${def.key}`}
                 label={`Slot ${slotIdx + 1} · ${def.key}`}
-                text={def.key}
                 group="PostFX"
-                className="param-label"
               />
+              <span className="param-label">{def.key}</span>
               <button
                 className={`param-toggle ${on ? "on" : ""}`}
                 onClick={(e) => {
@@ -303,13 +302,12 @@ function SlotParams({
         const isInt = def.type === "int";
         return (
           <div key={def.key} className="param-row">
-            <MidiLearnLabel
+            <MidiLearnSlot
               targetId={`postfx-slot:${slotIdx}:param:${def.key}`}
               label={`Slot ${slotIdx + 1} · ${def.key}`}
-              text={def.key}
               group="PostFX"
-              className="param-label"
             />
+            <span className="param-label">{def.key}</span>
             <input
               type="range"
               min={0}

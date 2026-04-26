@@ -5,21 +5,17 @@ interface Props {
   targetId: string;
   /** Human-readable label shown in the MIDI Map panel. */
   label: string;
-  /** Visible text — typically the param key. */
-  text: string;
   group?: string;
-  className?: string;
 }
 
 /**
- * A param label that doubles as a MIDI-learn trigger. Click → enter REC
- * mode; the next physical control touched binds to this target. Right
- * click → clear the binding. The same physical control can only bind to
- * one target at a time, so clicking another label and moving the same
- * knob silently re-routes — which is the whole point of this control:
- * fast, transient assignments without leaving stale mappings around.
+ * Dedicated MIDI-learn click area at the left edge of a param row.
+ * Click to enter REC mode; the next physical control touched binds.
+ * When mapped, displays the bound MIDI number (e.g. "13"). Right-click
+ * clears the binding. Designed as a column-spanning vertical strip so
+ * the click target is large even when the row is compact.
  */
-export function MidiLearnLabel({ targetId, label, text, group, className }: Props) {
+export function MidiLearnSlot({ targetId, label, group }: Props) {
   const learningTarget = useMidiStore((s) => s.learningTarget);
   const mapped = useMidiStore((s) => s.mappings[targetId]);
   const isPulsing = useMidiStore((s) => s.pulseTargets[targetId] != null);
@@ -37,8 +33,7 @@ export function MidiLearnLabel({ targetId, label, text, group, className }: Prop
   const isLearning = learningTarget === targetId;
 
   const cls =
-    "midi-learn-label" +
-    (className ? ` ${className}` : "") +
+    "midi-rec-slot" +
     (isLearning ? " learning" : "") +
     (mapped && !isLearning ? " mapped" : "") +
     (isPulsing ? " pulse" : "");
@@ -47,11 +42,13 @@ export function MidiLearnLabel({ targetId, label, text, group, className }: Prop
     ? "REC — move a knob to bind · click to cancel"
     : mapped
     ? `${formatAddress(mapped)} · click to remap · right-click to clear`
-    : "click to MIDI learn — move a knob to bind";
+    : "click to MIDI learn";
 
   return (
-    <span
+    <button
+      type="button"
       className={cls}
+      title={title}
       onClick={(e) => {
         e.stopPropagation();
         if (isLearning) cancelLearn();
@@ -62,13 +59,8 @@ export function MidiLearnLabel({ targetId, label, text, group, className }: Prop
         e.stopPropagation();
         if (mapped) removeMapping(targetId);
       }}
-      title={title}
     >
-      {isLearning && <span className="midi-learn-rec">●</span>}
-      <span className="midi-learn-text">{text}</span>
-      {!isLearning && mapped && (
-        <span className="midi-learn-addr">{shortAddress(mapped)}</span>
-      )}
-    </span>
+      {isLearning ? "●" : mapped ? shortAddress(mapped) : ""}
+    </button>
   );
 }

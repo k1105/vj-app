@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import { MidiLearnButton } from "./MidiLearnButton";
-import { MidiLearnLabel } from "./MidiLearnLabel";
+import { MidiLearnSlot } from "./MidiLearnSlot";
 import { AutoSyncButton } from "./AutoSyncButton";
 import { AssetPreview } from "./AssetPreview";
 import type { LayerState, ParamDef, PluginMeta } from "../../shared/types";
@@ -332,13 +332,12 @@ function ParamControl({
     const displayVal = String(Math.round(displayAngle));
     return (
       <div className="param-row" onClick={(e) => e.stopPropagation()}>
-        <MidiLearnLabel
+        <MidiLearnSlot
           targetId={midiTargetId}
           label={midiLabel}
-          text={def.key}
           group="Clip Params"
-          className="param-label"
         />
+        <span className="param-label">{def.key}</span>
         <div className="param-step-group">
           <button className="param-step-btn" onClick={() => onChange(num - step)}>◀</button>
           <span className="param-step-val">{displayVal}</span>
@@ -352,13 +351,12 @@ function ParamControl({
     const on = value === true || value === 1;
     return (
       <div className="param-row" onClick={(e) => e.stopPropagation()}>
-        <MidiLearnLabel
+        <MidiLearnSlot
           targetId={midiTargetId}
           label={midiLabel}
-          text={def.key}
           group="Clip Params"
-          className="param-label"
         />
+        <span className="param-label">{def.key}</span>
         <button
           className={`param-toggle ${on ? "on" : ""}`}
           onClick={() => onChange(!on)}
@@ -372,13 +370,12 @@ function ParamControl({
   if (def.type === "enum" && def.options) {
     return (
       <div className="param-row" onClick={(e) => e.stopPropagation()}>
-        <MidiLearnLabel
+        <MidiLearnSlot
           targetId={midiTargetId}
           label={midiLabel}
-          text={def.key}
           group="Clip Params"
-          className="param-label"
         />
+        <span className="param-label">{def.key}</span>
         <select
           className="param-select"
           value={String(value)}
@@ -435,13 +432,12 @@ function ParamControl({
 
   return (
     <div className="param-row" onClick={(e) => e.stopPropagation()}>
-      <MidiLearnLabel
+      <MidiLearnSlot
         targetId={midiTargetId}
         label={midiLabel}
-        text={def.key}
         group="Clip Params"
-        className="param-label"
       />
+      <span className="param-label">{def.key}</span>
       <input
         type="range"
         className="param-slider"
