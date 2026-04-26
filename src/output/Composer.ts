@@ -98,6 +98,8 @@ export class Composer {
   private flashScene: THREE.Scene;
   private flashMaterial: THREE.ShaderMaterial;
   private flashCaptureTexture: THREE.FramebufferTexture | null = null;
+  private burstScene: THREE.Scene;
+  private burstMaterial: THREE.ShaderMaterial;
   private static readonly FLASH_DURATION_MS = 120;
   // Flash-zoom: short, sharply-damped ring so the camera punch feels
   // crisp without leaving a lingering wobble.
@@ -348,6 +350,57 @@ export class Composer {
     });
     const flashQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.flashMaterial);
     this.flashScene.add(flashQuad);
+
+    // BURST shader: strobe (thermal-ramp wash ↔ near-white) + a fast
+    // sweeping thermal shift driven by uTime. Reuses the same captured
+    // framebuffer as the flash pass.
+    this.burstScene = new THREE.Scene();
+    this.burstMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uTex: { value: null },
+        uTime: { value: 0 },
+        uPhase: { value: 0 },
+      },
+      vertexShader: POSTFX_VERTEX_SHADER,
+      fragmentShader: /* glsl */ `
+        precision highp float;
+        varying vec2 vUv;
+        uniform sampler2D uTex;
+        uniform float uTime;
+        uniform float uPhase;
+
+        vec3 thermalRamp(float t) {
+          t = fract(t);
+          vec3 c0 = vec3(0.0, 0.0, 0.0);
+          vec3 c1 = vec3(0.0, 0.0, 0.5);
+          vec3 c2 = vec3(0.5, 0.0, 0.8);
+          vec3 c3 = vec3(1.0, 0.1, 0.2);
+          vec3 c4 = vec3(1.0, 0.8, 0.0);
+          vec3 c5 = vec3(1.0, 1.0, 1.0);
+          if (t < 0.2)      return mix(c0, c1, t / 0.2);
+          else if (t < 0.4) return mix(c1, c2, (t - 0.2) / 0.2);
+          else if (t < 0.6) return mix(c2, c3, (t - 0.4) / 0.2);
+          else if (t < 0.8) return mix(c3, c4, (t - 0.6) / 0.2);
+          else              return mix(c4, c5, (t - 0.8) / 0.2);
+        }
+
+        void main() {
+          vec4 c = texture2D(uTex, vUv);
+          float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+          // Sweep the entire ramp ~5 times per second.
+          float shift = uTime * 5.0;
+          vec3 thermal = thermalRamp(l + shift);
+          // Strobe: first half of each cycle = thermal, second half = white.
+          float white = step(0.5, uPhase);
+          vec3 final = mix(thermal, vec3(1.0), white * 0.92);
+          gl_FragColor = vec4(final, c.a);
+        }
+      `,
+      blending: THREE.NoBlending,
+      depthWrite: false,
+    });
+    const burstQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.burstMaterial);
+    this.burstScene.add(burstQuad);
   }
 
   /** Called once after construction (main.ts). Loads plugin metadata. */
@@ -869,14 +922,13 @@ export class Composer {
         this.renderer.render(this.displayScene, this.displayCamera);
       }
 
-      // BURST takes priority over FLASH while held — a continuous strobe
-      // alternating between the inverted-luma view and a near-white wash
-      // at ~16 Hz. More aggressive than the one-shot flash decay.
+      // BURST takes priority over FLASH while held. Strobe (thermal-ramp
+      // wash ↔ near-white) at ~16 Hz, with a faster shift sweep on the
+      // ramp itself so the gradient scans continuously across the image.
       if (this.state?.burstAt != null) {
         const elapsed = Date.now() - this.state.burstAt;
-        const period = 60; // ms → ~16 Hz
+        const period = 60; // ms → ~16 Hz strobe
         const phase = (elapsed % period) / period;
-        const invertPhase = phase < 0.5;
 
         const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
         const w = Math.max(1, Math.floor(size.x));
@@ -889,11 +941,11 @@ export class Composer {
         this.renderer.setRenderTarget(null);
         this.renderer.copyFramebufferToTexture(this.flashCaptureTexture!);
 
-        this.flashMaterial.uniforms.uTex.value = this.flashCaptureTexture;
-        this.flashMaterial.uniforms.uFlash.value = invertPhase ? 1.0 : 0.0;
-        this.flashMaterial.uniforms.uWhite.value = invertPhase ? 0.0 : 0.95;
+        this.burstMaterial.uniforms.uTex.value = this.flashCaptureTexture;
+        this.burstMaterial.uniforms.uTime.value = elapsed * 0.001;
+        this.burstMaterial.uniforms.uPhase.value = phase;
         this.renderer.autoClear = false;
-        this.renderer.render(this.flashScene, this.displayCamera);
+        this.renderer.render(this.burstScene, this.displayCamera);
         this.renderer.autoClear = true;
       } else if (this.state?.flashAt != null) {
         // Flash invert — snapshot the just-rendered framebuffer, then redraw
@@ -1032,6 +1084,7 @@ export class Composer {
     this.postfxMaterials.clear();
     this.flashMaterial.dispose();
     this.flashCaptureTexture?.dispose();
+    this.burstMaterial.dispose();
     this.blackTexture.dispose();
     this.renderer.dispose();
   }
