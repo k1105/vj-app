@@ -1,7 +1,7 @@
 import Store from "electron-store";
 
 const store = new Store({
-  name: "hatakanata-vj-settings",
+  name: "videojockeyjs-settings",
   defaults: {
     midiMappings: {},
     lastBPM: 128,

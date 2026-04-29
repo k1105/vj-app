@@ -1,0 +1,40 @@
+{
+  "name": "ymgishi_STYLE_Low-poly_PlayStation_1_era_3D_game_graphics_cir_3878217e-0cc0-4480-becc-55d2ce356ea3_0",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/ymgishi_STYLE_Low-poly_PlayStation_1_era_3D_game_graphics_cir_3878217e-0cc0-4480-becc-55d2ce356ea3_0.mp4",
+  "thumbnail": "thumbnail.jpg",
+  "duration": 8.875,
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2,
+      "step": 0.05
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 0,
+      "min": 0,
+      "max": 9,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 9,
+      "min": 0,
+      "max": 9,
+      "step": 1
+    }
+  ],
+  "category": "scene01"
+}

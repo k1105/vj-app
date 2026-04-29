@@ -18,7 +18,7 @@ export function createControllerWindow(): BrowserWindow {
     minWidth: 1200,
     minHeight: 720,
     backgroundColor: "#05070a",
-    title: "hatakanata-vj · Controller",
+    title: "VideoJockeyJS · Controller",
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -43,7 +43,7 @@ export function createManagerWindow(): BrowserWindow {
     minWidth: 720,
     minHeight: 540,
     backgroundColor: "#05070a",
-    title: "hatakanata-vj · Library",
+    title: "VideoJockeyJS · Library",
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -73,7 +73,7 @@ export function createOutputWindow(): BrowserWindow {
     x: bounds?.x,
     y: bounds?.y,
     backgroundColor: "#000000",
-    title: "hatakanata-vj · Output",
+    title: "VideoJockeyJS · Output",
     autoHideMenuBar: true,
     webPreferences: {
       preload: preloadPath,

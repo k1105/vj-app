@@ -5,6 +5,7 @@ import {
   type DownloadProgress,
   type DownloadResult,
   type ParamValue,
+  type PerfStats,
   type PluginKind,
   type PluginMeta,
   type SplatProgress,
@@ -88,6 +89,15 @@ const api: VJApi = {
   migrateTextAssets: (): Promise<number> =>
     ipcRenderer.invoke(IPC.MigrateTextAssets),
 
+  pickImagesForAsset: (): Promise<string[]> =>
+    ipcRenderer.invoke(IPC.PickImagesForAsset),
+
+  createImageAsset: (name: string, imagePaths: string[]): Promise<string> =>
+    ipcRenderer.invoke(IPC.CreateImageAsset, { name, imagePaths }),
+
+  createSequenceAsset: (name: string, videoPluginIds: string[]): Promise<string> =>
+    ipcRenderer.invoke(IPC.CreateSequenceAsset, { name, videoPluginIds }),
+
   setPluginHidden: (id: string, hidden: boolean): Promise<void> =>
     ipcRenderer.invoke(IPC.SetPluginHidden, { id, hidden }),
 
@@ -99,6 +109,13 @@ const api: VJApi = {
     id: string,
     values: Record<string, ParamValue>,
   ): Promise<void> => ipcRenderer.invoke(IPC.SetPluginDefaults, { kind, id, values }),
+
+  setParamPrimary: (
+    kind: PluginKind,
+    id: string,
+    paramKeys: string[],
+    primary: boolean,
+  ): Promise<void> => ipcRenderer.invoke(IPC.SetParamPrimary, { kind, id, paramKeys, primary }),
 
   setPluginCategory: (
     kind: PluginKind,
@@ -119,6 +136,16 @@ const api: VJApi = {
     const listener = (_: unknown, p: SplatProgress) => cb(p);
     ipcRenderer.on(IPC.SplatProgress, listener);
     return () => ipcRenderer.removeListener(IPC.SplatProgress, listener);
+  },
+
+  sendPerfStats: (stats: PerfStats) => {
+    ipcRenderer.send(IPC.PerfStats, stats);
+  },
+
+  onPerfStats: (cb: (stats: PerfStats) => void) => {
+    const listener = (_: unknown, stats: PerfStats) => cb(stats);
+    ipcRenderer.on(IPC.PerfStats, listener);
+    return () => ipcRenderer.removeListener(IPC.PerfStats, listener);
   },
 };
 

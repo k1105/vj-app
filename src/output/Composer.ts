@@ -3,6 +3,9 @@ import { easeCubicIn } from "d3-ease";
 import type { LayerState, PluginMeta, VJState } from "../shared/types";
 import { PluginHost, type GlobalUniforms } from "./PluginHost";
 
+// FPS ring buffer: keep the last N frame deltas (ms) for a rolling average.
+const FPS_WINDOW = 60;
+
 const MAX_LAYERS = 4;
 const BLEND_MODE: Record<LayerState["blend"], number> = {
   normal: 0,
@@ -119,12 +122,19 @@ export class Composer {
   private raf = 0;
   private state: VJState | null = null;
   private clock = new THREE.Clock();
+  private fpsBuffer: number[] = [];
+  private lastPerfSentMs = 0;
   private lastTime = 0;
   private zoomScale = 1.0; // flash-zoom scale factor; 1.0 = no zoom
 
   private reconcilePending = false;
   private reconcileDirty = false;
   private lastReconcileKey = "";
+  private metasReady = false;
+
+  private prevBurstAt: number | null = null;
+  private burstFadeStartedAt: number | null = null;
+  private static readonly BURST_FADEOUT_MS = 600;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
@@ -360,6 +370,7 @@ export class Composer {
         uTex: { value: null },
         uTime: { value: 0 },
         uPhase: { value: 0 },
+        uIntensity: { value: 1.0 },
       },
       vertexShader: POSTFX_VERTEX_SHADER,
       fragmentShader: /* glsl */ `
@@ -368,6 +379,7 @@ export class Composer {
         uniform sampler2D uTex;
         uniform float uTime;
         uniform float uPhase;
+        uniform float uIntensity;
 
         vec3 thermalRamp(float t) {
           t = fract(t);
@@ -395,7 +407,7 @@ export class Composer {
           // edges so the flash reads as a pulse, not a hard shutter.
           float white = smoothstep(0.75, 0.95, uPhase);
           vec3 final = mix(thermal, vec3(1.0), white * 0.85);
-          gl_FragColor = vec4(final, c.a);
+          gl_FragColor = vec4(mix(c.rgb, final, uIntensity), c.a);
         }
       `,
       blending: THREE.NoBlending,
@@ -411,9 +423,11 @@ export class Composer {
     console.log(`[Composer] loadPlugins: ${metas.length} plugins`);
     this.allPlugins = metas;
     this.host.setMetas(metas);
+    this.metasReady = true;
     window.vj.onPluginsChanged((plugins) => {
       this.allPlugins = plugins;
       this.host.setMetas(plugins);
+      this.metasReady = true;
       this.reconcileDirty = true;
       this.scheduleReconcile();
     });
@@ -451,6 +465,7 @@ export class Composer {
   private scheduleReconcile(): void {
     if (this.reconcilePending || !this.reconcileDirty) return;
     if (!this.state) return;
+    if (!this.metasReady) { this.reconcileDirty = true; return; }
     this.reconcilePending = true;
     this.reconcileDirty = false;
 
@@ -927,11 +942,13 @@ export class Composer {
       // BURST takes priority over FLASH while held. Strobe (thermal-ramp
       // wash ↔ near-white) at ~16 Hz, with a faster shift sweep on the
       // ramp itself so the gradient scans continuously across the image.
-      if (this.state?.burstAt != null) {
-        const elapsed = Date.now() - this.state.burstAt;
-        const period = 60; // ms → ~16 Hz strobe
-        const phase = (elapsed % period) / period;
+      const curBurstAt = this.state?.burstAt ?? null;
+      if (this.prevBurstAt != null && curBurstAt == null) {
+        this.burstFadeStartedAt = Date.now();
+      }
+      this.prevBurstAt = curBurstAt;
 
+      const captureBurst = (timeMs: number, phase: number, intensity: number): void => {
         const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
         const w = Math.max(1, Math.floor(size.x));
         const h = Math.max(1, Math.floor(size.y));
@@ -942,13 +959,29 @@ export class Composer {
         }
         this.renderer.setRenderTarget(null);
         this.renderer.copyFramebufferToTexture(this.flashCaptureTexture!);
-
         this.burstMaterial.uniforms.uTex.value = this.flashCaptureTexture;
-        this.burstMaterial.uniforms.uTime.value = elapsed * 0.001;
+        this.burstMaterial.uniforms.uTime.value = timeMs * 0.001;
         this.burstMaterial.uniforms.uPhase.value = phase;
+        this.burstMaterial.uniforms.uIntensity.value = intensity;
         this.renderer.autoClear = false;
         this.renderer.render(this.burstScene, this.displayCamera);
         this.renderer.autoClear = true;
+      };
+
+      if (curBurstAt != null) {
+        const elapsed = Date.now() - curBurstAt;
+        const period = 60; // ms → ~16 Hz strobe
+        captureBurst(elapsed, (elapsed % period) / period, 1.0);
+      } else if (this.burstFadeStartedAt != null) {
+        const fadeElapsed = Date.now() - this.burstFadeStartedAt;
+        if (fadeElapsed < Composer.BURST_FADEOUT_MS) {
+          const t = fadeElapsed / Composer.BURST_FADEOUT_MS;
+          // easeOutCubic: 急速に始まりゆっくり終わる
+          const intensity = Math.pow(1 - t, 3);
+          captureBurst(fadeElapsed, 0, intensity);
+        } else {
+          this.burstFadeStartedAt = null;
+        }
       } else if (this.state?.flashAt != null) {
         // Flash invert — snapshot the just-rendered framebuffer, then redraw
         // it through the invert shader.
@@ -978,6 +1011,28 @@ export class Composer {
           this.renderer.render(this.flashScene, this.displayCamera);
           this.renderer.autoClear = true;
         }
+      }
+
+      // ── Perf stats (once per second) ─────────────────────────────────
+      if (delta > 0) {
+        this.fpsBuffer.push(delta);
+        if (this.fpsBuffer.length > FPS_WINDOW) this.fpsBuffer.shift();
+      }
+      const nowMs = Date.now();
+      if (nowMs - this.lastPerfSentMs >= 1000 && this.fpsBuffer.length > 0) {
+        this.lastPerfSentMs = nowMs;
+        const avgDelta =
+          this.fpsBuffer.reduce((a, b) => a + b, 0) / this.fpsBuffer.length;
+        const fps = Math.round((1000 / avgDelta) * 10) / 10;
+        const mem = (performance as unknown as { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
+        window.vj.sendPerfStats({
+          fps,
+          heapUsedMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : -1,
+          heapLimitMB: mem ? Math.round(mem.jsHeapSizeLimit / 1048576) : -1,
+          textures: this.renderer.info.memory.textures,
+          geometries: this.renderer.info.memory.geometries,
+          mountedPlugins: this.host.getMountedCount(),
+        });
       }
 
       this.raf = requestAnimationFrame(tick);

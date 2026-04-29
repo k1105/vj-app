@@ -10,6 +10,8 @@ import { downloadVideo } from "./videoDownloader";
 import { importLocalVideo } from "./videoImporter";
 import { generateSplat } from "./splatGenerator";
 import { createTextAsset, migrateAllTextAssets } from "./textAssetImporter";
+import { createImageAsset } from "./imageAssetImporter";
+import { createSequenceAsset } from "./sequenceAssetImporter";
 import { broadcastPluginsNow, listPlugins, readPluginSource } from "./pluginLoader";
 import {
   bakePluginThumbnail,
@@ -18,6 +20,7 @@ import {
   revealPlugin,
   setPluginCategory,
   setPluginDefaults,
+  setParamPrimary,
 } from "./pluginCrud";
 import { getSetting, setSetting } from "./store";
 
@@ -124,6 +127,11 @@ export function registerIpcHandlers(ctx: Ctx): void {
     ctx.getController()?.webContents.send(IPC.RequestStateRebroadcast);
   });
 
+  // Output → Controller: forward perf stats once per second.
+  ipcMain.on(IPC.PerfStats, (_event, stats) => {
+    ctx.getController()?.webContents.send(IPC.PerfStats, stats);
+  });
+
   ipcMain.handle(IPC.SettingsGet, (_event, key: string) => getSetting(key));
   ipcMain.handle(IPC.SettingsSet, (_event, key: string, value: unknown) => {
     setSetting(key, value);
@@ -143,6 +151,30 @@ export function registerIpcHandlers(ctx: Ctx): void {
   );
 
   ipcMain.handle(IPC.MigrateTextAssets, async () => migrateAllTextAssets());
+
+  ipcMain.handle(IPC.PickImagesForAsset, async () => {
+    const result = await dialog.showOpenDialog({
+      title: "Select images",
+      filters: [{ name: "Image", extensions: ["jpg", "jpeg", "png", "webp", "gif"] }],
+      properties: ["openFile", "multiSelections"],
+    });
+    if (result.canceled) return [];
+    return result.filePaths;
+  });
+
+  ipcMain.handle(
+    IPC.CreateImageAsset,
+    async (_event, args: { name: string; imagePaths: string[] }) => {
+      return createImageAsset(args.name, args.imagePaths);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.CreateSequenceAsset,
+    async (_event, args: { name: string; videoPluginIds: string[] }) => {
+      return createSequenceAsset(args.name, args.videoPluginIds);
+    },
+  );
 
   // Show a native (OS-level) context menu and resolve to the selected
   // item id, or null if dismissed. Each `id` is opaque — the renderer
@@ -186,6 +218,16 @@ export function registerIpcHandlers(ctx: Ctx): void {
       args: { kind: PluginKind; id: string; values: Record<string, ParamValue> },
     ) => {
       await setPluginDefaults(args.kind, args.id, args.values);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.SetParamPrimary,
+    async (
+      _event,
+      args: { kind: PluginKind; id: string; paramKeys: string[]; primary: boolean },
+    ) => {
+      await setParamPrimary(args.kind, args.id, args.paramKeys, args.primary);
     },
   );
 

@@ -1,5 +1,5 @@
 {
-  "name": "ymgishi_A_close_composition_of_a_decorative_artificial_canal__3da3e337-d9ee-4775-a46d-0ed8f468541f_3",
+  "name": "canal-scene",
   "author": "user",
   "version": "0.1.0",
   "outputType": "splat",
@@ -9,7 +9,7 @@
     {
       "key": "posX",
       "type": "float",
-      "default": -1.25,
+      "default": 1.75,
       "min": -10,
       "max": 10,
       "step": 0.05
@@ -17,7 +17,7 @@
     {
       "key": "posY",
       "type": "float",
-      "default": 0.55,
+      "default": 1.15,
       "min": -10,
       "max": 10,
       "step": 0.05
@@ -25,7 +25,7 @@
     {
       "key": "posZ",
       "type": "float",
-      "default": -6.3,
+      "default": 6.4,
       "min": -10,
       "max": 10,
       "step": 0.05
@@ -33,7 +33,7 @@
     {
       "key": "targetX",
       "type": "float",
-      "default": 0,
+      "default": -2.55,
       "min": -10,
       "max": 10,
       "step": 0.05
@@ -41,7 +41,7 @@
     {
       "key": "targetY",
       "type": "float",
-      "default": 0,
+      "default": -1.2,
       "min": -10,
       "max": 10,
       "step": 0.05
@@ -49,24 +49,32 @@
     {
       "key": "targetZ",
       "type": "float",
-      "default": -10,
-      "min": -10,
+      "default": -32.55,
+      "min": -50,
       "max": 10,
       "step": 0.05
     },
     {
       "key": "fov",
       "type": "float",
-      "default": 50,
+      "default": 28,
       "min": 20,
       "max": 120,
       "step": 1
     },
     {
-      "key": "orbitSpeed",
+      "key": "cruiseSpeed",
       "type": "float",
-      "default": 0,
+      "default": 1,
       "min": -1,
+      "max": 1,
+      "step": 0.01
+    },
+    {
+      "key": "cruiseSize",
+      "type": "float",
+      "default": 0.14,
+      "min": 0,
       "max": 1,
       "step": 0.01
     }

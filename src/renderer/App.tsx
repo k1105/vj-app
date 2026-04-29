@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useVJStore } from "./state/vjStore";
+import type { Deck } from "../shared/types";
 import { initMidi } from "./midi/midiManager";
 import { startAutoSyncDriver } from "./autoSync/autoSyncDriver";
 import { startBpmDetector, type BpmDetectorHandle } from "./audio/bpmDetector";
@@ -27,6 +28,9 @@ export function App() {
   const setDetectedBpm = useVJStore((s) => s.setDetectedBpm);
   const setAudio = useVJStore((s) => s.setAudio);
   const toggleMidiMap = useMidiMapPanelStore((s) => s.toggle);
+  const saveDeck = useVJStore((s) => s.saveDeck);
+  const setDecks = useVJStore((s) => s.setDecks);
+  const [showDeckModal, setShowDeckModal] = useState(false);
 
   useEffect(() => {
     // Restore the persisted scene first so loadPlugins' default-seed
@@ -38,6 +42,12 @@ export function App() {
         if (saved) useVJStore.getState().restoreScene(saved);
       } catch (err) {
         console.error("[scene] restore failed:", err);
+      }
+      try {
+        const savedDecks = await window.vj.getSetting("decks");
+        if (Array.isArray(savedDecks)) setDecks(savedDecks as Deck[]);
+      } catch (err) {
+        console.error("[decks] restore failed:", err);
       }
       await loadPlugins();
       off = window.vj.onPluginsChanged(() => loadPlugins());
@@ -124,6 +134,11 @@ export function App() {
       ) {
         return;
       }
+      if ((e.key === "d" || e.key === "D") && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setShowDeckModal(true);
+        return;
+      }
       if (e.key === "t" || e.key === "T") {
         e.preventDefault();
         tap();
@@ -143,7 +158,7 @@ export function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [tap, toggleMidiMap, enterStage, releaseStage, cancelStage]);
+  }, [tap, toggleMidiMap, enterStage, releaseStage, cancelStage, setShowDeckModal]);
 
   return (
     <div className={`app${stageMode ? " stage-active" : ""}`}>
@@ -164,6 +179,54 @@ export function App() {
       <AudioMeters />
       <TransportBar />
       <MidiMapPanel />
+      {showDeckModal && (
+        <DeckSaveModal
+          onSave={(title) => {
+            saveDeck(title);
+            setShowDeckModal(false);
+          }}
+          onCancel={() => setShowDeckModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function DeckSaveModal({
+  onSave,
+  onCancel,
+}: {
+  onSave: (title: string) => void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState("Deck " + new Date().toLocaleTimeString());
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    inputRef.current?.select();
+  }, []);
+  return (
+    <div className="modal-overlay" onMouseDown={onCancel}>
+      <div className="modal-card" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-title">Save Deck</div>
+        <input
+          ref={inputRef}
+          autoFocus
+          className="modal-input"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSave(title.trim() || "Deck");
+            if (e.key === "Escape") onCancel();
+          }}
+          placeholder="Deck title…"
+        />
+        <div className="modal-actions">
+          <button className="btn-mini" onClick={onCancel}>Cancel</button>
+          <button className="btn-mini accent" onClick={() => onSave(title.trim() || "Deck")}>
+            Save
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

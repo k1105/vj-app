@@ -1,13 +1,12 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import type { LayerState, PluginMeta } from "../../shared/types";
 
 const BLEND_MODES: LayerState["blend"][] = ["normal", "add", "multiply", "screen"];
 
-// Drag types. x-plugin-id: a fresh asset from the AssetsPanel (copy).
-// x-clip-move: an existing layer clip being moved between layers (move).
 const DT_PLUGIN = "application/x-plugin-id";
 const DT_CLIP_MOVE = "application/x-clip-move";
+const DT_DECK = "application/x-deck-id";
 
 export function LayerStack() {
   const layers = useVJStore((s) => s.state.layers);
@@ -18,13 +17,15 @@ export function LayerStack() {
   const triggerClip = useVJStore((s) => s.triggerClip);
   const removeClip = useVJStore((s) => s.removeClip);
   const moveClip = useVJStore((s) => s.moveClip);
+  const reorderClip = useVJStore((s) => s.reorderClip);
   const setLayerOpacity = useVJStore((s) => s.setLayerOpacity);
   const setLayerBlend = useVJStore((s) => s.setLayerBlend);
   const setLayerMute = useVJStore((s) => s.setLayerMute);
   const setLayerSolo = useVJStore((s) => s.setLayerSolo);
   const selectLayer = useVJStore((s) => s.selectLayer);
+  const applyDeck = useVJStore((s) => s.applyDeck);
 
-  const onDrop = (e: React.DragEvent, toLayer: number) => {
+  const onDrop = (e: React.DragEvent, toLayer: number, insertBefore?: number) => {
     e.preventDefault();
     const moveRaw = e.dataTransfer.getData(DT_CLIP_MOVE);
     if (moveRaw) {
@@ -33,7 +34,11 @@ export function LayerStack() {
           fromLayer: number;
           fromClipIdx: number;
         };
-        moveClip(fromLayer, fromClipIdx, toLayer);
+        if (fromLayer === toLayer && insertBefore !== undefined) {
+          reorderClip(toLayer, fromClipIdx, insertBefore);
+        } else {
+          moveClip(fromLayer, fromClipIdx, toLayer);
+        }
       } catch {
         /* malformed payload — ignore */
       }
@@ -72,13 +77,31 @@ export function LayerStack() {
     const types = e.dataTransfer.types;
     const isPlugin = types.includes(DT_PLUGIN);
     const isMove = types.includes(DT_CLIP_MOVE);
-    if (!isPlugin && !isMove) return;
+    const isDeck = types.includes(DT_DECK);
+    if (!isPlugin && !isMove && !isDeck) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = isMove ? "move" : "copy";
   };
 
+  const onLayerAreaDrop = (e: React.DragEvent) => {
+    const deckId = e.dataTransfer.getData(DT_DECK);
+    if (!deckId) return;
+    e.preventDefault();
+    applyDeck(deckId);
+  };
+
+  const onLayerAreaDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes(DT_DECK)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
   return (
-    <div className="layer-area">
+    <div
+      className="layer-area"
+      onDrop={onLayerAreaDrop}
+      onDragOver={onLayerAreaDragOver}
+    >
       <div className="layer-area-header">
         <span>Layers</span>
         <span className="live-indicator">● LIVE</span>
@@ -96,7 +119,7 @@ export function LayerStack() {
               layer={layer}
               idx={idx}
               plugins={plugins}
-              onDrop={(e) => onDrop(e, idx)}
+              onDrop={(e, insertBefore) => onDrop(e, idx, insertBefore)}
               onDragOver={onDragOver}
               onOpacityChange={(v) => setLayerOpacity(idx, v)}
               onBlendChange={(b) => setLayerBlend(idx, b)}
@@ -161,7 +184,7 @@ function LayerRow(props: {
   layer: LayerState;
   idx: number;
   plugins: PluginMeta[];
-  onDrop: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent, insertBefore?: number) => void;
   onDragOver: (e: React.DragEvent) => void;
   onOpacityChange: (value: number) => void;
   onBlendChange: (blend: LayerState["blend"]) => void;
@@ -186,14 +209,29 @@ function LayerRow(props: {
     onClipContextMenu,
   } = props;
 
+  // insertIdx: which slot the dragged clip will be inserted before.
+  // null = no active intra-layer drag.
+  const [insertIdx, setInsertIdx] = useState<number | null>(null);
+
   const pluginById = (pluginId: string) => plugins.find((p) => p.id === pluginId);
   const pluginName = (pluginId: string) => pluginById(pluginId)?.name ?? pluginId;
+
+  const calcInsert = (e: React.DragEvent, clipIdx: number): number => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return e.clientX < rect.left + rect.width / 2 ? clipIdx : clipIdx + 1;
+  };
 
   return (
     <div
       className="layer-row"
-      onDrop={onDrop}
+      onDrop={(e) => {
+        setInsertIdx(null);
+        onDrop(e);
+      }}
       onDragOver={onDragOver}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setInsertIdx(null);
+      }}
       onClick={onSelect}
     >
       <VerticalOpacityLine
@@ -218,10 +256,17 @@ function LayerRow(props: {
             if (clipIdx === layer.activeClipIdx) classes.push("live-active");
             if (clipIdx === layer.nextClipIdx && clipIdx !== layer.activeClipIdx)
               classes.push("next-active");
+            const isInsertBefore = insertIdx === clipIdx;
+            const isInsertAfter =
+              insertIdx === layer.clips.length && clipIdx === layer.clips.length - 1;
             return (
               <div
                 key={clipIdx}
-                className={classes.join(" ")}
+                className={[
+                  ...classes,
+                  isInsertBefore ? "insert-before" : "",
+                  isInsertAfter ? "insert-after" : "",
+                ].filter(Boolean).join(" ")}
                 style={bgStyle}
                 draggable
                 onDragStart={(e) => {
@@ -232,12 +277,27 @@ function LayerRow(props: {
                     JSON.stringify({ fromLayer: idx, fromClipIdx: clipIdx }),
                   );
                 }}
+                onDragOver={(e) => {
+                  if (!e.dataTransfer.types.includes(DT_CLIP_MOVE)) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.dataTransfer.dropEffect = "move";
+                  setInsertIdx(calcInsert(e, clipIdx));
+                }}
+                onDrop={(e) => {
+                  if (!e.dataTransfer.types.includes(DT_CLIP_MOVE)) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const ins = calcInsert(e, clipIdx);
+                  setInsertIdx(null);
+                  onDrop(e, ins);
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onTriggerClip(clipIdx);
                 }}
                 onContextMenu={(e) => onClipContextMenu(clipIdx, e)}
-                title={`${pluginName(clip.pluginId)} (click to trigger · drag to another layer to move · right-click for options)`}
+                title={`${pluginName(clip.pluginId)} (click to trigger · drag to reorder or move · right-click for options)`}
               >
                 <div className="mat-name">{pluginName(clip.pluginId)}</div>
               </div>

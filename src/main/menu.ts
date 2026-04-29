@@ -8,11 +8,33 @@ import { Menu, type MenuItemConstructorOptions } from "electron";
  */
 export function installAppMenu(handlers: {
   openManager: () => void;
+  toggleOutputFullscreen: () => void;
 }): void {
   const isMac = process.platform === "darwin";
 
+  const macAppMenu: MenuItemConstructorOptions = {
+    label: "VideoJockeyJS",
+    submenu: [
+      { role: "about" },
+      { type: "separator" },
+      {
+        label: "Toggle Output Fullscreen",
+        accelerator: "Shift+CmdOrCtrl+F",
+        click: () => handlers.toggleOutputFullscreen(),
+      },
+      { type: "separator" },
+      { role: "services" },
+      { type: "separator" },
+      { role: "hide" },
+      { role: "hideOthers" },
+      { role: "unhide" },
+      { type: "separator" },
+      { role: "quit" },
+    ],
+  };
+
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: "appMenu" as const }] : []),
+    ...(isMac ? [macAppMenu] : []),
     { role: "fileMenu" },
     { role: "editMenu" },
     { role: "viewMenu" },

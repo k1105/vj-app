@@ -7,6 +7,8 @@ import { installAppMenu } from "./menu";
 import { startPluginWatcher, appRoot } from "./pluginLoader";
 import { startLivePreview } from "./livePreview";
 
+app.setName("VideoJockeyJS");
+
 // Forward renderer console.{log,warn,error} to the main-process stdout
 // so `npm run dev` shows them alongside main logs.
 if (!app.isPackaged) {
@@ -80,7 +82,14 @@ app.whenReady().then(async () => {
     }
   });
 
-  installAppMenu({ openManager: openManagerWindow });
+  installAppMenu({
+    openManager: openManagerWindow,
+    toggleOutputFullscreen: () => {
+      if (outputWindow && !outputWindow.isDestroyed()) {
+        outputWindow.setFullScreen(!outputWindow.isFullScreen());
+      }
+    },
+  });
 
   controllerWindow = createControllerWindow();
   outputWindow = createOutputWindow();

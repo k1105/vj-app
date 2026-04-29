@@ -25,17 +25,24 @@ float hash21(vec2 p) {
 
 vec3 thermalRamp(float t) {
   t = clamp(t, 0.0, 1.0);
-  vec3 c0 = vec3(0.0, 0.0, 0.0);
-  vec3 c1 = vec3(0.0, 0.0, 0.5);
-  vec3 c2 = vec3(0.5, 0.0, 0.8);
-  vec3 c3 = vec3(1.0, 0.1, 0.2);
-  vec3 c4 = vec3(1.0, 0.8, 0.0);
-  vec3 c5 = vec3(1.0, 1.0, 1.0);
-  if (t < 0.2)      return mix(c0, c1, t / 0.2);
-  else if (t < 0.4) return mix(c1, c2, (t - 0.2) / 0.2);
-  else if (t < 0.6) return mix(c2, c3, (t - 0.4) / 0.2);
-  else if (t < 0.8) return mix(c3, c4, (t - 0.6) / 0.2);
-  else              return mix(c4, c5, (t - 0.8) / 0.2);
+  // Full-spectrum: black → purple → blue → cyan → green → yellow → orange → white
+  // 7 equal segments (each ~0.143), cool colors occupy the lower half.
+  vec3 c0 = vec3(0.00, 0.00, 0.00);  // black
+  vec3 c1 = vec3(0.08, 0.00, 0.45);  // deep purple
+  vec3 c2 = vec3(0.00, 0.15, 0.90);  // blue
+  vec3 c3 = vec3(0.00, 0.75, 0.85);  // cyan
+  vec3 c4 = vec3(0.10, 0.90, 0.20);  // green
+  vec3 c5 = vec3(1.00, 0.95, 0.00);  // yellow
+  vec3 c6 = vec3(1.00, 0.30, 0.00);  // orange
+  vec3 c7 = vec3(1.00, 1.00, 1.00);  // white
+  float s = t * 7.0;
+  if (s < 1.0)      return mix(c0, c1, s);
+  else if (s < 2.0) return mix(c1, c2, s - 1.0);
+  else if (s < 3.0) return mix(c2, c3, s - 2.0);
+  else if (s < 4.0) return mix(c3, c4, s - 3.0);
+  else if (s < 5.0) return mix(c4, c5, s - 4.0);
+  else if (s < 6.0) return mix(c5, c6, s - 5.0);
+  else              return mix(c6, c7, s - 6.0);
 }
 
 void main() {

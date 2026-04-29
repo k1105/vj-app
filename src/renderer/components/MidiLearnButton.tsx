@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useMidiStore, formatAddress, shortAddress } from "../state/midiStore";
+import { isLockedTarget } from "../midi/lockedMidi";
 
 interface Props {
   targetId: string;
@@ -13,6 +14,9 @@ export function MidiLearnButton({ targetId, label, group }: Props) {
   const learningTarget = useMidiStore((s) => s.learningTarget);
   const mapped = useMidiStore((s) => s.mappings[targetId]);
   const isPulsing = useMidiStore((s) => s.pulseTargets[targetId] != null);
+  const conflict = useMidiStore((s) =>
+    s.lockedConflict?.targetId === targetId ? s.lockedConflict : null,
+  );
   const startLearn = useMidiStore((s) => s.startLearn);
   const cancelLearn = useMidiStore((s) => s.cancelLearn);
   const removeMapping = useMidiStore((s) => s.removeMapping);
@@ -25,20 +29,33 @@ export function MidiLearnButton({ targetId, label, group }: Props) {
   }, [targetId, label, group, registerTarget, unregisterTarget]);
 
   const isLearning = learningTarget === targetId;
+  const isLocked = isLockedTarget(targetId);
 
-  const title = isLearning
+  const title = conflict
+    ? `LOCKED — ${formatAddress(conflict.lockedAddress)} is reserved for ${conflict.lockedTargetId}`
+    : isLocked
+    ? `Locked to ${mapped ? formatAddress(mapped) : ""} (fixed)`
+    : isLearning
     ? "Listening for MIDI… click to cancel"
     : mapped
     ? `${formatAddress(mapped)} · click to remap · right-click to clear`
     : "MIDI learn";
 
-  const buttonLabel = isLearning ? "●" : mapped ? shortAddress(mapped) : "M";
+  const buttonLabel = conflict
+    ? shortAddress(conflict.lockedAddress)
+    : isLearning
+    ? "●"
+    : mapped
+    ? shortAddress(mapped)
+    : "M";
 
   const className =
     "midi-learn-btn" +
     (isLearning ? " learning" : "") +
     (mapped && !isLearning ? " mapped" : "") +
-    (isPulsing ? " pulse" : "");
+    (isPulsing ? " pulse" : "") +
+    (isLocked ? " locked" : "") +
+    (conflict ? " conflict" : "");
 
   return (
     <button

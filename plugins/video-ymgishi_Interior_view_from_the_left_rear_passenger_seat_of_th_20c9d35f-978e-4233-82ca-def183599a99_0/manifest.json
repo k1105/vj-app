@@ -1,0 +1,40 @@
+{
+  "name": "ymgishi_Interior_view_from_the_left_rear_passenger_seat_of_th_20c9d35f-978e-4233-82ca-def183599a99_0",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/ymgishi_Interior_view_from_the_left_rear_passenger_seat_of_th_20c9d35f-978e-4233-82ca-def183599a99_0.mp4",
+  "thumbnail": "thumbnail.jpg",
+  "duration": 8.875,
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2,
+      "step": 0.05
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 0,
+      "min": 0,
+      "max": 9,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 9,
+      "min": 0,
+      "max": 9,
+      "step": 1
+    }
+  ],
+  "category": "scene05"
+}

@@ -3,6 +3,7 @@ import { promises as fs } from "fs";
 import { join, resolve } from "path";
 import { appRoot, broadcastPluginsNow } from "./pluginLoader";
 import type { ParamValue, PluginKind } from "../shared/types";
+export type { PluginKind };
 
 const THUMB_WIDTH = 320;
 
@@ -159,6 +160,40 @@ export async function setPluginDefaults(
       return { ...p, default: values[p.key] };
     }
     return p;
+  });
+  await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf-8");
+  await broadcastPluginsNow();
+}
+
+/**
+ * Set or clear the `primary` flag on one or more params in the manifest.
+ * Range pairs (loopStart/loopEnd etc.) are always toggled together, so
+ * the caller passes both keys in a single call.
+ */
+export async function setParamPrimary(
+  kind: PluginKind,
+  id: string,
+  paramKeys: string[],
+  primary: boolean,
+): Promise<void> {
+  const dir = pluginDir(kind, id);
+  assertInsideRoot(dir, kind);
+  const manifestPath = join(dir, "manifest.json");
+  const raw = await fs.readFile(manifestPath, "utf-8");
+  const manifest = JSON.parse(raw);
+  if (!Array.isArray(manifest.params)) {
+    throw new Error("manifest has no params array");
+  }
+  const keySet = new Set(paramKeys);
+  manifest.params = manifest.params.map((p: { key: string; primary?: boolean }) => {
+    if (!keySet.has(p.key)) return p;
+    const next = { ...p };
+    if (primary) {
+      next.primary = true;
+    } else {
+      delete next.primary;
+    }
+    return next;
   });
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf-8");
   await broadcastPluginsNow();

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useVJStore } from "../state/vjStore";
-import type { LayerClip, LayerState, PluginMeta } from "../../shared/types";
+import type { LayerClip, LayerState, PerfStats, PluginMeta } from "../../shared/types";
 import { PostFXEditor } from "./PostFXBar";
 import { AssetPreview } from "./AssetPreview";
 
@@ -18,6 +18,38 @@ const CSS_BLEND: Record<LayerState["blend"], string> = {
  * `strings` param + `idx`; use the currently-selected string. Other plugins
  * fall back to the plugin name so the user still sees *something*.
  */
+function PerfBar({ perf }: { perf: PerfStats }) {
+  const fpsWarn = perf.fps < 50;
+  const heapPct = perf.heapLimitMB > 0 ? perf.heapUsedMB / perf.heapLimitMB : 0;
+  const heapWarn = heapPct > 0.7;
+  return (
+    <div className="perf-bar">
+      <span className={`perf-stat${fpsWarn ? " warn" : ""}`} title="frames per second">
+        {perf.fps.toFixed(1)} <span className="perf-unit">FPS</span>
+      </span>
+      <span className="perf-divider">·</span>
+      <span className={`perf-stat${heapWarn ? " warn" : ""}`} title="JS heap used / limit">
+        {perf.heapUsedMB >= 0 ? `${perf.heapUsedMB}` : "—"}
+        <span className="perf-unit">MB</span>
+        {perf.heapLimitMB > 0 && (
+          <span className="perf-heap-bar">
+            <span className="perf-heap-fill" style={{ width: `${Math.min(100, heapPct * 100).toFixed(0)}%` }} />
+          </span>
+        )}
+      </span>
+      <span className="perf-divider">·</span>
+      <span className="perf-stat" title="Three.js textures / geometries in GPU memory">
+        {perf.textures}<span className="perf-unit">tex</span>
+        {" "}{perf.geometries}<span className="perf-unit">geo</span>
+      </span>
+      <span className="perf-divider">·</span>
+      <span className="perf-stat" title="mounted plugins">
+        {perf.mountedPlugins}<span className="perf-unit">plug</span>
+      </span>
+    </div>
+  );
+}
+
 function textLabelForClip(plugin: PluginMeta, clip: LayerClip): string {
   const stringsDef = plugin.params.find((p) => p.type === "strings");
   if (stringsDef) {
@@ -44,10 +76,12 @@ export function TopBar() {
   const stageMode = useVJStore((s) => s.stageMode);
 
   const [liveSrc, setLiveSrc] = useState<string>("");
+  const [perf, setPerf] = useState<PerfStats | null>(null);
 
   useEffect(() => {
-    const off = window.vj.onPreviewLive((dataUrl) => setLiveSrc(dataUrl));
-    return off;
+    const offLive = window.vj.onPreviewLive((dataUrl) => setLiveSrc(dataUrl));
+    const offPerf = window.vj.onPerfStats((s) => setPerf(s));
+    return () => { offLive(); offPerf(); };
   }, []);
 
   const pluginById = (pluginId: string): PluginMeta | undefined =>
@@ -135,6 +169,7 @@ export function TopBar() {
       <div className="master-panel">
         <PostFXEditor />
       </div>
+      {perf && <PerfBar perf={perf} />}
     </div>
   );
 }

@@ -82,12 +82,6 @@ export function TransportBar() {
         </button>
         <MidiLearnButton targetId="burst" label="BURST" group="Transport" />
       </div>
-      <button
-        className="btn-blackout"
-        onClick={() => window.vj.toggleOutputFullscreen()}
-      >
-        FULLSCREEN
-      </button>
     </div>
   );
 }

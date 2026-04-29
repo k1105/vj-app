@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import type { ParamDef, PostFXSlot } from "../../shared/types";
 import { POSTFX_SLOT_COUNT } from "../../shared/types";
-import { MidiLearnButton } from "./MidiLearnButton";
 import { MidiLearnSlot } from "./MidiLearnSlot";
 import { AutoSyncButton } from "./AutoSyncButton";
+import { usePrimaryExpander } from "../hooks/usePrimaryExpander";
 
 /**
  * Just the 8-tile selector row. Lives above LayerStack in the middle
@@ -56,11 +56,6 @@ export function PostFXSlotsRow() {
               <div className="postfx-slot-name">
                 {meta?.name ?? <span className="dim">empty</span>}
               </div>
-              <MidiLearnButton
-                targetId={`postfx-slot:${i}:bypass`}
-                label={`Slot ${i + 1} bypass`}
-                group="PostFX"
-              />
             </div>
           );
         })}
@@ -250,97 +245,80 @@ function SlotParams({
   params: ParamDef[];
   onParamChange: (key: string, value: number | boolean) => void;
 }) {
-  const [showAll, setShowAll] = useState(false);
+  const { primary, secondary, hasPrimary, showAll, setShowAll, secondaryCount } =
+    usePrimaryExpander(params, (p) => !!p.primary);
+
   if (params.length === 0) {
     return <div className="postfx-rack-empty">no params</div>;
   }
-  // If the plugin opted into primary/secondary, hide secondaries behind
-  // a per-section expander. Otherwise show every param (back-compat).
-  const hasPrimary = params.some((p) => p.primary);
-  const secondaryCount = params.filter((p) => !p.primary).length;
-  const visible = hasPrimary && !showAll ? params.filter((p) => p.primary) : params;
+
+  const togglePrimary = slot.pluginId
+    ? async (def: ParamDef) => {
+        const choice = await window.vj.showContextMenu([
+          {
+            id: "toggle",
+            label: def.primary ? "★ Unset as Primary" : "☆ Set as Primary",
+          },
+        ]);
+        if (choice === "toggle") {
+          await window.vj.setParamPrimary("postfx", slot.pluginId!, [def.key], !def.primary);
+        }
+      }
+    : null;
+  const renderDef = (def: ParamDef) => {
+    const labelEl = (
+      <span
+        className={`param-label${def.primary ? " param-label-primary" : ""}`}
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); togglePrimary?.(def); }}
+        title={togglePrimary ? (def.primary ? "primary — right-click to unset" : "right-click to set as primary") : undefined}
+      >{def.key}</span>
+    );
+    if (def.type === "bool") {
+      const cur = slot.params[def.key];
+      const on = typeof cur === "boolean" ? cur : typeof def.default === "boolean" ? def.default : false;
+      return (
+        <div key={def.key} className="param-row">
+          <MidiLearnSlot targetId={`postfx-slot:${slotIdx}:param:${def.key}`} label={`Slot ${slotIdx + 1} · ${def.key}`} group="PostFX" />
+          {labelEl}
+          <button className={`param-toggle ${on ? "on" : ""}`} onClick={(e) => { e.stopPropagation(); onParamChange(def.key, !on); }}>
+            {on ? "ON" : "OFF"}
+          </button>
+        </div>
+      );
+    }
+    const cur = slot.params[def.key];
+    const value = typeof cur === "number" ? cur : typeof def.default === "number" ? def.default : 0;
+    const min = def.min ?? 0;
+    const max = def.max ?? 1;
+    const isInt = def.type === "int";
+    return (
+      <div key={def.key} className="param-row">
+        <MidiLearnSlot targetId={`postfx-slot:${slotIdx}:param:${def.key}`} label={`Slot ${slotIdx + 1} · ${def.key}`} group="PostFX" />
+        {labelEl}
+        <input
+          type="range" min={0} max={1000} className="param-slider"
+          value={Math.round(((value - min) / (max - min)) * 1000)}
+          onChange={(e) => { const raw = min + (parseInt(e.target.value) / 1000) * (max - min); onParamChange(def.key, isInt ? Math.round(raw) : raw); }}
+          onClick={(e) => e.stopPropagation()}
+        />
+        <span className="param-val">{isInt ? Math.round(value).toString() : value.toFixed(2)}</span>
+        <AutoSyncButton targetId={`postfx-slot:${slotIdx}:param:${def.key}`} />
+      </div>
+    );
+  };
+
   return (
     <div className="postfx-rack-params">
-      {visible.map((def) => {
-        if (def.type === "bool") {
-          const cur = slot.params[def.key];
-          const on =
-            typeof cur === "boolean"
-              ? cur
-              : typeof def.default === "boolean"
-              ? def.default
-              : false;
-          return (
-            <div key={def.key} className="param-row">
-              <MidiLearnSlot
-                targetId={`postfx-slot:${slotIdx}:param:${def.key}`}
-                label={`Slot ${slotIdx + 1} · ${def.key}`}
-                group="PostFX"
-              />
-              <span className="param-label">{def.key}</span>
-              <button
-                className={`param-toggle ${on ? "on" : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onParamChange(def.key, !on);
-                }}
-              >
-                {on ? "ON" : "OFF"}
-              </button>
-            </div>
-          );
-        }
-        const cur = slot.params[def.key];
-        const value =
-          typeof cur === "number"
-            ? cur
-            : typeof def.default === "number"
-            ? def.default
-            : 0;
-        const min = def.min ?? 0;
-        const max = def.max ?? 1;
-        const isInt = def.type === "int";
-        return (
-          <div key={def.key} className="param-row">
-            <MidiLearnSlot
-              targetId={`postfx-slot:${slotIdx}:param:${def.key}`}
-              label={`Slot ${slotIdx + 1} · ${def.key}`}
-              group="PostFX"
-            />
-            <span className="param-label">{def.key}</span>
-            <input
-              type="range"
-              min={0}
-              max={1000}
-              value={Math.round(((value - min) / (max - min)) * 1000)}
-              onChange={(e) => {
-                const ratio = parseInt(e.target.value) / 1000;
-                const raw = min + ratio * (max - min);
-                onParamChange(def.key, isInt ? Math.round(raw) : raw);
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="param-slider"
-            />
-            <span className="param-val">
-              {isInt ? Math.round(value).toString() : value.toFixed(2)}
-            </span>
-            <AutoSyncButton
-              targetId={`postfx-slot:${slotIdx}:param:${def.key}`}
-            />
-          </div>
-        );
-      })}
+      {primary.map(renderDef)}
       {hasPrimary && secondaryCount > 0 && (
         <button
           className="param-more-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowAll((v) => !v);
-          }}
+          onClick={(e) => { e.stopPropagation(); setShowAll((v) => !v); }}
         >
           {showAll ? "▴ LESS" : `▾ ${secondaryCount} MORE`}
         </button>
       )}
+      {showAll && secondary.map(renderDef)}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import type {
   DownloadProgress,
   DownloadResult,
   ParamValue,
+  PerfStats,
   PluginKind,
   PluginMeta,
   SplatProgress,
@@ -51,6 +52,15 @@ export interface VJApi {
   revealPlugin(kind: PluginKind, id: string): Promise<void>;
   /** Create a new text asset from the shared template. Returns the new plugin id. */
   createTextAsset(name: string, texts: string[]): Promise<string>;
+  /** Open a native multi-file picker for images (jpg/png/webp/gif). */
+  pickImagesForAsset(): Promise<string[]>;
+  /** Copy image files into a new plugin directory and register the asset. Returns the new plugin id. */
+  createImageAsset(name: string, imagePaths: string[]): Promise<string>;
+  /**
+   * Create a sequence asset from existing video plugin ids (in playback order).
+   * The sequence auto-advances on ended. Returns the new plugin id.
+   */
+  createSequenceAsset(name: string, videoPluginIds: string[]): Promise<string>;
   /** Rewrite every text asset's manifest against the current template schema. Returns count migrated. */
   migrateTextAssets(): Promise<number>;
   /**
@@ -73,6 +83,16 @@ export interface VJApi {
     values: Record<string, ParamValue>,
   ): Promise<void>;
   /**
+   * Toggle the `primary` flag on one or more params in the plugin's manifest.
+   * Range pairs should pass both keys so they're toggled atomically.
+   */
+  setParamPrimary(
+    kind: PluginKind,
+    id: string,
+    paramKeys: string[],
+    primary: boolean,
+  ): Promise<void>;
+  /**
    * Set or clear (empty string) the plugin's `category` for grouping in
    * the Assets panel. When unset, the loader falls back to outputType.
    */
@@ -92,6 +112,10 @@ export interface VJApi {
   generateSplat(imagePath: string, name: string): Promise<SplatResult>;
   /** Subscribe to per-line progress emitted while a splat is generating. */
   onSplatProgress(cb: (p: SplatProgress) => void): () => void;
+  /** Output window sends a perf snapshot once per second. */
+  sendPerfStats(stats: PerfStats): void;
+  /** Controller subscribes to perf snapshots forwarded from the Output window. */
+  onPerfStats(cb: (stats: PerfStats) => void): () => void;
 }
 
 declare global {

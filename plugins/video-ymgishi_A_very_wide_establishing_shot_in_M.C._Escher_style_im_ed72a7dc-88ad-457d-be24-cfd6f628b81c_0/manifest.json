@@ -1,0 +1,41 @@
+{
+  "name": "ymgishi_A_very_wide_establishing_shot_in_M.C._Escher_style_im_ed72a7dc-88ad-457d-be24-cfd6f628b81c_0",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/ymgishi_A_very_wide_establishing_shot_in_M.C._Escher_style_im_ed72a7dc-88ad-457d-be24-cfd6f628b81c_0.mp4",
+  "thumbnail": "thumbnail.jpg",
+  "duration": 8.875,
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2,
+      "step": 0.05,
+      "primary": true
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 0,
+      "min": 0,
+      "max": 9,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 9,
+      "min": 0,
+      "max": 9,
+      "step": 1
+    }
+  ],
+  "category": "scene02"
+}

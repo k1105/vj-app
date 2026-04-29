@@ -80,9 +80,10 @@ function defaultManifest(name: string, splatFile: string): Record<string, unknow
       { key: "posZ",       type: "float", default: 0,  min: -10, max: 10,  step: 0.05 },
       { key: "targetX",    type: "float", default: 0,  min: -10, max: 10,  step: 0.05 },
       { key: "targetY",    type: "float", default: 0,  min: -10, max: 10,  step: 0.05 },
-      { key: "targetZ",    type: "float", default: -5, min: -10, max: 10,  step: 0.05 },
-      { key: "fov",        type: "float", default: 50, min: 20,  max: 120, step: 1    },
-      { key: "orbitSpeed", type: "float", default: 0,  min: -1,  max: 1,   step: 0.01 },
+      { key: "targetZ",    type: "float", default: -5, min: -50, max: 10,  step: 0.05 },
+      { key: "fov",         type: "float", default: 50,  min: 20, max: 120, step: 1    },
+      { key: "cruiseSpeed", type: "float", default: 0,   min: -1, max: 1,   step: 0.01 },
+      { key: "cruiseSize",  type: "float", default: 0.5, min: 0,  max: 1,   step: 0.01 },
     ],
   };
 }

@@ -1,15 +1,13 @@
 import { useState } from "react";
 import { ImportTab } from "./ImportTab";
 import { LibraryTab } from "./LibraryTab";
-import { SceneTab } from "./SceneTab";
 
-type Tab = "asset" | "postfx" | "create" | "scene";
+type Tab = "asset" | "postfx" | "create";
 
 const TABS: Array<{ id: Tab; label: string }> = [
-  { id: "asset", label: "Asset" },
+  { id: "asset",  label: "Asset"  },
   { id: "postfx", label: "PostFX" },
   { id: "create", label: "Create" },
-  { id: "scene", label: "Scene" },
 ];
 
 export function ManagerApp() {
@@ -35,7 +33,6 @@ export function ManagerApp() {
         {active === "asset" && <LibraryTab kind="material" />}
         {active === "postfx" && <LibraryTab kind="postfx" />}
         {active === "create" && <ImportTab />}
-        {active === "scene" && <SceneTab />}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-# hatakanata-vj (Electron)
+# VideoJockeyJS
 
 VJ system: Controller UI + Three.js Composer を Electron の 2 ウィンドウで動かす。
 

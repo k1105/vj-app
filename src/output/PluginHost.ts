@@ -109,6 +109,9 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
   private loopStartSec = 0; // seconds, kept in sync with params each frame
   private prevLoopStartSec = -1; // sentinel; first update() always counts as a change
   private isSeeking = false; // prevent seek spam across frames
+  // Decode-error recovery: exponential backoff, no hard give-up limit.
+  private decodeErrCount = 0;
+  private decodeRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly url: string) {}
 
@@ -143,6 +146,38 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
       this.isSeeking = false;
       if (video.error?.code === MediaError.MEDIA_ERR_ABORTED) return; // seek interrupted — not fatal
       console.error(`[video] error ${this.url}`, video.error);
+
+      if (video.error?.code === MediaError.MEDIA_ERR_DECODE) {
+        // Decoder crash — full pipeline reset with exponential backoff.
+        // Never give up: a black screen during a live set is worse than retrying.
+        this.decodeErrCount++;
+        // 300ms, 600ms, 1.2s, 2.4s … capped at 8s
+        const delay = Math.min(8000, 300 * Math.pow(2, this.decodeErrCount - 1));
+        const resumeAt = isFinite(video.currentTime)
+          ? Math.max(this.loopStartSec, video.currentTime)
+          : this.loopStartSec;
+        console.warn(
+          `[video] decode error #${this.decodeErrCount} — retry in ${delay}ms ${this.url}`,
+        );
+        if (this.decodeRetryTimer !== null) clearTimeout(this.decodeRetryTimer);
+        this.decodeRetryTimer = setTimeout(() => {
+          this.decodeRetryTimer = null;
+          if (!this.video) return; // disposed while waiting
+          // Full pipeline reset: clear src first so Chromium tears down the decoder.
+          this.video.src = "";
+          this.video.load();
+          this.video.src = this.url;
+          const onCanPlay = () => {
+            this.video?.removeEventListener("canplay", onCanPlay);
+            if (!this.video) return;
+            this.isSeeking = true;
+            this.video.currentTime = resumeAt;
+            // seeked handler will call play()
+          };
+          this.video.addEventListener("canplay", onCanPlay);
+          this.video.load();
+        }, delay);
+      }
     });
 
     video.play().catch((err) => {
@@ -202,6 +237,10 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
   }
 
   dispose(): void {
+    if (this.decodeRetryTimer !== null) {
+      clearTimeout(this.decodeRetryTimer);
+      this.decodeRetryTimer = null;
+    }
     disposeVideo(this.video);
     this.video = null;
   }
@@ -219,7 +258,16 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
  *   posX/posY/posZ         camera position
  *   targetX/targetY/targetZ camera lookAt point
  *   fov                    vertical field of view (degrees)
- *   orbitSpeed             passive rotation around the target Y axis (rad/s)
+ *   cruiseSpeed            figure-8 auto-cruise speed (rad/s). The camera
+ *                          traces a Lissajous 8 (azimuth at f, elevation at
+ *                          2f) on a sphere of radius equal to the base
+ *                          distance from target — so it never crosses
+ *                          through target. cruisePhase=0 coincides with the
+ *                          base (posX/Y/Z) position, so toggling the param
+ *                          doesn't pop the camera.
+ *   cruiseSize             figure-8 amplitude (0..1). 0 = no motion even when
+ *                          cruiseSpeed is non-zero, 1 = full ±60° azimuth /
+ *                          ±~25° elevation swing.
  */
 class BuiltinSplatPlugin implements MaterialPluginInstance {
   private group: THREE.Group | null = null;
@@ -227,7 +275,7 @@ class BuiltinSplatPlugin implements MaterialPluginInstance {
   private viewer: any = null;
   private hostScene: THREE.Scene | null = null;
   private hostCamera: THREE.PerspectiveCamera | null = null;
-  private orbit = 0;
+  private cruisePhase = 0;
   // Set true the moment dispose() runs so any in-flight async setup work
   // (dynamic import, addSplatScene) bails out before mutating GPU state.
   private disposed = false;
@@ -333,8 +381,9 @@ class BuiltinSplatPlugin implements MaterialPluginInstance {
     const camera = this.hostCamera;
     if (!camera) return;
     const dt = Math.max(0, (global?.delta ?? 16) * 0.001);
-    const orbitSpeed = num(params.orbitSpeed, 0);
-    this.orbit += orbitSpeed * dt;
+    const cruiseSpeed = num(params.cruiseSpeed, 0);
+    const cruiseSize = Math.max(0, Math.min(1, num(params.cruiseSize, 0.5)));
+    this.cruisePhase += cruiseSpeed * dt;
 
     const targetX = num(params.targetX, 0);
     const targetY = num(params.targetY, 0);
@@ -343,17 +392,37 @@ class BuiltinSplatPlugin implements MaterialPluginInstance {
     const posY = num(params.posY, 1);
     const posZ = num(params.posZ, 3);
 
-    // Apply orbit as a rotation around the target's Y axis. Cheap per-frame
-    // transform — keeps the user's pos params as the "base" position.
-    const c = Math.cos(this.orbit);
-    const s = Math.sin(this.orbit);
-    const dx = posX - targetX;
-    const dz = posZ - targetZ;
-    camera.position.set(
-      targetX + dx * c - dz * s,
-      posY,
-      targetZ + dx * s + dz * c,
-    );
+    const baseDx = posX - targetX;
+    const baseDy = posY - targetY;
+    const baseDz = posZ - targetZ;
+
+    // Figure-8 cruise: keep the camera on a sphere of radius |base offset|
+    // around target and trace a Lissajous 8 in (azimuth, elevation). Because
+    // distance to target is constant, the path never crosses target. With
+    // cruisePhase = 0 we recover the base offset exactly so toggling
+    // cruiseSpeed doesn't pop the camera.
+    const baseRxz = Math.sqrt(baseDx * baseDx + baseDz * baseDz);
+    const r = Math.sqrt(baseRxz * baseRxz + baseDy * baseDy);
+    let camDx = baseDx;
+    let camDy = baseDy;
+    let camDz = baseDz;
+    if (r > 1e-6) {
+      const az0 = Math.atan2(baseDz, baseDx);
+      const el0 = Math.atan2(baseDy, baseRxz);
+      const t = this.cruisePhase;
+      // Full-scale ±60° horizontal / ±~25° vertical Lissajous (1:2, phase 0)
+      // keeps the camera on the front hemisphere; cruiseSize linearly scales
+      // both amplitudes down to 0 for a stationary camera.
+      const azAmp = (Math.PI / 3) * cruiseSize;
+      const elAmp = (Math.PI / 7) * cruiseSize;
+      const az = az0 + azAmp * Math.sin(t);
+      const el = el0 + elAmp * Math.sin(2 * t);
+      const cosEl = Math.cos(el);
+      camDx = r * cosEl * Math.cos(az);
+      camDy = r * Math.sin(el);
+      camDz = r * cosEl * Math.sin(az);
+    }
+    camera.position.set(targetX + camDx, targetY + camDy, targetZ + camDz);
     camera.lookAt(targetX, targetY, targetZ);
 
     const fov = num(params.fov, 50);
@@ -368,6 +437,122 @@ class BuiltinSplatPlugin implements MaterialPluginInstance {
     this.cleanupViewer();
     this.hostScene = null;
     this.hostCamera = null;
+  }
+}
+
+/**
+ * BuiltinSequencePlugin — plays a list of video files in order.
+ * Auto-advances on `ended`. Responds to `idx` param for manual jumps.
+ * Params: idx (int), loop (bool).
+ */
+class BuiltinSequencePlugin implements MaterialPluginInstance {
+  private video: HTMLVideoElement | null = null;
+  private currentIdx = 0;
+  private prevParamIdx = -1;
+  private isSeeking = false;
+  private decodeErrCount = 0;
+  private decodeRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(private readonly urls: string[]) {}
+
+  setup(_ctx: PluginSetupContext): void {
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.muted = true;
+    video.playsInline = true;
+    video.autoplay = true;
+
+    video.addEventListener("seeked", () => {
+      this.isSeeking = false;
+      void video.play().catch(() => {});
+    });
+    video.addEventListener("playing", () => {
+      this.decodeErrCount = 0;
+    });
+    video.addEventListener("error", () => {
+      this.isSeeking = false;
+      if (video.error?.code === MediaError.MEDIA_ERR_ABORTED) return;
+      console.error(`[sequence] error idx=${this.currentIdx}`, video.error);
+      if (video.error?.code === MediaError.MEDIA_ERR_DECODE) {
+        this.decodeErrCount++;
+        const delay = Math.min(8000, 300 * Math.pow(2, this.decodeErrCount - 1));
+        if (this.decodeRetryTimer !== null) clearTimeout(this.decodeRetryTimer);
+        this.decodeRetryTimer = setTimeout(() => {
+          this.decodeRetryTimer = null;
+          if (!this.video) return;
+          this.video.src = "";
+          this.video.load();
+          this.video.src = this.urls[this.currentIdx] ?? "";
+          void this.video.play().catch(() => {});
+        }, delay);
+      }
+    });
+
+    if (this.urls.length > 0) {
+      video.src = this.urls[0];
+    }
+    void video.play().catch(() => {});
+    this.video = video;
+  }
+
+  private loadAt(idx: number): void {
+    const video = this.video;
+    if (!video || this.urls.length === 0) return;
+    const clamped = Math.max(0, Math.min(this.urls.length - 1, idx));
+    this.currentIdx = clamped;
+    this.isSeeking = false;
+    this.decodeErrCount = 0;
+    video.src = this.urls[clamped];
+    void video.play().catch(() => {});
+  }
+
+  update({ params }: PluginUpdateContext): void {
+    const video = this.video;
+    if (!video || this.urls.length === 0) return;
+
+    const loop = params.loop !== false && params.loop !== 0;
+    const paramIdx = Math.max(
+      0,
+      Math.min(
+        this.urls.length - 1,
+        typeof params.idx === "number" ? Math.round(params.idx) : 0,
+      ),
+    );
+
+    // Manual jump when idx param changes (skip first frame: setup already loaded idx 0)
+    if (this.prevParamIdx >= 0 && paramIdx !== this.prevParamIdx) {
+      this.loadAt(paramIdx);
+    }
+    this.prevParamIdx = paramIdx;
+
+    // Auto-advance on natural end
+    if (video.ended) {
+      const next = this.currentIdx + 1;
+      if (next < this.urls.length) {
+        this.loadAt(next);
+      } else if (loop) {
+        this.loadAt(0);
+      }
+    }
+
+    // Resume if unexpectedly paused
+    if (video.paused && !video.ended && !this.isSeeking) {
+      void video.play().catch(() => {});
+    }
+  }
+
+  getElement(): HTMLVideoElement {
+    if (!this.video) throw new Error("BuiltinSequencePlugin: setup() not called");
+    return this.video;
+  }
+
+  dispose(): void {
+    if (this.decodeRetryTimer !== null) {
+      clearTimeout(this.decodeRetryTimer);
+      this.decodeRetryTimer = null;
+    }
+    disposeVideo(this.video);
+    this.video = null;
   }
 }
 
@@ -465,6 +650,29 @@ export class PluginHost {
         objectUrl: null,
         directTexture: null,
         smoothed: {},
+      });
+      return;
+    }
+
+    // outputType === "sequence" — plays multiple videos in order.
+    if (meta.outputType === "sequence") {
+      if (!meta.sequenceUrls || meta.sequenceUrls.length === 0) {
+        throw new Error(`sequence plugin ${id} has no sequenceUrls`);
+      }
+      const instance = new BuiltinSequencePlugin(meta.sequenceUrls);
+      instance.setup({
+        THREE, renderer: this.renderer, scene, camera,
+        width: this.width, height: this.height,
+        GLTFLoader, RoomEnvironment, EffectComposer, RenderPass, OutputPass, Pass, FullScreenQuad,
+      });
+      const videoEl = instance.getElement();
+      const directTexture = new THREE.VideoTexture(videoEl);
+      directTexture.minFilter = THREE.LinearFilter;
+      directTexture.magFilter = THREE.LinearFilter;
+      directTexture.colorSpace = THREE.SRGBColorSpace;
+      this.mounted.set(id, {
+        id, meta, instance, scene, camera, renderTarget,
+        objectUrl: null, directTexture, smoothed: {},
       });
       return;
     }
@@ -669,6 +877,10 @@ export class PluginHost {
     const m = this.mounted.get(pluginId);
     if (!m) return null;
     return m.directTexture ?? m.renderTarget.texture;
+  }
+
+  getMountedCount(): number {
+    return this.mounted.size;
   }
 
   dispose(): void {

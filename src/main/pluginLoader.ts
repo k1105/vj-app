@@ -113,6 +113,21 @@ async function scanKind(kind: PluginKind): Promise<PluginMeta[]> {
         }
       }
 
+      // Resolve a sequence asset: array of video files → vj-asset:// URL array.
+      let sequenceUrls: string[] | undefined;
+      if (manifest.outputType === "sequence" && Array.isArray(manifest.videos)) {
+        sequenceUrls = [];
+        const root = resolve(appRoot());
+        for (const vid of manifest.videos as unknown[]) {
+          if (typeof vid !== "string") continue;
+          const abs = resolve(pluginDir, vid);
+          if (abs.startsWith(root + "/")) {
+            const rel = relative(root, abs).split(/[\\/]/).map(encodeURIComponent).join("/");
+            sequenceUrls.push(`vj-asset://local/${rel}`);
+          }
+        }
+      }
+
       // Resolve a splat asset to a vj-asset:// URL.
       let splatUrl: string | undefined;
       if (manifest.outputType === "splat" && typeof manifest.splatFile === "string") {
@@ -192,6 +207,7 @@ async function scanKind(kind: PluginKind): Promise<PluginMeta[]> {
         manifestPath,
         videoUrl,
         splatUrl,
+        sequenceUrls,
         thumbnailUrl,
         duration: typeof manifest.duration === "number" ? manifest.duration : undefined,
         sizeBytes,

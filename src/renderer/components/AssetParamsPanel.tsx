@@ -4,6 +4,7 @@ import { MidiLearnButton } from "./MidiLearnButton";
 import { MidiLearnSlot } from "./MidiLearnSlot";
 import { AutoSyncButton } from "./AutoSyncButton";
 import { AssetPreview } from "./AssetPreview";
+import { usePrimaryExpander } from "../hooks/usePrimaryExpander";
 import type { LayerState, ParamDef, PluginMeta } from "../../shared/types";
 
 type ParamGroup =
@@ -119,15 +120,24 @@ const LayerSection = forwardRef<HTMLDivElement, LayerSectionProps>(
     const visibleParams = (plugin?.params ?? []).filter((d) => d.type !== "strings");
     const labelPrefix = `L${layerIdx + 1} ${plugin?.name ?? "?"}`;
     const allGroups = groupParams(visibleParams);
-    // If any param of this plugin opts into primary, only those groups are
-    // shown by default; the rest are hidden behind a "MORE" expander.
-    // Range pairs count as primary when either end is primary.
-    const hasPrimary = visibleParams.some((p) => p.primary);
     const isPrimaryGroup = (g: ParamGroup) =>
       g.type === "range" ? !!(g.start.primary || g.end.primary) : !!g.def.primary;
-    const [showAll, setShowAll] = useState(false);
-    const groupsToRender = hasPrimary && !showAll ? allGroups.filter(isPrimaryGroup) : allGroups;
-    const secondaryCount = allGroups.filter((g) => !isPrimaryGroup(g)).length;
+    const { primary: primaryGroups, secondary: secondaryGroups, hasPrimary, showAll, setShowAll, secondaryCount } =
+      usePrimaryExpander(allGroups, isPrimaryGroup);
+
+    const togglePrimary = plugin
+      ? async (paramKeys: string[], currentPrimary: boolean) => {
+          const choice = await window.vj.showContextMenu([
+            {
+              id: "toggle",
+              label: currentPrimary ? "★ Unset as Primary" : "☆ Set as Primary",
+            },
+          ]);
+          if (choice === "toggle") {
+            await window.vj.setParamPrimary(plugin.kind, plugin.id, paramKeys, !currentPrimary);
+          }
+        }
+      : null;
 
     return (
       <div
@@ -155,49 +165,73 @@ const LayerSection = forwardRef<HTMLDivElement, LayerSectionProps>(
           </button>
         </div>
         <div className="asset-params">
-          {groupsToRender.map((group) => {
+          {visibleParams.length === 0 && (
+            <div className="param-empty">no params</div>
+          )}
+          {primaryGroups.map((group) => {
             if (group.type === "range") {
               const { start, end } = group;
               return (
                 <RangeControl
                   key={`${start.key}-${end.key}`}
-                  startDef={start}
-                  endDef={end}
-                  startValue={currentVal(start)}
-                  endValue={currentVal(end)}
+                  startDef={start} endDef={end}
+                  startValue={currentVal(start)} endValue={currentVal(end)}
                   onStartChange={(v) => setValue(start.key, v)}
                   onEndChange={(v) => setValue(end.key, v)}
                   midiStartId={`clip:${layerIdx}:${start.key}`}
                   midiEndId={`clip:${layerIdx}:${end.key}`}
                   labelPrefix={labelPrefix}
+                  onTogglePrimary={togglePrimary ? () => togglePrimary([start.key, end.key], !!(start.primary || end.primary)) : undefined}
                 />
               );
             }
             return (
               <ParamControl
-                key={group.def.key}
-                def={group.def}
+                key={group.def.key} def={group.def}
                 value={currentVal(group.def)}
                 onChange={(v) => setValue(group.def.key, v)}
                 midiTargetId={`clip:${layerIdx}:${group.def.key}`}
                 labelPrefix={labelPrefix}
+                onTogglePrimary={togglePrimary ? () => togglePrimary([group.def.key], !!group.def.primary) : undefined}
               />
             );
           })}
-          {visibleParams.length === 0 && (
-            <div className="param-empty">no params</div>
-          )}
           {hasPrimary && secondaryCount > 0 && (
             <button
               className="param-more-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowAll((v) => !v);
-              }}
+              onClick={(e) => { e.stopPropagation(); setShowAll((v) => !v); }}
             >
               {showAll ? "▴ LESS" : `▾ ${secondaryCount} MORE`}
             </button>
           )}
+          {showAll && secondaryGroups.map((group) => {
+            if (group.type === "range") {
+              const { start, end } = group;
+              return (
+                <RangeControl
+                  key={`${start.key}-${end.key}`}
+                  startDef={start} endDef={end}
+                  startValue={currentVal(start)} endValue={currentVal(end)}
+                  onStartChange={(v) => setValue(start.key, v)}
+                  onEndChange={(v) => setValue(end.key, v)}
+                  midiStartId={`clip:${layerIdx}:${start.key}`}
+                  midiEndId={`clip:${layerIdx}:${end.key}`}
+                  labelPrefix={labelPrefix}
+                  onTogglePrimary={togglePrimary ? () => togglePrimary([start.key, end.key], !!(start.primary || end.primary)) : undefined}
+                />
+              );
+            }
+            return (
+              <ParamControl
+                key={group.def.key} def={group.def}
+                value={currentVal(group.def)}
+                onChange={(v) => setValue(group.def.key, v)}
+                midiTargetId={`clip:${layerIdx}:${group.def.key}`}
+                labelPrefix={labelPrefix}
+                onTogglePrimary={togglePrimary ? () => togglePrimary([group.def.key], !!group.def.primary) : undefined}
+              />
+            );
+          })}
         </div>
       </div>
     );
@@ -218,6 +252,7 @@ function RangeControl({
   midiStartId,
   midiEndId,
   labelPrefix,
+  onTogglePrimary,
 }: {
   startDef: ParamDef;
   endDef: ParamDef;
@@ -228,6 +263,7 @@ function RangeControl({
   midiStartId: string;
   midiEndId: string;
   labelPrefix: string;
+  onTogglePrimary?: () => void;
 }) {
   const min = startDef.min ?? 0;
   const max = endDef.max ?? startDef.max ?? 1;
@@ -242,13 +278,18 @@ function RangeControl({
 
   const label = startDef.key.slice(0, -5) || "range";
   const showAutoControls = label !== "loop";
+  const isPrimary = !!(startDef.primary || endDef.primary);
 
   const fmt = (v: number) =>
     startDef.type === "int" ? String(Math.round(v)) : v.toFixed(1);
 
   return (
     <div className="param-row param-range-row" onClick={(e) => e.stopPropagation()}>
-      <span className="param-label">{label}</span>
+      <span
+        className={`param-label${isPrimary ? " param-label-primary" : ""}`}
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onTogglePrimary?.(); }}
+        title={onTogglePrimary ? (isPrimary ? "primary — right-click to unset" : "right-click to set as primary") : undefined}
+      >{label}</span>
       <div className="range2-wrap">
         <div className="range2-track">
           <div
@@ -317,14 +358,25 @@ function ParamControl({
   onChange,
   midiTargetId,
   labelPrefix,
+  onTogglePrimary,
 }: {
   def: ParamDef;
   value: number | boolean | string;
   onChange: (v: number | boolean | string) => void;
   midiTargetId: string;
   labelPrefix: string;
+  onTogglePrimary?: () => void;
 }) {
   const midiLabel = `${labelPrefix} · ${def.key}`;
+  const labelEl = (
+    <span
+      className={`param-label${def.primary ? " param-label-primary" : ""}`}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onTogglePrimary?.(); }}
+      title={onTogglePrimary ? (def.primary ? "primary — right-click to unset" : "right-click to set as primary") : undefined}
+    >
+      {def.key}
+    </span>
+  );
   if (isStepParam(def)) {
     const num = typeof value === "number" ? value : Number(value);
     const step = def.step!;
@@ -337,7 +389,7 @@ function ParamControl({
           label={midiLabel}
           group="Clip Params"
         />
-        <span className="param-label">{def.key}</span>
+        {labelEl}
         <div className="param-step-group">
           <button className="param-step-btn" onClick={() => onChange(num - step)}>◀</button>
           <span className="param-step-val">{displayVal}</span>
@@ -356,7 +408,7 @@ function ParamControl({
           label={midiLabel}
           group="Clip Params"
         />
-        <span className="param-label">{def.key}</span>
+        {labelEl}
         <button
           className={`param-toggle ${on ? "on" : ""}`}
           onClick={() => onChange(!on)}
@@ -375,7 +427,7 @@ function ParamControl({
           label={midiLabel}
           group="Clip Params"
         />
-        <span className="param-label">{def.key}</span>
+        {labelEl}
         <select
           className="param-select"
           value={String(value)}
@@ -399,7 +451,7 @@ function ParamControl({
         : "#000000";
     return (
       <div className="param-row" onClick={(e) => e.stopPropagation()}>
-        <span className="param-label">{def.key}</span>
+        {labelEl}
         <input
           type="color"
           className="param-color"
@@ -414,7 +466,7 @@ function ParamControl({
   if (def.type === "camera") {
     return (
       <div className="param-row" onClick={(e) => e.stopPropagation()}>
-        <span className="param-label">{def.key}</span>
+        {labelEl}
         <CameraDeviceSelect
           value={typeof value === "string" ? value : ""}
           onChange={onChange}
@@ -437,7 +489,7 @@ function ParamControl({
         label={midiLabel}
         group="Clip Params"
       />
-      <span className="param-label">{def.key}</span>
+      {labelEl}
       <input
         type="range"
         className="param-slider"

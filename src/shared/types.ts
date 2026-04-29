@@ -24,11 +24,16 @@ export const IPC = {
   SetPluginHidden: "vj:set-plugin-hidden",
   SavePluginThumbnail: "vj:save-plugin-thumbnail",
   SetPluginDefaults: "vj:set-plugin-defaults",
+  SetParamPrimary: "vj:set-param-primary",
   SetPluginCategory: "vj:set-plugin-category",
   ShowContextMenu: "vj:show-context-menu",
   GenerateSplat: "vj:generate-splat",
+  PerfStats: "vj:perf-stats",
   SplatProgress: "vj:splat-progress",
   PickImageFile: "vj:pick-image-file",
+  PickImagesForAsset: "vj:pick-images-for-asset",
+  CreateImageAsset: "vj:create-image-asset",
+  CreateSequenceAsset: "vj:create-sequence-asset",
 } as const;
 
 export interface ContextMenuItem {
@@ -66,7 +71,7 @@ export interface PluginMeta {
   name: string;
   author?: string;
   version?: string;
-  outputType?: "three" | "canvas" | "video" | "splat";
+  outputType?: "three" | "canvas" | "video" | "splat" | "sequence";
   params: ParamDef[];
   inputs?: string[]; // for scene-composer style plugins
   entry?: string; // implementation entry file
@@ -82,6 +87,11 @@ export interface PluginMeta {
   // Optional preview image URL (vj-asset://local/...). Resolved from
   // manifest.thumbnail when the file exists in the plugin directory.
   thumbnailUrl?: string;
+  /**
+   * For outputType === "sequence": resolved vj-asset:// URLs for each video
+   * in the playlist, in playback order.
+   */
+  sequenceUrls?: string[];
   /** Clip length in seconds. For video plugins, read from manifest.duration. */
   duration?: number;
   /** Size on disk. For video plugins, size of the videoFile; undefined otherwise. */
@@ -210,6 +220,16 @@ export interface DownloadProgress {
   message?: string;
 }
 
+/** Performance snapshot collected once per second from the Output window. */
+export interface PerfStats {
+  fps: number;
+  heapUsedMB: number;
+  heapLimitMB: number;
+  textures: number;
+  geometries: number;
+  mountedPlugins: number;
+}
+
 export interface SplatProgress {
   percent: number;
   stage: "starting" | "running" | "done" | "error";
@@ -218,4 +238,17 @@ export interface SplatProgress {
 
 export interface SplatResult {
   pluginId: string;
+}
+
+/**
+ * A deck is a named snapshot of the layer bin layout and PostFX chain.
+ * Applying a deck overwrites layers, postfx, and postfxBoundary in one shot.
+ */
+export interface Deck {
+  id: string;
+  title: string;
+  layers: LayerState[];
+  postfx: PostFXSlot[];
+  postfxBoundary: number;
+  createdAt: number;
 }

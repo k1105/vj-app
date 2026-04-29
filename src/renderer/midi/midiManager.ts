@@ -219,6 +219,12 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
       if (!slot?.pluginId) return;
       const plugin = vj.plugins.find((p) => p.id === slot.pluginId);
       const def = plugin?.params.find((p) => p.key === key);
+      if (def?.type === "bool") {
+        const cur = slot.params[key];
+        const curBool = cur === true || (typeof cur === "number" && cur > 0);
+        vj.setPostFXSlotParam(slotIdx, key, addrType === "note" ? !curBool : rawValue > 63);
+        return;
+      }
       const min = def?.min ?? 0;
       const max = def?.max ?? 1;
       vj.setPostFXSlotParam(slotIdx, key, min + (rawValue / 127) * (max - min));
@@ -250,6 +256,20 @@ function dispatch(targetId: string, rawValue: number, addrType: "cc" | "note"): 
     const step = def?.step;
 
     if (addrType === "note" && isNoteOff) return;
+
+    // Bool params: note = toggle current value; CC = threshold (>63 → true).
+    if (def?.type === "bool") {
+      let next: boolean;
+      if (addrType === "note") {
+        const cur = clip.params[key];
+        const curBool = cur === true || (typeof cur === "number" && cur > 0);
+        next = !curBool;
+      } else {
+        next = rawValue > 63;
+      }
+      vj.setClipParam(layerIdx, clipIdx, key, next);
+      return;
+    }
 
     // Linear map 0-127 → min-max, then snap to step if defined.
     let value = min + (rawValue / 127) * (max - min);

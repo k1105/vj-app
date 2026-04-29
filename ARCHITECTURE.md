@@ -1,4 +1,4 @@
-# hatakanata-vj — Application Architecture
+# VideoJockeyJS — Application Architecture
 
 _基礎設計。詳細仕様は `../2026-04-04_system-spec-v1.md` を参照。_
 

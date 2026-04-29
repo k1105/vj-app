@@ -35,7 +35,7 @@ export default class TextAsset {
     const cols = Math.max(1, Math.min(16, Math.round(params?.grid ?? 4)));
     const rows = Math.max(1, Math.ceil((h / w) * cols));
     const scale = Math.max(0.1, Math.min(3, params?.scale ?? 1));
-    const vibrateOn = params?.vibrate !== false;
+    const vibrateOn = params?.vibrate == null ? true : Boolean(params.vibrate);
     const bgColor = typeof params?.bgColor === "string" && /^#[0-9a-fA-F]{6}$/.test(params.bgColor)
       ? params.bgColor
       : "#000000";

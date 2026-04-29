@@ -1,15 +1,20 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useVJStore } from "../state/vjStore";
-import type { DownloadProgress, PluginMeta } from "../../shared/types";
+import type { Deck, DownloadProgress, PluginMeta } from "../../shared/types";
 
 const ASSETS_WIDTH_MIN = 140;
 const ASSETS_WIDTH_MAX = 600;
 const ASSETS_WIDTH_DEFAULT = 200;
 const ASSETS_WIDTH_SETTING = "assetsWidth";
 
+const DT_DECK = "application/x-deck-id";
+
 export function AssetsPanel() {
   const plugins = useVJStore((s) => s.plugins);
   const materials = plugins.filter((p) => p.kind === "material" && !p.hidden);
+  const stageMode = useVJStore((s) => s.stageMode);
+  const decks = useVJStore((s) => s.decks);
+  const deleteDeck = useVJStore((s) => s.deleteDeck);
 
   // User-created empty categories are persisted in settings so they survive
   // restarts even when no manifest currently references them.
@@ -150,6 +155,31 @@ export function AssetsPanel() {
     persistExtras([...extraCategories, name]);
   };
 
+  const onDeckContextMenu = async (e: React.MouseEvent, deck: Deck) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const choice = await window.vj.showContextMenu([
+      { id: "delete", label: `Delete "${deck.title}"`, danger: true },
+    ]);
+    if (choice === "delete") deleteDeck(deck.id);
+  };
+
+  const onDeckDragStart = (e: React.DragEvent, deckId: string) => {
+    e.dataTransfer.setData(DT_DECK, deckId);
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
+  const onAssetContextMenu = async (e: React.MouseEvent, p: PluginMeta) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const choice = await window.vj.showContextMenu([
+      { id: "hide", label: "Hide" },
+    ]);
+    if (choice === "hide") {
+      await window.vj.setPluginHidden(p.id, true);
+    }
+  };
+
   const onDragStart = (e: React.DragEvent, pluginId: string) => {
     e.dataTransfer.setData("application/x-plugin-id", pluginId);
     // copy → drop on a layer (LayerStack uses "copy")
@@ -236,6 +266,35 @@ export function AssetsPanel() {
         <span>Assets</span>
       </div>
       <div className="assets-groups">
+        {stageMode && (
+          <div className="deck-section">
+            <div className="deck-section-header">
+              <span>Decks</span>
+              <span className="assets-group-count">{decks.length}</span>
+            </div>
+            {decks.length === 0 ? (
+              <div className="deck-empty">No decks — Cmd+D to save</div>
+            ) : (
+              <div className="deck-list">
+                {decks.map((deck) => (
+                  <div
+                    key={deck.id}
+                    className="deck-card"
+                    draggable
+                    onDragStart={(e) => onDeckDragStart(e, deck.id)}
+                    onContextMenu={(e) => onDeckContextMenu(e, deck)}
+                    title={`${deck.title} — drag to apply · right-click to delete`}
+                  >
+                    <span className="deck-card-title">{deck.title}</span>
+                    <span className="deck-card-meta">
+                      {new Date(deck.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div
           className="assets-group-spacer"
           onContextMenu={onSpacerContextMenu}
@@ -262,6 +321,7 @@ export function AssetsPanel() {
                     className="asset-thumb"
                     draggable
                     onDragStart={(e) => onDragStart(e, p.id)}
+                    onContextMenu={(e) => onAssetContextMenu(e, p)}
                     title={p.name}
                     style={
                       p.thumbnailUrl

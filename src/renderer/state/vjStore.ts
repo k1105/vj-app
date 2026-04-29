@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type {
+  Deck,
   LayerState,
   ParamValue,
   PluginMeta,
@@ -75,6 +76,8 @@ interface VJStoreShape {
   triggerClip: (layerIdx: number, clipIdx: number) => void;
   /** Remove a clip from a layer's bin. Adjusts active/next indices. */
   removeClip: (layerIdx: number, clipIdx: number) => void;
+  /** Reorder a clip within the same layer. fromIdx → toIdx (insert-before semantics). */
+  reorderClip: (layerIdx: number, fromIdx: number, toIdx: number) => void;
   /**
    * Move a clip (with its params) from one layer to another. No-op if
    * source and destination are the same. The moved clip lands at the end
@@ -150,6 +153,19 @@ interface VJStoreShape {
    */
   setBurst: (on: boolean) => void;
   broadcastState: () => void;
+  /** All saved decks. Persisted to electron-store. */
+  decks: Deck[];
+  /** Overwrite decks list (called on boot to restore from store). */
+  setDecks: (decks: Deck[]) => void;
+  /** Snapshot current layers/postfx/boundary as a named deck. */
+  saveDeck: (title: string) => void;
+  /** Remove a deck by id. */
+  deleteDeck: (id: string) => void;
+  /**
+   * Overwrite current state.layers / postfx / postfxBoundary with a saved
+   * deck's contents. No-op if the id is unknown.
+   */
+  applyDeck: (id: string) => void;
 }
 
 // Default PostFX slot assignment, seeded once on the first plugin load if
@@ -250,6 +266,41 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
   stageMode: false,
   liveSnapshot: null,
   selectedPostFXSlot: 0,
+  decks: [],
+  setDecks: (decks) => set({ decks }),
+  saveDeck: (title) => {
+    const s = get();
+    const deck: Deck = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+      title,
+      layers: structuredClone(s.state.layers),
+      postfx: structuredClone(s.state.postfx),
+      postfxBoundary: s.state.postfxBoundary,
+      createdAt: Date.now(),
+    };
+    const next = [...s.decks, deck];
+    set({ decks: next });
+    void window.vj.setSetting("decks", next);
+  },
+  deleteDeck: (id) => {
+    const next = get().decks.filter((d) => d.id !== id);
+    set({ decks: next });
+    void window.vj.setSetting("decks", next);
+  },
+  applyDeck: (id) => {
+    const s = get();
+    const deck = s.decks.find((d) => d.id === id);
+    if (!deck) return;
+    set((s2) => ({
+      state: {
+        ...s2.state,
+        layers: structuredClone(deck.layers),
+        postfx: structuredClone(deck.postfx),
+        postfxBoundary: deck.postfxBoundary,
+      },
+    }));
+    get().broadcastState();
+  },
   selectPostFXSlot: (slotIdx) =>
     set(() => ({ selectedPostFXSlot: Math.max(0, Math.min(POSTFX_SLOT_COUNT - 1, slotIdx)) })),
   restoreScene: (saved) => {
@@ -440,6 +491,37 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
         }));
       }, txInfo.duration);
     }
+  },
+
+  reorderClip: (layerIdx, fromIdx, toIdx) => {
+    if (fromIdx === toIdx) return;
+    set((s) => {
+      const layers = s.state.layers.map((l, i) => {
+        if (i !== layerIdx) return l;
+        const clips = [...l.clips];
+        const [moved] = clips.splice(fromIdx, 1);
+        // toIdx was calculated before removal; adjust if needed
+        const insertAt = fromIdx < toIdx ? toIdx - 1 : toIdx;
+        clips.splice(insertAt, 0, moved);
+        const adjust = (idx: number): number => {
+          if (idx < 0) return idx;
+          if (idx === fromIdx) return insertAt;
+          if (fromIdx < insertAt) {
+            if (idx > fromIdx && idx <= insertAt) return idx - 1;
+          } else {
+            if (idx >= insertAt && idx < fromIdx) return idx + 1;
+          }
+          return idx;
+        };
+        return {
+          ...l,
+          clips,
+          activeClipIdx: adjust(l.activeClipIdx),
+          nextClipIdx: adjust(l.nextClipIdx),
+        };
+      });
+      return { state: { ...s.state, layers } };
+    });
   },
 
   removeClip: (layerIdx, clipIdx) => {
