@@ -1,0 +1,40 @@
+{
+  "name": "ymgishi_rotate_clockwise_--ar_9151_--bs_1_--video_1_--end_loo_36ef4983-5517-48a0-9b54-85cd57faa39b_0",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/ymgishi_rotate_clockwise_--ar_9151_--bs_1_--video_1_--end_loo_36ef4983-5517-48a0-9b54-85cd57faa39b_0.mp4",
+  "thumbnail": "thumbnail.jpg",
+  "duration": 5.041667,
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2,
+      "step": 0.05
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 0,
+      "min": 0,
+      "max": 6,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 6,
+      "min": 0,
+      "max": 6,
+      "step": 1
+    }
+  ],
+  "category": "scene06"
+}

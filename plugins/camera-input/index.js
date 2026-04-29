@@ -51,6 +51,7 @@ export default class CameraPolkaDot {
     const cols = clamp(Math.round(Number(params?.gridSize) || 24), 4, 96);
     const dotRatio = clamp(Number(params?.dotSize) || 0.8, 0.05, 1);
     const mirror = params?.mirror !== false;
+    const raw = params?.raw === true || params?.raw === 1;
 
     // Square cells so the aspect ratio of the dot grid matches the canvas.
     const cellSize = w / cols;
@@ -68,6 +69,18 @@ export default class CameraPolkaDot {
     const ready =
       this.video.readyState >= 2 && this.video.videoWidth > 0;
     if (!ready) return;
+
+    // Raw mode: stretch the camera frame directly onto the canvas.
+    if (raw) {
+      ctx2d.save();
+      if (mirror) {
+        ctx2d.translate(w, 0);
+        ctx2d.scale(-1, 1);
+      }
+      ctx2d.drawImage(this.video, 0, 0, w, h);
+      ctx2d.restore();
+      return;
+    }
 
     // Down-sample the camera frame at grid resolution. drawImage uses the
     // browser's native scaler, which is plenty for cols ≤ 96.

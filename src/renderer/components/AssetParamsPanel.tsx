@@ -113,11 +113,20 @@ const LayerSection = forwardRef<HTMLDivElement, LayerSectionProps>(
 
     const currentVal = (def: ParamDef): number | boolean | string => {
       const v = clip?.params[def.key];
-      if (v !== undefined && !Array.isArray(v)) return v;
-      return def.default as number | boolean | string;
+      if (v !== undefined && v !== null && !Array.isArray(v)) return v;
+      return (def.default ?? 0) as number | boolean | string;
     };
 
-    const visibleParams = (plugin?.params ?? []).filter((d) => d.type !== "strings");
+    const visibleParams = (plugin?.params ?? []).filter((d) => {
+      if (d.type === "strings") return false;
+      if (d.type === "trigger") return true; // always include triggers (button in UI)
+      if (d.showWhen) {
+        const cur = clip?.params[d.showWhen.key]
+          ?? plugin?.params.find((p) => p.key === d.showWhen!.key)?.default;
+        return cur === d.showWhen.value;
+      }
+      return true;
+    });
     const labelPrefix = `L${layerIdx + 1} ${plugin?.name ?? "?"}`;
     const allGroups = groupParams(visibleParams);
     const isPrimaryGroup = (g: ParamGroup) =>
@@ -420,6 +429,23 @@ function ParamControl({
   }
 
   if (def.type === "enum" && def.options) {
+    // 2-option enums render as a tap-toggle for better performance UX
+    if (def.options.length === 2) {
+      const cur = String(value);
+      const next = def.options.find((o) => o !== cur) ?? def.options[0];
+      return (
+        <div className="param-row" onClick={(e) => e.stopPropagation()}>
+          <MidiLearnSlot targetId={midiTargetId} label={midiLabel} group="Clip Params" />
+          {labelEl}
+          <button
+            className="param-toggle on"
+            onClick={() => onChange(next)}
+          >
+            {cur}
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="param-row" onClick={(e) => e.stopPropagation()}>
         <MidiLearnSlot
@@ -459,6 +485,20 @@ function ParamControl({
           onChange={(e) => onChange(e.target.value)}
         />
         <span className="param-val">{hex}</span>
+      </div>
+    );
+  }
+
+  if (def.type === "trigger") {
+    return (
+      <div className="param-row" onClick={(e) => e.stopPropagation()}>
+        {labelEl}
+        <button
+          className="param-trigger-btn"
+          onClick={() => onChange(Date.now())}
+        >
+          {def.key}
+        </button>
       </div>
     );
   }

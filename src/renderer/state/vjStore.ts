@@ -161,6 +161,8 @@ interface VJStoreShape {
   saveDeck: (title: string) => void;
   /** Remove a deck by id. */
   deleteDeck: (id: string) => void;
+  /** Rename a deck by id. */
+  renameDeck: (id: string, title: string) => void;
   /**
    * Overwrite current state.layers / postfx / postfxBoundary with a saved
    * deck's contents. No-op if the id is unknown.
@@ -284,6 +286,11 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
   },
   deleteDeck: (id) => {
     const next = get().decks.filter((d) => d.id !== id);
+    set({ decks: next });
+    void window.vj.setSetting("decks", next);
+  },
+  renameDeck: (id, title) => {
+    const next = get().decks.map((d) => d.id === id ? { ...d, title } : d);
     set({ decks: next });
     void window.vj.setSetting("decks", next);
   },

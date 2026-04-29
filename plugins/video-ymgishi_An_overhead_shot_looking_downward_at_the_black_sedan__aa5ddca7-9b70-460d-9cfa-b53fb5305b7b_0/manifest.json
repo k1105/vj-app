@@ -1,0 +1,40 @@
+{
+  "name": "ymgishi_An_overhead_shot_looking_downward_at_the_black_sedan__aa5ddca7-9b70-460d-9cfa-b53fb5305b7b_0",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/ymgishi_An_overhead_shot_looking_downward_at_the_black_sedan__aa5ddca7-9b70-460d-9cfa-b53fb5305b7b_0.mp4",
+  "thumbnail": "thumbnail.jpg",
+  "duration": 12.708333,
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2,
+      "step": 0.05
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 0,
+      "min": 0,
+      "max": 13,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 13,
+      "min": 0,
+      "max": 13,
+      "step": 1
+    }
+  ],
+  "category": "scene06"
+}

@@ -46,11 +46,11 @@ export interface ContextMenuItem {
 export type PluginKind = "material" | "postfx" | "transition";
 
 /** A parameter value may be a number, boolean, single string (enum), or string array. */
-export type ParamValue = number | boolean | string | string[];
+export type ParamValue = number | boolean | string | string[] | null;
 
 export interface ParamDef {
   key: string;
-  type: "float" | "int" | "bool" | "enum" | "strings" | "camera" | "color";
+  type: "float" | "int" | "bool" | "enum" | "strings" | "camera" | "color" | "trigger";
   default: ParamValue;
   min?: number;
   max?: number;
@@ -63,6 +63,12 @@ export interface ParamDef {
    * params remain visible (backward compatible).
    */
   primary?: boolean;
+  /**
+   * Conditionally show this param only when another param equals a specific
+   * value. e.g. `{ "key": "mode", "value": "orbit" }` hides the param
+   * unless the "mode" param is currently "orbit".
+   */
+  showWhen?: { key: string; value: ParamValue };
 }
 
 export interface PluginMeta {

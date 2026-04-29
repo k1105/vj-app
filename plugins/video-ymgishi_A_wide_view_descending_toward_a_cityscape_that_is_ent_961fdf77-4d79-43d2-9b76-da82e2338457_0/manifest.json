@@ -1,0 +1,40 @@
+{
+  "name": "ymgishi_A_wide_view_descending_toward_a_cityscape_that_is_ent_961fdf77-4d79-43d2-9b76-da82e2338457_0",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/ymgishi_A_wide_view_descending_toward_a_cityscape_that_is_ent_961fdf77-4d79-43d2-9b76-da82e2338457_0.mp4",
+  "thumbnail": "thumbnail.jpg",
+  "duration": 9.041667,
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2,
+      "step": 0.05
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 0,
+      "min": 0,
+      "max": 10,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 10,
+      "min": 0,
+      "max": 10,
+      "step": 1
+    }
+  ],
+  "category": "scene06"
+}

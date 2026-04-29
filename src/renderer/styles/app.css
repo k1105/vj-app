@@ -429,6 +429,30 @@ body {
 .param-label-primary {
   color: var(--accent);
 }
+.param-trigger-btn {
+  grid-column: 3 / 5;
+  grid-row: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  color: var(--text);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+}
+.param-trigger-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+.param-trigger-btn:active {
+  background: var(--accent);
+  color: #000;
+}
 .param-label[oncontextmenu] {
   cursor: context-menu;
 }
@@ -446,9 +470,14 @@ body {
 }
 /* Compact inline controls sit in row 1 col 3 (where val would go). */
 .param-row > .param-toggle,
-.param-row > .param-color,
 .param-row > .param-step-group {
   grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+/* Color swatch goes to col 4 so it doesn't overlap the hex value in col 3. */
+.param-row > .param-color {
+  grid-column: 4;
   grid-row: 1;
   justify-self: end;
 }

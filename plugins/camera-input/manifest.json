@@ -14,7 +14,7 @@
     {
       "key": "gridSize",
       "type": "int",
-      "default": 24,
+      "default": 96,
       "min": 4,
       "max": 96,
       "step": 1,
@@ -32,6 +32,12 @@
       "key": "mirror",
       "type": "bool",
       "default": true
+    },
+    {
+      "key": "raw",
+      "type": "bool",
+      "default": false,
+      "primary": true
     }
   ]
 }

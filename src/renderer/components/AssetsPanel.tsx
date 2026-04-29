@@ -15,6 +15,7 @@ export function AssetsPanel() {
   const stageMode = useVJStore((s) => s.stageMode);
   const decks = useVJStore((s) => s.decks);
   const deleteDeck = useVJStore((s) => s.deleteDeck);
+  const renameDeck = useVJStore((s) => s.renameDeck);
 
   // User-created empty categories are persisted in settings so they survive
   // restarts even when no manifest currently references them.
@@ -159,9 +160,15 @@ export function AssetsPanel() {
     e.preventDefault();
     e.stopPropagation();
     const choice = await window.vj.showContextMenu([
+      { id: "rename", label: "Rename…" },
       { id: "delete", label: `Delete "${deck.title}"`, danger: true },
     ]);
-    if (choice === "delete") deleteDeck(deck.id);
+    if (choice === "rename") {
+      const next = await promptValue("Rename deck", deck.title);
+      if (next && next !== deck.title) renameDeck(deck.id, next);
+    } else if (choice === "delete") {
+      deleteDeck(deck.id);
+    }
   };
 
   const onDeckDragStart = (e: React.DragEvent, deckId: string) => {
@@ -276,7 +283,7 @@ export function AssetsPanel() {
               <div className="deck-empty">No decks — Cmd+D to save</div>
             ) : (
               <div className="deck-list">
-                {decks.map((deck) => (
+                {[...decks].sort((a, b) => a.title.localeCompare(b.title)).map((deck) => (
                   <div
                     key={deck.id}
                     className="deck-card"

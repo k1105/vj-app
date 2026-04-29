@@ -1,0 +1,211 @@
+{
+  "name": "Mercedes E55",
+  "author": "user",
+  "version": "0.1.0",
+  "outputType": "three",
+  "category": "3D",
+  "entry": "index.js",
+  "params": [
+    {
+      "key": "mode",
+      "type": "enum",
+      "default": "orbit",
+      "options": [
+        "orbit",
+        "interior"
+      ],
+      "primary": true
+    },
+    {
+      "key": "rotY",
+      "type": "float",
+      "default": -0.55,
+      "min": -5,
+      "max": 5,
+      "step": 0.05,
+      "primary": true,
+      "showWhen": {
+        "key": "mode",
+        "value": "orbit"
+      }
+    },
+    {
+      "key": "rotX",
+      "type": "float",
+      "default": 0,
+      "min": -5,
+      "max": 5,
+      "step": 0.05,
+      "showWhen": {
+        "key": "mode",
+        "value": "orbit"
+      }
+    },
+    {
+      "key": "rotZ",
+      "type": "float",
+      "default": 0,
+      "min": -5,
+      "max": 5,
+      "step": 0.05,
+      "showWhen": {
+        "key": "mode",
+        "value": "orbit"
+      }
+    },
+    {
+      "key": "height",
+      "type": "float",
+      "default": 2,
+      "min": -2,
+      "max": 2,
+      "step": 0.05,
+      "showWhen": {
+        "key": "mode",
+        "value": "orbit"
+      }
+    },
+    {
+      "key": "fovOrbit",
+      "type": "float",
+      "default": 22,
+      "min": 10,
+      "max": 90,
+      "step": 1,
+      "showWhen": {
+        "key": "mode",
+        "value": "orbit"
+      }
+    },
+    {
+      "key": "originReset",
+      "type": "trigger",
+      "default": 1777441004204,
+      "primary": true,
+      "showWhen": {
+        "key": "mode",
+        "value": "orbit"
+      }
+    },
+    {
+      "key": "camX",
+      "type": "float",
+      "default": -0.02,
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "showWhen": {
+        "key": "mode",
+        "value": "interior"
+      }
+    },
+    {
+      "key": "camY",
+      "type": "float",
+      "default": -0.32,
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "showWhen": {
+        "key": "mode",
+        "value": "interior"
+      }
+    },
+    {
+      "key": "camZ",
+      "type": "float",
+      "default": -0.04,
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "showWhen": {
+        "key": "mode",
+        "value": "interior"
+      }
+    },
+    {
+      "key": "lookX",
+      "type": "float",
+      "default": -0.09,
+      "min": -2,
+      "max": 2,
+      "step": 0.01,
+      "showWhen": {
+        "key": "mode",
+        "value": "interior"
+      },
+      "primary": true
+    },
+    {
+      "key": "lookY",
+      "type": "float",
+      "default": 0.88,
+      "min": -2,
+      "max": 2,
+      "step": 0.01,
+      "showWhen": {
+        "key": "mode",
+        "value": "interior"
+      }
+    },
+    {
+      "key": "lookZ",
+      "type": "float",
+      "default": 2.49,
+      "min": -5,
+      "max": 5,
+      "step": 0.01,
+      "showWhen": {
+        "key": "mode",
+        "value": "interior"
+      }
+    },
+    {
+      "key": "fovInterior",
+      "type": "float",
+      "default": 70,
+      "min": 10,
+      "max": 90,
+      "step": 1,
+      "showWhen": {
+        "key": "mode",
+        "value": "interior"
+      },
+      "primary": true
+    },
+    {
+      "key": "cruise",
+      "type": "bool",
+      "default": true,
+      "primary": true,
+      "showWhen": {
+        "key": "mode",
+        "value": "interior"
+      }
+    },
+    {
+      "key": "cruiseAmp",
+      "type": "float",
+      "default": 0.05,
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "showWhen": {
+        "key": "mode",
+        "value": "interior"
+      }
+    },
+    {
+      "key": "cruiseSpeed",
+      "type": "float",
+      "default": 0.91,
+      "min": 0.01,
+      "max": 3,
+      "step": 0.01,
+      "showWhen": {
+        "key": "mode",
+        "value": "interior"
+      }
+    }
+  ]
+}

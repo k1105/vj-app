@@ -617,7 +617,14 @@ export class PluginHost {
       100,
     );
     camera.position.set(0, 0, 3);
-    const renderTarget = createRenderTarget(this.width, this.height);
+    // 3D plugins (three / splat / custom) need a depth buffer for correct
+    // occlusion. Video / canvas / sequence are 2D textures and don't need one.
+    const needs3D = meta.outputType === "three" || meta.outputType === "splat"
+      || (!meta.outputType && !!meta.entry);
+    const renderTarget = createRenderTarget(
+      this.width, this.height,
+      needs3D ? { depthBuffer: true } : {},
+    );
 
     // outputType === "splat" uses a built-in Gaussian-Splatting driver.
     if (meta.outputType === "splat") {
@@ -865,9 +872,14 @@ export class PluginHost {
         // VideoTexture updates itself.
         continue;
       }
+      // Clear with alpha=0 so the Composer composites only drawn geometry.
+      // Restore clearColor AFTER render so autoClear inside render() also
+      // uses alpha=0 (autoClear=true would re-clear at the start of render).
       this.renderer.setRenderTarget(m.renderTarget);
+      this.renderer.setClearColor(0x000000, 0);
       this.renderer.clear();
       this.renderer.render(m.scene, m.camera);
+      this.renderer.setClearColor(0x000000, 1);
     }
     this.renderer.setRenderTarget(null);
   }
@@ -883,7 +895,7 @@ export class PluginHost {
     return this.mounted.size;
   }
 
-  dispose(): void {
+dispose(): void {
     for (const id of [...this.mounted.keys()]) this.unmount(id);
   }
 }
