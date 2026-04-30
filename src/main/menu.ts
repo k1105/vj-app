@@ -1,4 +1,5 @@
 import { Menu, type MenuItemConstructorOptions } from "electron";
+import { isLoggingEnabled, setLoggingEnabled } from "./logger";
 
 /**
  * Install the application menu. We keep the standard roles (app / file /
@@ -44,6 +45,17 @@ export function installAppMenu(handlers: {
         {
           label: "Open Asset Manager…",
           click: () => handlers.openManager(),
+        },
+      ],
+    },
+    {
+      label: "Debug",
+      submenu: [
+        {
+          label: "Session Logging",
+          type: "checkbox",
+          checked: isLoggingEnabled(),
+          click: (item) => setLoggingEnabled(item.checked),
         },
       ],
     },
