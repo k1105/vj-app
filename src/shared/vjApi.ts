@@ -10,6 +10,7 @@ import type {
   ContextMenuItem,
   DownloadProgress,
   DownloadResult,
+  LogEntry,
   ParamValue,
   PerfStats,
   PluginKind,
@@ -116,6 +117,12 @@ export interface VJApi {
   sendPerfStats(stats: PerfStats): void;
   /** Controller subscribes to perf snapshots forwarded from the Output window. */
   onPerfStats(cb: (stats: PerfStats) => void): () => void;
+  /** Send a structured log entry to main for writing to the session JSONL file. */
+  log(entry: LogEntry): void;
+  /** Enable or disable structured log file writing. Persists for the session. */
+  setLogging(enabled: boolean): Promise<void>;
+  /** Returns true if structured logging is currently enabled. */
+  getLogging(): Promise<boolean>;
 }
 
 declare global {

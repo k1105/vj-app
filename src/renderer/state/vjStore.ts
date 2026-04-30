@@ -652,6 +652,18 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
   commitGo: () => {
     const s = get();
     const type = s.state.transition.type;
+    window.vj.log({
+      level: "info",
+      src: "controller",
+      op: "layer:go",
+      data: {
+        type,
+        layers: s.state.layers.map((l) => ({
+          active: l.clips[l.activeClipIdx]?.pluginId ?? null,
+          next: l.clips[l.nextClipIdx]?.pluginId ?? null,
+        })),
+      },
+    });
     // Build the new activeClipIdx per layer using nextClipIdx when set.
     const resolveNext = (l: LayerState): number =>
       l.nextClipIdx >= 0 ? l.nextClipIdx : l.activeClipIdx;

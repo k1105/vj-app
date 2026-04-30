@@ -22,6 +22,18 @@ function PerfBar({ perf }: { perf: PerfStats }) {
   const fpsWarn = perf.fps < 50;
   const heapPct = perf.heapLimitMB > 0 ? perf.heapUsedMB / perf.heapLimitMB : 0;
   const heapWarn = heapPct > 0.7;
+  const [logging, setLogging] = useState<boolean>(true);
+
+  useEffect(() => {
+    window.vj.getLogging().then(setLogging).catch(() => {});
+  }, []);
+
+  const toggleLogging = async () => {
+    const next = !logging;
+    await window.vj.setLogging(next);
+    setLogging(next);
+  };
+
   return (
     <div className="perf-bar">
       <span className={`perf-stat${fpsWarn ? " warn" : ""}`} title="frames per second">
@@ -46,6 +58,14 @@ function PerfBar({ perf }: { perf: PerfStats }) {
       <span className="perf-stat" title="mounted plugins">
         {perf.mountedPlugins}<span className="perf-unit">plug</span>
       </span>
+      <span className="perf-divider">·</span>
+      <button
+        className={`perf-log-btn${logging ? " on" : ""}`}
+        onClick={toggleLogging}
+        title={logging ? "Logging ON — click to stop" : "Logging OFF — click to start"}
+      >
+        LOG
+      </button>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   type ContextMenuItem,
   type DownloadProgress,
   type DownloadResult,
+  type LogEntry,
   type ParamValue,
   type PerfStats,
   type PluginKind,
@@ -147,6 +148,16 @@ const api: VJApi = {
     ipcRenderer.on(IPC.PerfStats, listener);
     return () => ipcRenderer.removeListener(IPC.PerfStats, listener);
   },
+
+  log: (entry: LogEntry) => {
+    ipcRenderer.send(IPC.LogWrite, entry);
+  },
+
+  setLogging: (enabled: boolean): Promise<void> =>
+    ipcRenderer.invoke(IPC.LogSetEnabled, enabled),
+
+  getLogging: (): Promise<boolean> =>
+    ipcRenderer.invoke(IPC.LogGetEnabled),
 };
 
 contextBridge.exposeInMainWorld("vj", api);

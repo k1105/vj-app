@@ -124,12 +124,20 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
     video.playsInline = true;
     video.autoplay = true;
 
-    video.addEventListener("loadedmetadata", () =>
-      console.log(`[video] loadedmetadata ${this.url} dur=${video.duration}`),
-    );
-    video.addEventListener("playing", () =>
-      console.log(`[video] playing ${this.url}`),
-    );
+    video.addEventListener("loadedmetadata", () => {
+      console.log(`[video] loadedmetadata ${this.url} dur=${video.duration}`);
+      window.vj.log({ level: "info", src: "output", op: "video:loadedmetadata", data: { url: this.url, duration: video.duration } });
+    });
+    video.addEventListener("playing", () => {
+      console.log(`[video] playing ${this.url}`);
+      window.vj.log({ level: "info", src: "output", op: "video:playing", data: { url: this.url } });
+    });
+    video.addEventListener("stalled", () => {
+      window.vj.log({ level: "warn", src: "output", op: "video:stalled", data: { url: this.url, currentTime: video.currentTime } });
+    });
+    video.addEventListener("waiting", () => {
+      window.vj.log({ level: "warn", src: "output", op: "video:waiting", data: { url: this.url, currentTime: video.currentTime } });
+    });
     video.addEventListener("ended", () => {
       // Natural end (or loopEnd = duration): seek back to loopStart.
       // play() is intentionally NOT called here — seeked handler does it
@@ -146,6 +154,12 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
       this.isSeeking = false;
       if (video.error?.code === MediaError.MEDIA_ERR_ABORTED) return; // seek interrupted — not fatal
       console.error(`[video] error ${this.url}`, video.error);
+      window.vj.log({
+        level: "error",
+        src: "output",
+        op: "video:error",
+        data: { url: this.url, code: video.error?.code, message: video.error?.message, currentTime: video.currentTime },
+      });
 
       if (video.error?.code === MediaError.MEDIA_ERR_DECODE) {
         // Decoder crash — full pipeline reset with exponential backoff.
@@ -608,6 +622,7 @@ export class PluginHost {
   private async mount(id: string): Promise<void> {
     const meta = this.metas.get(id);
     if (!meta) throw new Error(`meta not found: ${id}`);
+    window.vj.log({ level: "info", src: "output", op: "plugin:mount", data: { id, outputType: meta.outputType } });
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(
@@ -800,6 +815,7 @@ export class PluginHost {
   private unmount(id: string): void {
     const m = this.mounted.get(id);
     if (!m) return;
+    window.vj.log({ level: "info", src: "output", op: "plugin:unmount", data: { id } });
     try {
       m.instance.dispose();
     } catch (err) {

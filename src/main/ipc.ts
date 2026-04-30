@@ -1,8 +1,9 @@
 import { BrowserWindow, Menu, dialog, ipcMain } from "electron";
-import { logError } from "./logger";
+import { isLoggingEnabled, logError, logStructured, setLoggingEnabled } from "./logger";
 import {
   IPC,
   type ContextMenuItem,
+  type LogEntry,
   type ParamValue,
   type PluginKind,
   type VJState,
@@ -245,6 +246,16 @@ export function registerIpcHandlers(ctx: Ctx): void {
       await setPluginCategory(args.kind, args.id, args.category);
     },
   );
+
+  ipcMain.on(IPC.LogWrite, (_event, entry: LogEntry) => {
+    logStructured(entry);
+  });
+
+  ipcMain.handle(IPC.LogSetEnabled, (_event, enabled: boolean) => {
+    setLoggingEnabled(enabled);
+  });
+
+  ipcMain.handle(IPC.LogGetEnabled, () => isLoggingEnabled());
 
   ipcMain.handle(
     IPC.SetPluginHidden,

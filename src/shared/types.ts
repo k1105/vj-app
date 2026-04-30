@@ -34,7 +34,20 @@ export const IPC = {
   PickImagesForAsset: "vj:pick-images-for-asset",
   CreateImageAsset: "vj:create-image-asset",
   CreateSequenceAsset: "vj:create-sequence-asset",
+  LogWrite: "vj:log-write",
+  LogSetEnabled: "vj:log-set-enabled",
+  LogGetEnabled: "vj:log-get-enabled",
 } as const;
+
+/** Structured log entry emitted from renderer/output processes. */
+export interface LogEntry {
+  level: "info" | "warn" | "error";
+  /** Source window: controller UI or output/composer. */
+  src: "controller" | "output";
+  /** Operation name, e.g. "video:error", "layer:go", "plugin:mount". */
+  op: string;
+  data?: Record<string, unknown>;
+}
 
 export interface ContextMenuItem {
   id: string;

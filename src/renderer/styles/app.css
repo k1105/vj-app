@@ -297,6 +297,20 @@ body {
   transition: width 0.8s linear;
 }
 .perf-stat.warn .perf-heap-fill { background: var(--danger); }
+.perf-log-btn {
+  margin-left: auto;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 2px;
+  letter-spacing: 0.05em;
+}
+.perf-log-btn.on { color: var(--accent); border-color: var(--accent); }
+.perf-log-btn:hover { opacity: 0.8; }
 
 /* ─────────────────────────────────────────────
    Master Panel (top-right)
