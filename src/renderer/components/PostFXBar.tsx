@@ -124,7 +124,6 @@ export function PostFXEditor() {
                 available.find((p) => p.id === slot.pluginId)?.params ?? []
               }
               onParamChange={(key, value) => {
-                if (!slot.enabled) togglePostFXSlot(i);
                 setPostFXSlotParam(i, key, value);
               }}
             />
