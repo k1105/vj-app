@@ -1,0 +1,40 @@
+{
+  "name": "ymgishi_go_forward_--ar_5229_--bs_1_--video_1_--end_loop_d5f42247-9656-46d2-bf5b-2758c3586a0f_0",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/ymgishi_go_forward_--ar_5229_--bs_1_--video_1_--end_loop_d5f42247-9656-46d2-bf5b-2758c3586a0f_0.mp4",
+  "thumbnail": "thumbnail.jpg",
+  "duration": 8.875,
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2,
+      "step": 0.05
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 0,
+      "min": 0,
+      "max": 9,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 9,
+      "min": 0,
+      "max": 9,
+      "step": 1
+    }
+  ],
+  "category": "scene02"
+}

@@ -1,4 +1,5 @@
 import { BrowserWindow, Menu, dialog, ipcMain } from "electron";
+import { logError } from "./logger";
 import {
   IPC,
   type ContextMenuItem,
@@ -29,6 +30,16 @@ interface Ctx {
   getOutput: () => BrowserWindow | null;
   getManager: () => BrowserWindow | null;
   openManager: () => void;
+}
+
+/** Send to a window only if it still exists. Swallows destroy-race errors. */
+function safeSend(win: BrowserWindow | null | undefined, channel: string, ...args: unknown[]): void {
+  if (!win || win.isDestroyed()) return;
+  try {
+    win.webContents.send(channel, ...args);
+  } catch (err) {
+    logError(`[ipc] safeSend "${channel}" failed:`, err);
+  }
 }
 
 export function registerIpcHandlers(ctx: Ctx): void {
@@ -114,22 +125,19 @@ export function registerIpcHandlers(ctx: Ctx): void {
   // Controller → Main → Output broadcast. Also forward to the Manager
   // window so the Library tab can mark "in-use" plugins.
   ipcMain.on(IPC.StateUpdate, (_event, state: VJState) => {
-    ctx.getOutput()?.webContents.send(IPC.StateBroadcast, state);
-    const manager = ctx.getManager();
-    if (manager && !manager.isDestroyed()) {
-      manager.webContents.send(IPC.StateBroadcast, state);
-    }
+    safeSend(ctx.getOutput(), IPC.StateBroadcast, state);
+    safeSend(ctx.getManager(), IPC.StateBroadcast, state);
   });
 
   // Manager (or anyone else) → Controller: please send your current state
   // now. Used when a window opens mid-session and needs to catch up.
   ipcMain.on(IPC.RequestStateRebroadcast, () => {
-    ctx.getController()?.webContents.send(IPC.RequestStateRebroadcast);
+    safeSend(ctx.getController(), IPC.RequestStateRebroadcast);
   });
 
   // Output → Controller: forward perf stats once per second.
   ipcMain.on(IPC.PerfStats, (_event, stats) => {
-    ctx.getController()?.webContents.send(IPC.PerfStats, stats);
+    safeSend(ctx.getController(), IPC.PerfStats, stats);
   });
 
   ipcMain.handle(IPC.SettingsGet, (_event, key: string) => getSetting(key));

@@ -1,0 +1,39 @@
+{
+  "name": "Daft Punk - One More Time (Official Video)",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/FGBhQbmPwH8.mp4",
+  "thumbnail": "thumbnail.jpg",
+  "duration": 321.457052,
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2,
+      "step": 0.05
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 18,
+      "min": 0,
+      "max": 322,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 138,
+      "min": 0,
+      "max": 322,
+      "step": 1
+    }
+  ]
+}

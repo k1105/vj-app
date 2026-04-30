@@ -6,8 +6,28 @@ import { registerIpcHandlers } from "./ipc";
 import { installAppMenu } from "./menu";
 import { startPluginWatcher, appRoot } from "./pluginLoader";
 import { startLivePreview } from "./livePreview";
+import { initLogger, closeLogger, logError, logWarn } from "./logger";
 
 app.setName("VideoJockeyJS");
+
+// Suppress "Object has been destroyed" modals during shutdown — these fire
+// when IPC messages arrive after a BrowserWindow has already been closed.
+// All errors are written to the session log file instead.
+process.on("uncaughtException", (err) => {
+  logError("[uncaughtException]", err);
+  if (
+    err.message.includes("Object has been destroyed") ||
+    err.message.includes("WebContents is destroyed")
+  ) {
+    return; // swallow — harmless shutdown race
+  }
+  // For other unexpected errors, still log but don't show the default modal.
+  // The app can continue; the log file preserves the full trace.
+});
+
+process.on("unhandledRejection", (reason) => {
+  logWarn("[unhandledRejection]", reason);
+});
 
 // Forward renderer console.{log,warn,error} to the main-process stdout
 // so `npm run dev` shows them alongside main logs.
@@ -47,6 +67,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 app.whenReady().then(async () => {
+  initLogger();
   // Serve local asset files to the renderer/output windows.
   // Required because the output document is loaded via http://localhost
   // in dev, which blocks plain `file://` media.
@@ -129,3 +150,5 @@ app.whenReady().then(async () => {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
+
+app.on("quit", closeLogger);

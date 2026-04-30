@@ -1,0 +1,40 @@
+{
+  "name": "social_ymgishi_A_very_wide_establishing_view_of_the_atmosphere_of_th_f77b8837-da67-4e9c-9383-53f4f1d9dc21_0",
+  "author": "yt-dlp",
+  "outputType": "video",
+  "videoFile": "../../materials/videos/social_ymgishi_A_very_wide_establishing_view_of_the_atmosphere_of_th_f77b8837-da67-4e9c-9383-53f4f1d9dc21_0.mp4",
+  "thumbnail": "thumbnail.jpg",
+  "duration": 9.041667,
+  "params": [
+    {
+      "key": "playing",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "speed",
+      "type": "float",
+      "default": 1,
+      "min": 0.25,
+      "max": 2,
+      "step": 0.05
+    },
+    {
+      "key": "loopStart",
+      "type": "float",
+      "default": 0,
+      "min": 0,
+      "max": 10,
+      "step": 1
+    },
+    {
+      "key": "loopEnd",
+      "type": "float",
+      "default": 10,
+      "min": 0,
+      "max": 10,
+      "step": 1
+    }
+  ],
+  "category": "scene05"
+}

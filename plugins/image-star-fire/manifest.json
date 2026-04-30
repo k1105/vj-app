@@ -3,7 +3,7 @@
   "author": "user",
   "version": "0.1.0",
   "outputType": "canvas",
-  "category": "image",
+  "category": "scene03",
   "entry": "../../templates/image-asset/index.js",
   "params": [
     {

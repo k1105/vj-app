@@ -105,6 +105,7 @@ export default class MercedesE55 {
     const rotX   = typeof params?.rotX === "number" ? params.rotX : 0;
     const rotY   = typeof params?.rotY === "number" ? params.rotY : 0.5;
     const rotZ   = typeof params?.rotZ === "number" ? params.rotZ : 0;
+    const camYOrbit = typeof params?.camYOrbit === "number" ? params.camYOrbit : 0;
     const fov    = mode === "orbit"
       ? (typeof params?.fovOrbit    === "number" ? params.fovOrbit    : 23)
       : (typeof params?.fovInterior === "number" ? params.fovInterior : 87);
@@ -146,7 +147,7 @@ export default class MercedesE55 {
         this.group.position.y = height;
       }
 
-      this.camera.position.set(0, height, 4);
+      this.camera.position.set(0, camYOrbit, 4);
       this.camera.lookAt(0, height, 0);
 
     } else {

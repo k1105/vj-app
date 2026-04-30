@@ -246,15 +246,21 @@ export interface SplatResult {
   pluginId: string;
 }
 
+/** Per-layer clip arrangement stored in a deck (clips only, no mix settings). */
+export interface DeckLayer {
+  clips: LayerClip[];
+  activeClipIdx: number;
+  nextClipIdx: number;
+}
+
 /**
- * A deck is a named snapshot of the layer bin layout and PostFX chain.
- * Applying a deck overwrites layers, postfx, and postfxBoundary in one shot.
+ * A deck stores only the clip arrangement per layer.
+ * Applying a deck updates clips/active/next but leaves opacity, blend,
+ * mute, solo, PostFX, and postfxBoundary untouched.
  */
 export interface Deck {
   id: string;
   title: string;
-  layers: LayerState[];
-  postfx: PostFXSlot[];
-  postfxBoundary: number;
+  layers: DeckLayer[];
   createdAt: number;
 }

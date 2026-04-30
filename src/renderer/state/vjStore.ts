@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
   Deck,
+  DeckLayer,
   LayerState,
   ParamValue,
   PluginMeta,
@@ -272,12 +273,15 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
   setDecks: (decks) => set({ decks }),
   saveDeck: (title) => {
     const s = get();
+    const deckLayers: DeckLayer[] = s.state.layers.map((l) => ({
+      clips: structuredClone(l.clips),
+      activeClipIdx: l.activeClipIdx,
+      nextClipIdx: l.nextClipIdx,
+    }));
     const deck: Deck = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2),
       title,
-      layers: structuredClone(s.state.layers),
-      postfx: structuredClone(s.state.postfx),
-      postfxBoundary: s.state.postfxBoundary,
+      layers: deckLayers,
       createdAt: Date.now(),
     };
     const next = [...s.decks, deck];
@@ -301,9 +305,17 @@ export const useVJStore = create<VJStoreShape>((set, get) => ({
     set((s2) => ({
       state: {
         ...s2.state,
-        layers: structuredClone(deck.layers),
-        postfx: structuredClone(deck.postfx),
-        postfxBoundary: deck.postfxBoundary,
+        // Only update clip arrangement; preserve opacity/blend/mute/solo/postfx
+        layers: s2.state.layers.map((layer, i) => {
+          const dl = deck.layers[i];
+          if (!dl) return layer;
+          return {
+            ...layer,
+            clips: structuredClone(dl.clips),
+            activeClipIdx: dl.activeClipIdx,
+            nextClipIdx: dl.nextClipIdx,
+          };
+        }),
       },
     }));
     get().broadcastState();
