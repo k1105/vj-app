@@ -91,6 +91,109 @@ interface MountedPlugin {
 // with the postfx-side constant in Composer.ts.
 const PARAM_SMOOTH_TAU_SEC = 0.06;
 
+// ---------------------------------------------------------------------------
+// VideoPool — reuse HTMLVideoElement decoders across rapid mount/unmount cycles.
+//
+// Chromium's hardware video decoder has a limited number of concurrent decode
+// pipelines. Rapidly creating and destroying HTMLVideoElements (e.g., every
+// time the user switches clips) exhausts this pool and causes
+// PIPELINE_ERROR_DECODE on subsequent elements. The fix: keep recently-released
+// elements alive in a warm state (just paused) for WARM_MS, and hand them back
+// if the same URL is re-mounted within that window. New decoder init is avoided
+// entirely for the common "switch away then switch back" pattern.
+// ---------------------------------------------------------------------------
+
+const VIDEO_POOL_MAX  = 6;     // max simultaneous decoder instances
+const VIDEO_POOL_WARM_MS = 8000; // keep warm for 8 s after release
+
+interface PoolEntry {
+  video: HTMLVideoElement;
+  url: string;
+  inUse: boolean;
+  releasedAt: number; // epoch ms; 0 while in use
+}
+
+class VideoPool {
+  private entries: PoolEntry[] = [];
+  private timer: ReturnType<typeof setInterval>;
+
+  constructor() {
+    this.timer = setInterval(() => this.evict(), 2000);
+  }
+
+  /**
+   * Acquire an element for `url`.
+   * Returns { video, fresh: false } when a warm element is reused (decoder
+   * stays alive — caller should re-add listeners and seek to start).
+   * Returns { video, fresh: true } for a brand-new element.
+   */
+  acquire(url: string, init: (v: HTMLVideoElement) => void): { video: HTMLVideoElement; fresh: boolean } {
+    // Prefer a warm element for the same URL to skip decoder teardown/init.
+    const warm = this.entries.find((e) => !e.inUse && e.url === url);
+    if (warm) {
+      warm.inUse = true;
+      warm.releasedAt = 0;
+      window.vj.log({ level: "info", src: "output", op: "video:pool-reuse", data: { url } });
+      return { video: warm.video, fresh: false };
+    }
+
+    // Evict the oldest idle entry if at capacity, to stay within the decoder limit.
+    if (this.entries.length >= VIDEO_POOL_MAX) {
+      const oldest = this.entries
+        .filter((e) => !e.inUse)
+        .sort((a, b) => a.releasedAt - b.releasedAt)[0];
+      if (oldest) {
+        disposeVideo(oldest.video);
+        this.entries.splice(this.entries.indexOf(oldest), 1);
+      }
+      // If ALL entries are in use (shouldn't happen normally), still create one
+      // rather than blocking VJ output.
+    }
+
+    const video = document.createElement("video");
+    init(video);
+    this.entries.push({ video, url, inUse: true, releasedAt: 0 });
+    return { video, fresh: true };
+  }
+
+  /**
+   * Return an element to the warm pool (just pause it; keep decoder alive).
+   * If the element has a pending error, dispose it immediately instead.
+   */
+  release(video: HTMLVideoElement): void {
+    const entry = this.entries.find((e) => e.video === video);
+    if (!entry) return;
+    if (video.error) {
+      // Poisoned element — fully destroy so the pool never hands it back.
+      disposeVideo(video);
+      this.entries.splice(this.entries.indexOf(entry), 1);
+      return;
+    }
+    entry.inUse = false;
+    entry.releasedAt = Date.now();
+    video.pause();
+  }
+
+  private evict(): void {
+    const now = Date.now();
+    this.entries = this.entries.filter((e) => {
+      if (!e.inUse && now - e.releasedAt > VIDEO_POOL_WARM_MS) {
+        disposeVideo(e.video);
+        return false;
+      }
+      return true;
+    });
+  }
+
+  dispose(): void {
+    clearInterval(this.timer);
+    for (const e of this.entries) disposeVideo(e.video);
+    this.entries = [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+
 /**
  * BuiltinVideoPlugin — driver for outputType:"video" plugins.
  *
@@ -106,53 +209,65 @@ const PARAM_SMOOTH_TAU_SEC = 0.06;
  */
 class BuiltinVideoPlugin implements MaterialPluginInstance {
   private video: HTMLVideoElement | null = null;
-  private loopStartSec = 0; // seconds, kept in sync with params each frame
-  private prevLoopStartSec = -1; // sentinel; first update() always counts as a change
-  private isSeeking = false; // prevent seek spam across frames
-  // Decode-error recovery: exponential backoff, no hard give-up limit.
+  private listenerAbort: AbortController | null = null;
+  private loopStartSec = 0;
+  private prevLoopStartSec = -1;
+  private isSeeking = false;
   private decodeErrCount = 0;
   private decodeRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private readonly url: string) {}
+  constructor(private readonly url: string, private readonly pool: VideoPool) {}
 
   setup(_ctx: PluginSetupContext): void {
-    const video = document.createElement("video");
-    video.crossOrigin = "anonymous";
-    video.src = this.url;
-    video.loop = false;
-    video.muted = true;
-    video.playsInline = true;
-    video.autoplay = true;
+    // Reset per-mount state regardless of whether we reuse a warm element.
+    this.isSeeking = false;
+    this.decodeErrCount = 0;
+    this.loopStartSec = 0;
+    this.prevLoopStartSec = -1;
+
+    this.listenerAbort = new AbortController();
+    const signal = this.listenerAbort.signal;
+
+    const { video, fresh } = this.pool.acquire(this.url, (v) => {
+      v.crossOrigin = "anonymous";
+      v.src = this.url;
+      v.loop = false;
+      v.muted = true;
+      v.playsInline = true;
+      v.autoplay = true;
+    });
 
     video.addEventListener("loadedmetadata", () => {
       console.log(`[video] loadedmetadata ${this.url} dur=${video.duration}`);
       window.vj.log({ level: "info", src: "output", op: "video:loadedmetadata", data: { url: this.url, duration: video.duration } });
-    });
+    }, { signal });
+
     video.addEventListener("playing", () => {
       console.log(`[video] playing ${this.url}`);
       window.vj.log({ level: "info", src: "output", op: "video:playing", data: { url: this.url } });
-    });
+    }, { signal });
+
     video.addEventListener("stalled", () => {
       window.vj.log({ level: "warn", src: "output", op: "video:stalled", data: { url: this.url, currentTime: video.currentTime } });
-    });
+    }, { signal });
+
     video.addEventListener("waiting", () => {
       window.vj.log({ level: "warn", src: "output", op: "video:waiting", data: { url: this.url, currentTime: video.currentTime } });
-    });
+    }, { signal });
+
     video.addEventListener("ended", () => {
-      // Natural end (or loopEnd = duration): seek back to loopStart.
-      // play() is intentionally NOT called here — seeked handler does it
-      // to avoid racing a play() call against an in-progress seek.
       this.isSeeking = true;
       video.currentTime = Math.min(this.loopStartSec, video.duration || 0);
-    });
+    }, { signal });
+
     video.addEventListener("seeked", () => {
       this.isSeeking = false;
-      // Always resume after any seek (loop, loopEnd wrap, or initial start).
       void video.play().catch(() => {});
-    });
+    }, { signal });
+
     video.addEventListener("error", () => {
       this.isSeeking = false;
-      if (video.error?.code === MediaError.MEDIA_ERR_ABORTED) return; // seek interrupted — not fatal
+      if (video.error?.code === MediaError.MEDIA_ERR_ABORTED) return;
       console.error(`[video] error ${this.url}`, video.error);
       window.vj.log({
         level: "error",
@@ -162,22 +277,15 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
       });
 
       if (video.error?.code === MediaError.MEDIA_ERR_DECODE) {
-        // Decoder crash — full pipeline reset with exponential backoff.
-        // Never give up: a black screen during a live set is worse than retrying.
         this.decodeErrCount++;
-        // 300ms, 600ms, 1.2s, 2.4s … capped at 8s
         const delay = Math.min(8000, 300 * Math.pow(2, this.decodeErrCount - 1));
-        const resumeAt = isFinite(video.currentTime)
-          ? Math.max(this.loopStartSec, video.currentTime)
-          : this.loopStartSec;
-        console.warn(
-          `[video] decode error #${this.decodeErrCount} — retry in ${delay}ms ${this.url}`,
-        );
+        console.warn(`[video] decode error #${this.decodeErrCount} — retry in ${delay}ms ${this.url}`);
         if (this.decodeRetryTimer !== null) clearTimeout(this.decodeRetryTimer);
         this.decodeRetryTimer = setTimeout(() => {
           this.decodeRetryTimer = null;
-          if (!this.video) return; // disposed while waiting
-          // Full pipeline reset: clear src first so Chromium tears down the decoder.
+          if (!this.video) return;
+          // Reset from position 0 (not the crash position) to avoid re-hitting
+          // the same bad frame on the very next decode attempt.
           this.video.src = "";
           this.video.load();
           this.video.src = this.url;
@@ -185,18 +293,24 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
             this.video?.removeEventListener("canplay", onCanPlay);
             if (!this.video) return;
             this.isSeeking = true;
-            this.video.currentTime = resumeAt;
-            // seeked handler will call play()
+            this.video.currentTime = this.loopStartSec;
           };
           this.video.addEventListener("canplay", onCanPlay);
           this.video.load();
         }, delay);
       }
-    });
+    }, { signal });
 
-    video.play().catch((err) => {
-      console.warn(`[video] play() rejected ${this.url}`, err);
-    });
+    if (fresh) {
+      video.play().catch((err) => {
+        console.warn(`[video] play() rejected ${this.url}`, err);
+      });
+    } else {
+      // Warm reuse: seek to loopStart; seeked handler will call play().
+      this.isSeeking = true;
+      video.currentTime = this.loopStartSec;
+    }
+
     this.video = video;
   }
 
@@ -209,7 +323,6 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
     const video = this.video;
     if (!video) return;
 
-    // play / pause — skip while seeking to avoid interrupting a loop seek
     const playing = params.playing;
     if (playing === false) {
       if (!video.paused) video.pause();
@@ -220,7 +333,6 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
     const speed = typeof params.speed === "number" ? params.speed : 1;
     if (video.playbackRate !== speed && speed > 0) video.playbackRate = speed;
 
-    // loopStart / loopEnd are in seconds (not normalised 0-1)
     const loopStartSec = typeof params.loopStart === "number" ? params.loopStart : 0;
     const loopEndSec   = typeof params.loopEnd   === "number" ? params.loopEnd   : Infinity;
     const newLoopStartSec = Math.max(0, loopStartSec);
@@ -231,8 +343,6 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
     const duration = video.duration || 0;
     if (duration > 0 && !this.isSeeking) {
       const s = Math.min(this.loopStartSec, duration);
-      // Upper bound: enforce loopEnd in-frame when set below duration.
-      //   When loopEnd >= duration, the natural 'ended' event handles the wrap.
       if (loopEndSec < duration) {
         const e = Math.max(s + 0.05, Math.min(loopEndSec, duration));
         if (video.currentTime >= e) {
@@ -240,9 +350,6 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
           video.currentTime = s;
         }
       }
-      // Lower bound: only re-seek when loopStart was just changed by the user
-      //   (or on first frame). Continuous enforcement deadlocks the player when
-      //   the browser snaps the seek target to a keyframe slightly before `s`.
       if (loopStartChanged && video.currentTime < s && !this.isSeeking) {
         this.isSeeking = true;
         video.currentTime = s;
@@ -255,8 +362,14 @@ class BuiltinVideoPlugin implements MaterialPluginInstance {
       clearTimeout(this.decodeRetryTimer);
       this.decodeRetryTimer = null;
     }
-    disposeVideo(this.video);
-    this.video = null;
+    // Abort all event listeners before returning the element to the pool,
+    // so stale callbacks from this instance never fire on the reused element.
+    this.listenerAbort?.abort();
+    this.listenerAbort = null;
+    if (this.video) {
+      this.pool.release(this.video);
+      this.video = null;
+    }
   }
 }
 
@@ -579,6 +692,7 @@ export class PluginHost {
   private metas = new Map<string, PluginMeta>();
   private width = 1280;
   private height = 720;
+  private videoPool = new VideoPool();
 
   constructor(private readonly renderer: THREE.WebGLRenderer) {}
 
@@ -705,7 +819,7 @@ export class PluginHost {
         throw new Error(`video plugin ${id} has no videoUrl`);
       }
       console.log(`[PluginHost] mounting video ${id} url=${meta.videoUrl}`);
-      const instance = new BuiltinVideoPlugin(meta.videoUrl);
+      const instance = new BuiltinVideoPlugin(meta.videoUrl, this.videoPool);
       instance.setup({
         THREE,
         renderer: this.renderer,
@@ -911,7 +1025,8 @@ export class PluginHost {
     return this.mounted.size;
   }
 
-dispose(): void {
+  dispose(): void {
     for (const id of [...this.mounted.keys()]) this.unmount(id);
+    this.videoPool.dispose();
   }
 }
