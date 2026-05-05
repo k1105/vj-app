@@ -133,15 +133,18 @@ export function GamepadRoot() {
     }
   }, []);
 
-  // パネルが開いている間はメインナビゲーションをブロック
-  const anyPanelOpen = () => {
-    const fs = useGamepadFocusStore.getState();
-    return fs.paramPanelOpen || fs.layerParamOpen || fs.optionsOpen ||
-           fs.assetPickerLayer !== null || fs.deleteTarget !== null;
-  };
+  // パネルが開いている間はメインナビゲーションをブロック（refで安定して参照）
+  const panelOpenRef = useRef(false);
+  useEffect(() => {
+    return useGamepadFocusStore.subscribe((s) => {
+      panelOpenRef.current =
+        s.paramPanelOpen || s.layerParamOpen || s.optionsOpen ||
+        s.assetPickerLayer !== null || s.deleteTarget !== null;
+    });
+  }, []);
 
   const moveUp    = useCallback(() => {
-    if (anyPanelOpen()) return;
+    if (panelOpenRef.current) return;
     const grid = gridRef.current;
     rowRef.current = Math.max(0, rowRef.current - 1);
     colRef.current = Math.min(colRef.current, (grid[rowRef.current]?.length ?? 1) - 1);
@@ -149,7 +152,7 @@ export function GamepadRoot() {
   }, [applyTarget]);
 
   const moveDown  = useCallback(() => {
-    if (anyPanelOpen()) return;
+    if (panelOpenRef.current) return;
     const grid = gridRef.current;
     rowRef.current = Math.min(grid.length - 1, rowRef.current + 1);
     colRef.current = Math.min(colRef.current, (grid[rowRef.current]?.length ?? 1) - 1);
@@ -157,13 +160,13 @@ export function GamepadRoot() {
   }, [applyTarget]);
 
   const moveLeft  = useCallback(() => {
-    if (anyPanelOpen()) return;
+    if (panelOpenRef.current) return;
     colRef.current = Math.max(0, colRef.current - 1);
     applyTarget();
   }, [applyTarget]);
 
   const moveRight = useCallback(() => {
-    if (anyPanelOpen()) return;
+    if (panelOpenRef.current) return;
     const grid = gridRef.current;
     const maxCol = (grid[rowRef.current]?.length ?? 1) - 1;
     colRef.current = Math.min(maxCol, colRef.current + 1);
