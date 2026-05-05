@@ -5,6 +5,7 @@ import {
   addGamepadListener,
   isButtonHeld,
   isGamepadConnected,
+  readRStickY,
   type ButtonName,
 } from "./gamepadManager";
 import { GamepadFocusOverlay, gpidFor } from "./GamepadFocusOverlay";
@@ -91,6 +92,28 @@ export function GamepadRoot() {
     return () => clearInterval(iv);
   }, []);
 
+  // ─── R stick → opacity（パネル非表示時）────────────────────────────────────
+  useEffect(() => {
+    const SPEED = 0.01;
+    let raf: number;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const fs = useGamepadFocusStore.getState();
+      if (fs.paramPanelOpen || fs.layerParamOpen || fs.optionsOpen ||
+          fs.assetPickerLayer !== null || fs.deleteTarget !== null) return;
+      const ry = readRStickY();
+      if (Math.abs(ry) < 0.01) return;
+      const t = fs.target;
+      if (!t || (t.kind !== "clip" && t.kind !== "add")) return;
+      const li = t.layerIdx;
+      const cur = useVJStore.getState().state.layers[li]?.opacity ?? 1;
+      const next = Math.max(0, Math.min(1, cur - ry * SPEED));
+      useVJStore.getState().setLayerOpacity(li, next);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   // ─── Navigation helpers ───────────────────────────────────────────────────
 
   const applyTarget = useCallback(() => {
@@ -172,6 +195,15 @@ export function GamepadRoot() {
       }
       return;
     }
+    if (fs.layerParamOpen) {
+      if (button === "triangle") { fs.closeLayerParam(); return; }
+      if (button === "up")    { paramNavEvent("up");    return; }
+      if (button === "down")  { paramNavEvent("down");  return; }
+      if (button === "left")  { paramNavEvent("up");    return; }
+      if (button === "right") { paramNavEvent("down");  return; }
+      if (button === "r3")    { paramR3Event();          return; }
+      return;
+    }
     if (fs.paramPanelOpen) {
       if (button === "triangle")  { fs.closeParamPanel(); return; }
       if (button === "circle")    { handleCircle(); return; }
@@ -194,6 +226,11 @@ export function GamepadRoot() {
     if (button === "options") { fs.openOptions();  return; }
     if (button === "triangle") {
       const t = fs.target;
+      if (isButtonHeld("r2") && t && (t.kind === "clip" || t.kind === "add")) {
+        // R2+△ → レイヤーパラメータパネル
+        fs.openLayerParam(t.layerIdx);
+        return;
+      }
       if (t && (t.kind === "clip" || t.kind === "postfx")) fs.openParamPanel();
       return;
     }

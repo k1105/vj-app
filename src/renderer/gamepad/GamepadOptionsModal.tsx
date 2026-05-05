@@ -14,7 +14,8 @@ interface MappingRow {
 const GLOBAL_ROWS: MappingRow[] = [
   { btns: [{ label: "D-PAD", cls: "ob-dpad" }], action: "フォーカス移動" },
   { btns: [{ label: "○", cls: "ob-circle" }],   action: "アセット / PostFX on/off" },
-  { btns: [{ label: "△", cls: "ob-triangle" }], action: "パラメータパネルを開く" },
+  { btns: [{ label: "△", cls: "ob-triangle" }],                                    action: "アセットパラメータパネルを開く" },
+  { btns: [{ label: "R2", cls: "ob-r2" }, { label: "△", cls: "ob-triangle" }],    action: "レイヤーパラメータパネルを開く" },
   { btns: [{ label: "✕", cls: "ob-cross" }],    action: "アセット削除（確認あり）" },
   { btns: [{ label: "□", cls: "ob-square" }],   action: "Stage toggle (ON/CANCEL)" },
   { btns: [{ label: "R2", cls: "ob-r2" }], action: "Stage release（ステージ中のみ）" },

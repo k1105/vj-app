@@ -52,14 +52,22 @@ interface Props {
 }
 
 export function GamepadParamPanel({ onClose }: Props) {
-  const target      = useGamepadFocusStore((s) => s.target);
-  const panelOpen   = useGamepadFocusStore((s) => s.paramPanelOpen);
+  const target         = useGamepadFocusStore((s) => s.target);
+  const panelOpen      = useGamepadFocusStore((s) => s.paramPanelOpen);
+  const layerParamOpen = useGamepadFocusStore((s) => s.layerParamOpen);
+  const layerParamIdx  = useGamepadFocusStore((s) => s.layerParamIdx);
+  const closeLayerParam = useGamepadFocusStore((s) => s.closeLayerParam);
   const layers      = useVJStore((s) => s.state.layers);
   const postfx      = useVJStore((s) => s.state.postfx);
   const plugins     = useVJStore((s) => s.plugins);
   const setClipParam       = useVJStore((s) => s.setClipParam);
   const setPostFXSlotParam = useVJStore((s) => s.setPostFXSlotParam);
   const setLayerBlend      = useVJStore((s) => s.setLayerBlend);
+  const setLayerOpacity    = useVJStore((s) => s.setLayerOpacity);
+  const setLayerMute       = useVJStore((s) => s.setLayerMute);
+  const setLayerSolo       = useVJStore((s) => s.setLayerSolo);
+
+  const isOpen = panelOpen || layerParamOpen;
 
   const [focusedRow, setFocusedRow] = useState(0);
 
@@ -108,17 +116,45 @@ export function GamepadParamPanel({ onClose }: Props) {
     return null;
   })();
 
-  // Reset row focus when target changes
-  useEffect(() => { setFocusedRow(0); }, [target]);
+  // レイヤーパラメータ用 data（layerParamOpen 時に data を上書き）
+  const layerData = (() => {
+    if (!layerParamOpen || layerParamIdx === null) return null;
+    const layer = layers[layerParamIdx];
+    if (!layer) return null;
+    const BLEND_OPTS = ["normal", "add", "multiply", "screen"];
+    const entries: ParamEntry[] = [
+      { type: "single", def: { key: "opacity", type: "float", default: 1, min: 0, max: 1 }, value: layer.opacity },
+      { type: "single", def: { key: "blend",   type: "enum",  default: "normal", options: BLEND_OPTS }, value: layer.blend },
+      { type: "single", def: { key: "mute",    type: "bool",  default: false }, value: layer.mute },
+      { type: "single", def: { key: "solo",    type: "bool",  default: false }, value: layer.solo },
+    ];
+    return {
+      title: `L${layerParamIdx + 1} — Layer`,
+      subtitle: "",
+      entries,
+      layer: null,
+      setValue: (key: string, val: number | boolean | string) => {
+        if (key === "opacity") setLayerOpacity(layerParamIdx, val as number);
+        if (key === "blend")   setLayerBlend(layerParamIdx, val as "normal"|"add"|"multiply"|"screen");
+        if (key === "mute")    setLayerMute(layerParamIdx, val as boolean);
+        if (key === "solo")    setLayerSolo(layerParamIdx, val as boolean);
+      },
+    };
+  })();
 
-  // L stick → continuous float/int delta
-  const dataRef = useRef(data);
+  const activeData = layerData ?? data;
+
+  // Reset row focus when target/mode changes
+  useEffect(() => { setFocusedRow(0); }, [target, layerParamOpen, layerParamIdx]);
+
+  // R stick → continuous float/int delta
+  const dataRef = useRef(activeData);
   const rowRef  = useRef(focusedRow);
-  dataRef.current = data;
+  dataRef.current = activeData;
   rowRef.current  = focusedRow;
 
   useEffect(() => {
-    if (!panelOpen) return;
+    if (!isOpen) return;
     let raf: number;
     const tick = () => {
       raf = requestAnimationFrame(tick);
@@ -205,32 +241,34 @@ export function GamepadParamPanel({ onClose }: Props) {
     };
   }, []);
 
+  const handleClose = layerParamOpen ? closeLayerParam : onClose;
+
   return (
-    <div className={`gp-param-panel${panelOpen ? " open" : ""}`}>
-      {data && (
+    <div className={`gp-param-panel${isOpen ? " open" : ""}`}>
+      {activeData && (
         <>
           <div className="gp-panel-header">
-            <span className="gp-panel-title">{data.title}</span>
-            <span className="gp-panel-subtitle">{data.subtitle}</span>
-            <button className="gp-panel-close" onClick={onClose}>
+            <span className="gp-panel-title">{activeData.title}</span>
+            <span className="gp-panel-subtitle">{activeData.subtitle}</span>
+            <button className="gp-panel-close" onClick={handleClose}>
               <span className="gp-btn-badge gp-tri">△</span> 閉じる
             </button>
           </div>
 
-          {data.layer && (
+          {activeData.layer && (
             <div className="gp-layer-strip">
               <span className="gp-strip-label">Opacity</span>
               <div className="gp-opacity-track">
-                <div className="gp-opacity-fill" style={{ width: `${Math.round(data.layer.opacity * 100)}%` }} />
+                <div className="gp-opacity-fill" style={{ width: `${Math.round(activeData.layer.opacity * 100)}%` }} />
               </div>
-              <span className="gp-opacity-val">{Math.round(data.layer.opacity * 100)}</span>
+              <span className="gp-opacity-val">{Math.round(activeData.layer.opacity * 100)}</span>
               <div className="gp-sep" />
               <span className="gp-strip-label">Blend</span>
               {(["normal", "add", "multiply", "screen"] as const).map(b => (
                 <button
                   key={b}
-                  className={`gp-blend-opt${data.layer!.blend === b ? " active" : ""}`}
-                  onClick={() => setLayerBlend(data.layer!.idx, b)}
+                  className={`gp-blend-opt${activeData.layer!.blend === b ? " active" : ""}`}
+                  onClick={() => setLayerBlend(activeData.layer!.idx, b)}
                 >
                   {b === "normal" ? "NRM" : b === "multiply" ? "MUL" : b.toUpperCase()}
                 </button>
@@ -239,7 +277,7 @@ export function GamepadParamPanel({ onClose }: Props) {
           )}
 
           <div className="gp-param-cols">
-            {data.entries.map((entry, i) => (
+            {activeData.entries.map((entry, i) => (
               <ParamCol
                 key={i}
                 entry={entry}
@@ -247,16 +285,16 @@ export function GamepadParamPanel({ onClose }: Props) {
                 onClick={() => setFocusedRow(i)}
                 onToggle={() => {
                   if (entry.type === "single" && entry.def.type === "bool") {
-                    data.setValue(entry.def.key, !entry.value);
+                    activeData.setValue(entry.def.key, !entry.value);
                   }
                 }}
                 onTrigger={() => {
                   if (entry.type === "single" && entry.def.type === "trigger") {
-                    data.setValue(entry.def.key, Date.now());
+                    activeData.setValue(entry.def.key, Date.now());
                   }
                 }}
                 onEnumSelect={(val) => {
-                  if (entry.type === "single") data.setValue(entry.def.key, val);
+                  if (entry.type === "single") activeData.setValue(entry.def.key, val);
                 }}
               />
             ))}

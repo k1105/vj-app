@@ -19,7 +19,8 @@ export function GamepadFocusOverlay() {
   const active     = useGamepadFocusStore((s) => s.active);
   // Hide ring whenever any panel/modal is open
   const anyOverlay = useGamepadFocusStore((s) =>
-    s.paramPanelOpen || s.optionsOpen || s.assetPickerLayer !== null || s.deleteTarget !== null
+    s.paramPanelOpen || s.layerParamOpen || s.optionsOpen ||
+    s.assetPickerLayer !== null || s.deleteTarget !== null
   );
   const ringRef = useRef<HTMLDivElement>(null);
 

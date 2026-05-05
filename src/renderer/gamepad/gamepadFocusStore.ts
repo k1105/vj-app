@@ -10,6 +10,9 @@ interface GamepadFocusState {
   active: boolean;
   target: FocusTarget | null;
   paramPanelOpen: boolean;
+  /** Layer-level param panel (opacity/blend/mute/solo) */
+  layerParamOpen: boolean;
+  layerParamIdx: number | null;
   optionsOpen: boolean;
   /** Non-null when waiting for delete confirmation */
   deleteTarget: FocusTarget | null;
@@ -20,6 +23,8 @@ interface GamepadFocusState {
   setTarget:          (t: FocusTarget | null) => void;
   openParamPanel:     () => void;
   closeParamPanel:    () => void;
+  openLayerParam:     (layerIdx: number) => void;
+  closeLayerParam:    () => void;
   openOptions:        () => void;
   closeOptions:       () => void;
   openDeleteConfirm:  (t: FocusTarget) => void;
@@ -32,14 +37,18 @@ export const useGamepadFocusStore = create<GamepadFocusState>((set) => ({
   active: false,
   target: null,
   paramPanelOpen: false,
+  layerParamOpen: false,
+  layerParamIdx: null,
   optionsOpen: false,
   deleteTarget: null,
   assetPickerLayer: null,
 
   setActive:          (v) => set({ active: v }),
   setTarget:          (t) => set({ target: t }),
-  openParamPanel:     () => set({ paramPanelOpen: true }),
+  openParamPanel:     () => set({ paramPanelOpen: true, layerParamOpen: false }),
   closeParamPanel:    () => set({ paramPanelOpen: false }),
+  openLayerParam:     (idx) => set({ layerParamOpen: true, layerParamIdx: idx, paramPanelOpen: false }),
+  closeLayerParam:    () => set({ layerParamOpen: false, layerParamIdx: null }),
   openOptions:        () => set({ optionsOpen: true }),
   closeOptions:       () => set({ optionsOpen: false }),
   openDeleteConfirm:  (t) => set({ deleteTarget: t }),
