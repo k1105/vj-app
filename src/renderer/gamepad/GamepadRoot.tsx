@@ -209,7 +209,8 @@ export function GamepadRoot() {
       vjs.triggerFlash(); return;
     }
     if (button === "r2") {
-      if (isButtonHeld("square")) { vjs.releaseStage?.(); return; }
+      // ステージ中なら release、それ以外は何もしない
+      if (vjs.stageMode) { vjs.releaseStage?.(); return; }
     }
   }, [applyTarget, upRepeat, downRepeat, leftRepeat, rightRepeat]);
 
