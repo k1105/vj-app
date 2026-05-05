@@ -267,7 +267,6 @@ function LayerRow(props: {
                   isInsertBefore ? "insert-before" : "",
                   isInsertAfter ? "insert-after" : "",
                 ].filter(Boolean).join(" ")}
-                data-gpid={`clip-${idx}-${clipIdx}`}
                 style={bgStyle}
                 draggable
                 onDragStart={(e) => {
@@ -305,16 +304,6 @@ function LayerRow(props: {
             );
           })
         )}
-        {/* Gamepad-only add slot — hidden by default, shown when .gamepad-active is on body */}
-        <div
-          className="gp-add-slot"
-          data-gpid={`add-${idx}`}
-          title="Add asset (gamepad)"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span>+</span>
-          <span className="gp-add-slot-label">ADD</span>
-        </div>
       </div>
       <div className="layer-controls">
         <select
