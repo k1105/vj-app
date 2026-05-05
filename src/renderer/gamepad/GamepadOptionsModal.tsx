@@ -17,7 +17,7 @@ const GLOBAL_ROWS: MappingRow[] = [
   { btns: [{ label: "△", cls: "ob-triangle" }], action: "パラメータパネルを開く" },
   { btns: [{ label: "✕", cls: "ob-cross" }],    action: "アセット削除（確認あり）" },
   { btns: [{ label: "□", cls: "ob-square" }],   action: "Stage toggle (ON/CANCEL)" },
-  { btns: [{ label: "□", cls: "ob-square" }, { label: "R1", cls: "ob-r1" }], action: "Stage release" },
+  { btns: [{ label: "□", cls: "ob-square" }, { label: "R2", cls: "ob-l2" }], action: "Stage release" },
   { btns: [{ label: "L1", cls: "ob-l1" }],      action: "TAP BPM" },
   { btns: [{ label: "R1", cls: "ob-r1" }],      action: "FLASH" },
   { btns: [{ label: "L1", cls: "ob-l1" }, { label: "R1", cls: "ob-r1" }], action: "BURST" },

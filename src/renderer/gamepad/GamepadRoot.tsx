@@ -205,9 +205,11 @@ export function GamepadRoot() {
       vjs.tap(); return;
     }
     if (button === "r1") {
-      if (isButtonHeld("square")) { vjs.releaseStage?.(); return; }
-      if (isButtonHeld("l1"))     { vjs.setBurst(true); return; }
+      if (isButtonHeld("l1")) { vjs.setBurst(true); return; }
       vjs.triggerFlash(); return;
+    }
+    if (button === "r2") {
+      if (isButtonHeld("square")) { vjs.releaseStage?.(); return; }
     }
   }, [applyTarget, upRepeat, downRepeat, leftRepeat, rightRepeat]);
 

@@ -351,7 +351,7 @@ function GpTransportBar() {
       {stageMode
         ? <>
             <button className="gpa-t-btn stage-release" onClick={releaseStage}>
-              <span className="gpa-t-badge gpa-sq">□+R1</span> RELEASE
+              <span className="gpa-t-badge gpa-sq">□+R2</span> RELEASE
             </button>
             <button className="gpa-t-btn stage-cancel" onClick={cancelStage}>
               <span className="gpa-t-badge gpa-sq">□</span> CANCEL
