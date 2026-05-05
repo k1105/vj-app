@@ -200,14 +200,13 @@ export function GamepadRoot() {
     if (button === "cross")   { handleCross();   return; }
     if (button === "square")  { handleSquare();  return; }
     if (button === "l1") {
-      if (isButtonHeld("r1")) { /* burst */ return; }
+      if (isButtonHeld("r1")) { vjs.setBurst(true); return; }
       vjs.tap(); return;
     }
     if (button === "r1") {
       if (isButtonHeld("square")) { vjs.releaseStage?.(); return; }
-      if (isButtonHeld("l1"))     { /* burst */ return; }
-      /* flash */
-      return;
+      if (isButtonHeld("l1"))     { vjs.setBurst(true); return; }
+      vjs.triggerFlash(); return;
     }
   }, [applyTarget, upRepeat, downRepeat, leftRepeat, rightRepeat]);
 
@@ -216,6 +215,8 @@ export function GamepadRoot() {
     if (button === "down")  downRepeat.stop();
     if (button === "left")  leftRepeat.stop();
     if (button === "right") rightRepeat.stop();
+    // Burst ends when either L1 or R1 is released
+    if (button === "l1" || button === "r1") useVJStore.getState().setBurst(false);
   }, [upRepeat, downRepeat, leftRepeat, rightRepeat]);
 
   // Param panel D-pad/R3 events (dispatched as custom DOM events so
