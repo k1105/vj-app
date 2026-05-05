@@ -65,6 +65,7 @@ export function GamepadRoot() {
   const gridRef  = useRef<FocusTarget[][]>([]);
   const rowRef   = useRef(0);
   const colRef   = useRef(0);
+  const r2Held   = useRef(false); // R2 押下を自前追跡
 
   // Keep grid in sync with layers
   useEffect(() => {
@@ -226,8 +227,7 @@ export function GamepadRoot() {
     if (button === "options") { fs.openOptions();  return; }
     if (button === "triangle") {
       const t = fs.target;
-      if (isButtonHeld("r2") && t && (t.kind === "clip" || t.kind === "add")) {
-        // R2+△ → レイヤーパラメータパネル
+      if (r2Held.current && t && (t.kind === "clip" || t.kind === "add")) {
         fs.openLayerParam(t.layerIdx);
         return;
       }
@@ -246,7 +246,7 @@ export function GamepadRoot() {
       vjs.triggerFlash(); return;
     }
     if (button === "r2") {
-      // ステージ中なら release、それ以外は何もしない
+      r2Held.current = true;
       if (vjs.stageMode) { vjs.releaseStage?.(); return; }
     }
   }, [applyTarget, upRepeat, downRepeat, leftRepeat, rightRepeat]);
@@ -256,8 +256,8 @@ export function GamepadRoot() {
     if (button === "down")  downRepeat.stop();
     if (button === "left")  leftRepeat.stop();
     if (button === "right") rightRepeat.stop();
-    // Burst ends when either L1 or R1 is released
     if (button === "l1" || button === "r1") useVJStore.getState().setBurst(false);
+    if (button === "r2") r2Held.current = false;
   }, [upRepeat, downRepeat, leftRepeat, rightRepeat]);
 
   // Param panel D-pad/R3 events (dispatched as custom DOM events so
