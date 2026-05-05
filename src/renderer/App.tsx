@@ -13,6 +13,8 @@ import { AudioMeters } from "./components/AudioMeters";
 import { TransportBar } from "./components/TransportBar";
 import { MidiMapPanel } from "./components/midiMap/MidiMapPanel";
 import { useMidiMapPanelStore } from "./state/midiMapPanelStore";
+import { GamepadRoot } from "./gamepad/GamepadRoot";
+import "../styles/gamepad.css";
 
 export function App() {
   const loadPlugins = useVJStore((s) => s.loadPlugins);
@@ -179,6 +181,7 @@ export function App() {
       <AudioMeters />
       <TransportBar />
       <MidiMapPanel />
+      <GamepadRoot />
       {showDeckModal && (
         <DeckSaveModal
           onSave={(title) => {

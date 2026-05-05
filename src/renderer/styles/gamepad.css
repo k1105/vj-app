@@ -1,0 +1,315 @@
+/* ═══════════════════════════════════════════════════════════
+   Gamepad mode — additive CSS only. Does not override app.css.
+   Activated by .gamepad-active on <body>.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Focus ring ─────────────────────────────────────────── */
+.gp-focus-ring {
+  position: fixed;
+  pointer-events: none;
+  z-index: 200;
+  border: 2px solid var(--info);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--info), 0 0 10px rgba(0, 229, 255, 0.25);
+  transition: top 0.08s ease, left 0.08s ease, width 0.08s ease, height 0.08s ease;
+}
+
+/* ─── Gamepad-only add slot (hidden unless .gamepad-active on body) ─── */
+.gp-add-slot {
+  display: none;
+  width: 64px;
+  height: 48px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 3px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.1s, color 0.1s, background 0.1s;
+}
+.gp-add-slot-label { font-size: 8px; color: inherit; letter-spacing: 0.06em; }
+.gamepad-active .gp-add-slot { display: flex; }
+
+/* ─── Slide-in param panel ───────────────────────────────── */
+.gp-param-panel {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 150;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-strong);
+  max-height: 65vh;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.2s ease;
+}
+.gp-param-panel.open { transform: translateY(0); }
+
+.gp-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.gp-panel-title    { font-size: 13px; font-weight: 700; color: var(--text-strong); }
+.gp-panel-subtitle { font-size: 10px; color: var(--text-dim); }
+.gp-panel-close {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; color: var(--text-dim);
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-ui);
+}
+
+/* Layer strip (opacity + blend) */
+.gp-layer-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  flex-shrink: 0;
+}
+.gp-strip-label { font-size: 8px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; width: 38px; flex-shrink: 0; }
+.gp-opacity-track { flex: 1; height: 4px; background: var(--bg-inset); border-radius: 2px; position: relative; overflow: hidden; }
+.gp-opacity-fill  { position: absolute; left: 0; top: 0; height: 100%; background: var(--info); border-radius: 2px; transition: width 0.1s; }
+.gp-opacity-val   { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--info); min-width: 24px; text-align: right; }
+.gp-sep { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; }
+.gp-blend-opt {
+  padding: 2px 7px; border-radius: 2px;
+  border: 1px solid var(--border-strong); background: var(--bg-card);
+  color: var(--text-dim); font-size: 8px; font-weight: 700;
+  cursor: pointer; text-transform: uppercase;
+  font-family: var(--font-ui);
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.gp-blend-opt.active { background: var(--info-dim); color: var(--info); border-color: var(--info); }
+
+/* Scrollable param list */
+.gp-param-scroll { overflow-y: auto; flex: 1; }
+
+/* Param rows — reuse .param-label, .param-toggle, .param-step-btn, .param-trigger-btn from app.css */
+.gp-param-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(27, 36, 48, 0.8);
+  cursor: pointer;
+  transition: background 0.07s;
+  border-left: 2px solid transparent;
+}
+.gp-param-row:last-child { border-bottom: none; }
+.gp-param-row:hover      { background: var(--bg-card-hover); }
+.gp-param-row.focused {
+  background: var(--bg-active);
+  border-left-color: var(--accent);
+}
+.gp-param-row.focused .param-label { color: var(--accent); }
+.gp-param-row.focused .gp-slider-fill { background: var(--accent); }
+.gp-param-row.focused .param-val      { color: var(--accent); }
+
+/* Slider */
+.gp-param-slider {
+  flex: 1;
+  display: flex; align-items: center; gap: 8px;
+}
+.gp-slider-track {
+  flex: 1; height: 3px;
+  background: var(--bg-inset); border-radius: 2px; overflow: hidden;
+}
+.gp-slider-fill {
+  height: 100%; border-radius: 2px;
+  background: var(--text-dim);
+  transition: width 0.06s;
+}
+
+/* Range */
+.gp-range-track {
+  flex: 1; height: 3px;
+  background: var(--bg-inset); border-radius: 2px;
+  position: relative; overflow: hidden;
+}
+.gp-range-fill {
+  position: absolute; top: 0; height: 100%;
+  background: var(--text-dim); border-radius: 2px;
+  transition: left 0.06s, width 0.06s;
+}
+.gp-param-row.focused .gp-range-fill { background: var(--accent); }
+.gp-range-vals {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--text-dim); white-space: nowrap;
+}
+.gp-param-row.focused .gp-range-vals { color: var(--accent); }
+
+/* Enum chips */
+.gp-enum-chips { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; }
+.gp-enum-chip {
+  padding: 2px 7px; border-radius: 2px;
+  border: 1px solid var(--border); background: var(--bg-inset);
+  color: var(--text-muted); font-size: 8px; font-weight: 700;
+  cursor: pointer; text-transform: uppercase; font-family: var(--font-ui);
+  transition: all 0.1s;
+}
+.gp-enum-chip.selected { background: var(--accent-dim); color: var(--accent); border-color: rgba(255,176,32,0.4); }
+
+/* Inline hint badge */
+.gp-hint-badge {
+  font-size: 7px; font-weight: 700; padding: 1px 5px;
+  border-radius: 8px; margin-left: auto; flex-shrink: 0; white-space: nowrap;
+}
+
+/* Controller guide strip */
+.gp-param-guide {
+  display: flex; gap: 14px; align-items: center;
+  padding: 7px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-inset);
+  flex-shrink: 0;
+}
+.gp-guide-item { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--text-dim); }
+
+/* ─── Shared button badges ───────────────────────────────── */
+.gp-btn-badge {
+  font-size: 8px; font-weight: 700; padding: 1px 6px;
+  border-radius: 10px; display: inline-block; line-height: 14px;
+}
+.gp-dpad    { background: rgba(255,255,255,0.08); color: var(--text); }
+.gp-stick   { background: rgba(255,176,32,0.18); color: var(--accent); }
+.gp-circle  { background: rgba(232,160,48,0.2);  color: #e8a030; }
+.gp-cross   { background: rgba(80,144,224,0.2);  color: #5090e0; }
+.gp-tri     { background: rgba(64,192,128,0.2);  color: #40c080; }
+.gp-square  { background: rgba(208,64,160,0.2);  color: #d040a0; }
+.gp-l1      { background: rgba(255,176,32,0.18); color: var(--accent); }
+.gp-r1      { background: rgba(0,255,156,0.14);  color: var(--live); }
+.gp-r3      { background: rgba(255,62,165,0.18); color: var(--magenta); }
+
+/* (reuse for hint badges) */
+.gp-hint-badge.gp-stick { background: rgba(255,176,32,0.14); color: var(--accent); }
+.gp-hint-badge.gp-dpad  { background: rgba(255,255,255,0.07); color: var(--text-dim); }
+.gp-hint-badge.gp-r3    { background: rgba(255,62,165,0.14); color: var(--magenta); }
+
+/* ─── Generic modal overlay ──────────────────────────────── */
+.gp-modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.72);
+  z-index: 250;
+  align-items: center;
+  justify-content: center;
+}
+.gp-modal-overlay.open { display: flex; }
+
+/* ─── Options modal ──────────────────────────────────────── */
+.gp-opts-card {
+  background: var(--bg-panel); border: 1px solid var(--border-strong);
+  border-radius: 6px; padding: 18px 22px; width: 540px;
+  max-height: 90vh; overflow-y: auto;
+}
+.gp-opts-title {
+  font-size: 12px; font-weight: 700; color: var(--text-strong);
+  letter-spacing: 0.08em; margin-bottom: 14px;
+}
+.gp-opts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.gp-opts-col { padding: 0 12px; }
+.gp-opts-col:first-child { border-right: 1px solid var(--border); padding-left: 0; }
+.gp-opts-col:last-child  { padding-right: 0; }
+.gp-opts-col-title {
+  font-size: 8px; font-weight: 700; letter-spacing: 0.14em;
+  color: var(--text-muted); text-transform: uppercase;
+  padding-bottom: 6px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.gp-opts-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(27,36,48,0.6);
+}
+.gp-opts-row:last-child { border-bottom: none; }
+.gp-opts-btns { display: flex; gap: 3px; flex-shrink: 0; }
+.gp-opts-btn {
+  font-size: 8px; font-weight: 700; padding: 2px 7px;
+  border-radius: 10px; white-space: nowrap; line-height: 14px;
+}
+.gp-opts-action { font-size: 10px; color: var(--text-dim); flex: 1; }
+.gp-opts-ctx    { font-size: 8px;  color: var(--text-muted); margin-left: auto; }
+.gp-opts-foot   { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 9px; color: var(--text-muted); text-align: center; }
+
+/* Options button color classes */
+.ob-circle   { background: rgba(232,160,48,0.2);  color: #e8a030; }
+.ob-cross    { background: rgba(80,144,224,0.2);  color: #5090e0; }
+.ob-triangle { background: rgba(64,192,128,0.2);  color: #40c080; }
+.ob-square   { background: rgba(208,64,160,0.2);  color: #d040a0; }
+.ob-l1       { background: rgba(255,176,32,0.18); color: var(--accent); }
+.ob-r1       { background: rgba(0,255,156,0.14);  color: var(--live); }
+.ob-l1r1     { background: rgba(255,46,91,0.15);  color: var(--danger); }
+.ob-l3       { background: rgba(255,176,32,0.12); color: var(--accent); }
+.ob-r3       { background: rgba(255,62,165,0.18); color: var(--magenta); }
+.ob-lstick   { background: rgba(255,176,32,0.14); color: var(--accent); }
+.ob-dpad     { background: rgba(255,255,255,0.08); color: var(--text); }
+.ob-options  { background: rgba(255,255,255,0.1);  color: var(--text); }
+
+/* ─── Asset picker panel ─────────────────────────────────── */
+.gp-picker-panel {
+  background: var(--bg-panel); border: 1px solid var(--border-strong);
+  border-radius: 6px; width: 600px; max-height: 80vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.gp-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 5px;
+  padding: 10px 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+.gp-picker-item {
+  border: 1px solid var(--border); border-radius: 3px;
+  background: var(--bg-card);
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; padding: 8px 6px;
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+}
+.gp-picker-item:hover, .gp-picker-item.focused {
+  border-color: var(--accent); background: var(--accent-dim);
+}
+.gp-picker-item.focused { box-shadow: 0 0 0 1px var(--accent); }
+.gp-picker-thumb {
+  width: 60px; height: 40px;
+  object-fit: cover; border-radius: 2px;
+  background: var(--bg-inset);
+}
+.gp-picker-thumb-placeholder {
+  width: 60px; height: 40px;
+  background: var(--bg-inset); border-radius: 2px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: var(--text-dim);
+}
+.gp-picker-name { font-size: 9px; color: var(--text); text-align: center; }
+
+/* ─── Delete confirm card ────────────────────────────────── */
+.gp-delete-card {
+  background: var(--bg-panel); border: 1px solid var(--border-strong);
+  border-radius: 5px; padding: 22px 26px; width: 290px;
+  display: flex; flex-direction: column; gap: 12px; align-items: center;
+}
+.gp-delete-icon  { font-size: 26px; }
+.gp-delete-title { font-size: 13px; font-weight: 700; color: var(--text-strong); }
+.gp-delete-body  { font-size: 11px; color: var(--text-dim); text-align: center; line-height: 1.5; }
+.gp-delete-actions { display: flex; gap: 8px; }
+.gp-delete-btn {
+  padding: 6px 16px; border-radius: 3px;
+  border: 1px solid var(--border-strong); background: var(--bg-card);
+  color: var(--text); cursor: pointer; font-size: 11px; font-weight: 600;
+  font-family: var(--font-ui); display: flex; align-items: center; gap: 4px;
+}
+.gp-delete-btn.danger { border-color: rgba(255,46,91,0.4); background: var(--danger-dim); color: var(--danger); }

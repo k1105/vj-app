@@ -35,6 +35,7 @@ export function PostFXSlotsRow() {
             <div
               key={i}
               className={`postfx-slot ${isSelected ? "selected" : ""} ${on ? "on" : ""} ${!s?.pluginId ? "empty" : ""}`}
+              data-gpid={`postfx-${i}`}
               onClick={() => selectSlot(i)}
             >
               <div className="postfx-slot-num">{i + 1}</div>
