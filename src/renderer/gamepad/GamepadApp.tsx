@@ -484,7 +484,36 @@ function GpDeleteConfirm() {
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
+function useVJSession() {
+  const loadPlugins    = useVJStore((s) => s.loadPlugins);
+  const broadcastState = useVJStore((s) => s.broadcastState);
+  const state          = useVJStore((s) => s.state);
+
+  // Scene restore + plugin load (same as App.tsx)
+  useEffect(() => {
+    let off: (() => void) | null = null;
+    (async () => {
+      try {
+        const saved = await window.vj.getSetting("scene");
+        if (saved) useVJStore.getState().restoreScene(saved);
+      } catch { /* ignore */ }
+      await loadPlugins();
+      off = window.vj.onPluginsChanged(() => loadPlugins());
+    })();
+    return () => { off?.(); };
+  }, [loadPlugins]);
+
+  // Push state to output on every change
+  useEffect(() => { broadcastState(); }, [state, broadcastState]);
+
+  // Re-broadcast when output window re-opens
+  useEffect(() => {
+    return window.vj.onRequestStateRebroadcast(() => broadcastState());
+  }, [broadcastState]);
+}
+
 export function GamepadApp() {
+  useVJSession();
   const stageMode = useVJStore((s) => s.stageMode);
 
   return (
