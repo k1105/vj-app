@@ -7,7 +7,7 @@ import {
   isGamepadConnected,
   type ButtonName,
 } from "./gamepadManager";
-import { GamepadFocusOverlay } from "./GamepadFocusOverlay";
+import { GamepadFocusOverlay, gpidFor } from "./GamepadFocusOverlay";
 import { GamepadParamPanel }   from "./GamepadParamPanel";
 import { GamepadOptionsModal } from "./GamepadOptionsModal";
 import { GamepadAssetPicker }  from "./GamepadAssetPicker";
@@ -99,6 +99,14 @@ export function GamepadRoot() {
     const c    = colRef.current;
     const t    = grid[r]?.[c] ?? null;
     useGamepadFocusStore.getState().setTarget(t);
+    // Scroll the focused element into view
+    const sel = gpidFor(t);
+    if (sel) {
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>(sel)
+          ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      });
+    }
   }, []);
 
   const moveUp    = useCallback(() => {

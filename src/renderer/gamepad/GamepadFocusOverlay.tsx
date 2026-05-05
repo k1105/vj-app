@@ -1,8 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useGamepadFocusStore, type FocusTarget } from "./gamepadFocusStore";
 
-/** Returns the data-gpid selector string for a given focus target. */
-function gpidFor(t: FocusTarget): string | null {
+export function gpidFor(t: FocusTarget): string | null {
   if (!t) return null;
   if (t.kind === "clip")   return `[data-gpid="clip-${t.layerIdx}-${t.clipIdx}"]`;
   if (t.kind === "add")    return `[data-gpid="add-${t.layerIdx}"]`;
@@ -12,18 +11,23 @@ function gpidFor(t: FocusTarget): string | null {
 
 /**
  * Renders a focus ring that tracks the currently focused gamepad target.
- * Positioned with `position:fixed` so it works regardless of scroll.
+ * Hidden automatically when any overlay/panel is open so it never floats
+ * on top of modals.
  */
 export function GamepadFocusOverlay() {
-  const target = useGamepadFocusStore((s) => s.target);
-  const active = useGamepadFocusStore((s) => s.active);
+  const target     = useGamepadFocusStore((s) => s.target);
+  const active     = useGamepadFocusStore((s) => s.active);
+  // Hide ring whenever any panel/modal is open
+  const anyOverlay = useGamepadFocusStore((s) =>
+    s.paramPanelOpen || s.optionsOpen || s.assetPickerLayer !== null || s.deleteTarget !== null
+  );
   const ringRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const ring = ringRef.current;
     if (!ring) return;
 
-    if (!active || !target) {
+    if (!active || !target || anyOverlay) {
       ring.style.display = "none";
       return;
     }
@@ -34,7 +38,11 @@ export function GamepadFocusOverlay() {
     function place() {
       const el = document.querySelector<HTMLElement>(sel!);
       if (!el || !ring) { ring!.style.display = "none"; return; }
+
+      // Hide if the element is clipped outside its scroll container
       const r = el.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) { ring!.style.display = "none"; return; }
+
       ring!.style.display = "block";
       ring!.style.top    = `${r.top    - 2}px`;
       ring!.style.left   = `${r.left   - 2}px`;
@@ -54,7 +62,7 @@ export function GamepadFocusOverlay() {
       window.removeEventListener("scroll", place, true);
       ro.disconnect();
     };
-  }, [target, active]);
+  }, [target, active, anyOverlay]);
 
   return (
     <div
