@@ -303,8 +303,8 @@ export function GamepadParamPanel({ onClose }: Props) {
           <div className="gp-param-guide">
             <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">←→</span> 選択</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-stick">R ↕</span> 値変更</span>
-            <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">↑↓</span> step/enum</span>
-            <span className="gp-guide-item"><span className="gp-btn-badge gp-r3">R3</span> toggle/fire</span>
+            <span className="gp-guide-item"><span className="gp-btn-badge gp-r3">R3</span> / <span className="gp-btn-badge gp-circle">○</span> toggle/fire</span>
+            <span className="gp-guide-item"><span className="gp-btn-badge gp-tri">△</span> 閉じる</span>
           </div>
         </>
       )}

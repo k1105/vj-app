@@ -213,23 +213,17 @@ export function GamepadRoot() {
     }
     if (fs.layerParamOpen) {
       if (button === "triangle") { fs.closeLayerParam(); return; }
-      if (button === "up")    { paramNavEvent("up");    return; }
-      if (button === "down")  { paramNavEvent("down");  return; }
-      if (button === "left")  { paramNavEvent("up");    return; }
-      if (button === "right") { paramNavEvent("down");  return; }
-      if (button === "r3")    { paramR3Event();          return; }
+      if (button === "left")     { paramNavEvent("up");   return; }
+      if (button === "right")    { paramNavEvent("down"); return; }
+      if (button === "r3" || button === "circle") { paramR3Event(); return; }
       return;
     }
     if (fs.paramPanelOpen) {
-      if (button === "triangle")  { fs.closeParamPanel(); return; }
-      if (button === "circle")    { handleCircle(); return; }
-      // D-pad and R3 handled by GamepadParamPanel via events below
-      // 横並びレイアウト: ←→ で列移動、↑↓ で step/enum 操作
+      if (button === "triangle") { fs.closeParamPanel(); return; }
+      // ←→ で列移動、↑↓ は回収しない
       if (button === "left")  { paramNavEvent("up");    return; }
       if (button === "right") { paramNavEvent("down");  return; }
-      if (button === "up")    { paramStepEvent("left"); return; }
-      if (button === "down")  { paramStepEvent("right");return; }
-      if (button === "r3")    { paramR3Event();          return; }
+      if (button === "r3" || button === "circle") { paramR3Event(); return; }
       return;
     }
 
@@ -282,7 +276,7 @@ export function GamepadRoot() {
   // Param panel D-pad/R3 events (dispatched as custom DOM events so
   // GamepadParamPanel can respond without prop drilling).
   const paramNavEvent  = (dir: "up"|"down") => window.dispatchEvent(new CustomEvent("gp:param-nav",  { detail: dir }));
-  const paramStepEvent = (dir: "left"|"right") => window.dispatchEvent(new CustomEvent("gp:param-step", { detail: dir }));
+
   const paramR3Event   = () => window.dispatchEvent(new CustomEvent("gp:param-r3"));
 
   const handleCircle = () => {
