@@ -213,16 +213,19 @@ export function GamepadRoot() {
     }
     if (fs.layerParamOpen) {
       if (button === "triangle") { fs.closeLayerParam(); return; }
-      if (button === "left")     { paramNavEvent("up");   return; }
-      if (button === "right")    { paramNavEvent("down"); return; }
+      if (button === "left")     { paramNavEvent("up");    return; }
+      if (button === "right")    { paramNavEvent("down");  return; }
+      if (button === "up")       { paramAdjustEvent("inc"); return; }
+      if (button === "down")     { paramAdjustEvent("dec"); return; }
       if (button === "r3" || button === "circle") { paramR3Event(); return; }
       return;
     }
     if (fs.paramPanelOpen) {
       if (button === "triangle") { fs.closeParamPanel(); return; }
-      // ←→ で列移動、↑↓ は回収しない
-      if (button === "left")  { paramNavEvent("up");    return; }
-      if (button === "right") { paramNavEvent("down");  return; }
+      if (button === "left")     { paramNavEvent("up");    return; }
+      if (button === "right")    { paramNavEvent("down");  return; }
+      if (button === "up")       { paramAdjustEvent("inc"); return; }
+      if (button === "down")     { paramAdjustEvent("dec"); return; }
       if (button === "r3" || button === "circle") { paramR3Event(); return; }
       return;
     }
@@ -275,7 +278,8 @@ export function GamepadRoot() {
 
   // Param panel D-pad/R3 events (dispatched as custom DOM events so
   // GamepadParamPanel can respond without prop drilling).
-  const paramNavEvent  = (dir: "up"|"down") => window.dispatchEvent(new CustomEvent("gp:param-nav",  { detail: dir }));
+  const paramNavEvent    = (dir: "up"|"down")     => window.dispatchEvent(new CustomEvent("gp:param-nav",    { detail: dir }));
+  const paramAdjustEvent = (dir: "inc"|"dec")    => window.dispatchEvent(new CustomEvent("gp:param-adjust", { detail: dir }));
 
   const paramR3Event   = () => window.dispatchEvent(new CustomEvent("gp:param-r3"));
 

@@ -231,13 +231,50 @@ export function GamepadParamPanel({ onClose }: Props) {
       if (def.type === "bool")    d2.setValue(def.key, !entry.value);
       if (def.type === "trigger") d2.setValue(def.key, Date.now());
     };
-    window.addEventListener("gp:param-nav",  onNav);
-    window.addEventListener("gp:param-step", onStep);
-    window.addEventListener("gp:param-r3",   onR3);
+    const onAdjust = (e: Event) => {
+      const dir = (e as CustomEvent<"inc" | "dec">).detail;
+      const d2 = dataRef.current;
+      if (!d2) return;
+      const entry = d2.entries[rowRef.current];
+      if (!entry) return;
+      const delta = dir === "inc" ? 1 : -1;
+      if (entry.type === "range") {
+        // range: shift both handles
+        const min = entry.startDef.min ?? 0;
+        const max = entry.endDef.max ?? entry.startDef.max ?? 1;
+        const step = entry.startDef.step ?? ((max - min) / 20);
+        d2.setValue(entry.startDef.key, clamp(entry.startVal + step * delta, min, entry.endVal));
+        d2.setValue(entry.endDef.key,   clamp(entry.endVal   + step * delta, entry.startVal, max));
+        return;
+      }
+      const { def, value } = entry;
+      if (def.type === "bool") { d2.setValue(def.key, !value); return; }
+      if (def.type === "trigger") { d2.setValue(def.key, Date.now()); return; }
+      if (def.type === "enum" && def.options) {
+        const cur = def.options.indexOf(String(value));
+        d2.setValue(def.key, def.options[(cur + delta + def.options.length) % def.options.length]);
+        return;
+      }
+      if (isStepParam(def)) {
+        const cur = typeof value === "number" ? value : Number(value);
+        d2.setValue(def.key, clamp(cur + def.step! * delta, def.min ?? 0, def.max ?? 1));
+        return;
+      }
+      // float / int
+      const cur = typeof value === "number" ? value : Number(value);
+      const step = def.step ?? ((def.max ?? 1) - (def.min ?? 0)) / 20;
+      const next = clamp(cur + step * delta, def.min ?? 0, def.max ?? 1);
+      d2.setValue(def.key, def.type === "int" ? Math.round(next) : next);
+    };
+    window.addEventListener("gp:param-nav",    onNav);
+    window.addEventListener("gp:param-adjust", onAdjust);
+    window.addEventListener("gp:param-step",   onStep);
+    window.addEventListener("gp:param-r3",     onR3);
     return () => {
-      window.removeEventListener("gp:param-nav",  onNav);
-      window.removeEventListener("gp:param-step", onStep);
-      window.removeEventListener("gp:param-r3",   onR3);
+      window.removeEventListener("gp:param-nav",    onNav);
+      window.removeEventListener("gp:param-adjust", onAdjust);
+      window.removeEventListener("gp:param-step",   onStep);
+      window.removeEventListener("gp:param-r3",     onR3);
     };
   }, []);
 
@@ -302,9 +339,9 @@ export function GamepadParamPanel({ onClose }: Props) {
 
           <div className="gp-param-guide">
             <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">←→</span> 選択</span>
-            <span className="gp-guide-item"><span className="gp-btn-badge gp-stick">R ↕</span> 値変更</span>
+            <span className="gp-guide-item"><span className="gp-btn-badge gp-stick">R ↕</span> 連続変更</span>
+            <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">↑↓</span> ステップ変更</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-r3">R3</span> / <span className="gp-btn-badge gp-circle">○</span> toggle/fire</span>
-            <span className="gp-guide-item"><span className="gp-btn-badge gp-tri">△</span> 閉じる</span>
           </div>
         </>
       )}
