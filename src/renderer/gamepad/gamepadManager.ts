@@ -34,6 +34,14 @@ export function readLStickY(): number {
   return Math.abs(v) > DEADZONE ? v : 0;
 }
 
+/** Right stick Y axis, dead-zone applied. Negative = up, positive = down. */
+export function readRStickY(): number {
+  const gp = firstPad();
+  if (!gp) return 0;
+  const v = gp.axes[3] ?? 0;
+  return Math.abs(v) > DEADZONE ? v : 0;
+}
+
 export function isButtonHeld(button: ButtonName): boolean {
   const gp = firstPad();
   return gp?.buttons[PS4_BUTTONS[button]]?.pressed ?? false;

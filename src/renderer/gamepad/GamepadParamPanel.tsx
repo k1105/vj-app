@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import { useGamepadFocusStore } from "./gamepadFocusStore";
-import { readLStickY } from "./gamepadManager";
+import { readRStickY } from "./gamepadManager";
 import type { ParamDef } from "../../shared/types";
 
 const PARAM_SPEED = 0.012; // value delta per frame at full stick deflection
@@ -122,7 +122,7 @@ export function GamepadParamPanel({ onClose }: Props) {
     let raf: number;
     const tick = () => {
       raf = requestAnimationFrame(tick);
-      const ly = readLStickY();
+      const ly = readRStickY();
       if (Math.abs(ly) < 0.01) return;
       const d = dataRef.current;
       if (!d) return;
@@ -264,7 +264,7 @@ export function GamepadParamPanel({ onClose }: Props) {
 
           <div className="gp-param-guide">
             <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">←→</span> 選択</span>
-            <span className="gp-guide-item"><span className="gp-btn-badge gp-stick">L ↕</span> 値変更</span>
+            <span className="gp-guide-item"><span className="gp-btn-badge gp-stick">R ↕</span> 値変更</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">↑↓</span> step/enum</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-r3">R3</span> toggle/fire</span>
           </div>
@@ -308,7 +308,7 @@ function ParamCol({
           </div>
         </div>
         <span className="gp-col-val">{entry.startVal.toFixed(1)}–{entry.endVal.toFixed(1)}</span>
-        <span className="gp-col-hint gp-stick">L↕</span>
+        <span className="gp-col-hint gp-stick">R↕</span>
       </div>
     );
   }
@@ -406,7 +406,7 @@ function ParamCol({
         <div className="gp-vslider-fill" style={{ height: `${clamp(pct, 0, 100)}%` }} />
       </div>
       <span className="gp-col-val">{displayVal}</span>
-      <span className="gp-col-hint gp-stick">L↕</span>
+      <span className="gp-col-hint gp-stick">R↕</span>
     </div>
   );
 }

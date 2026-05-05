@@ -26,7 +26,7 @@ const GLOBAL_ROWS: MappingRow[] = [
 
 const PANEL_ROWS: MappingRow[] = [
   { btns: [{ label: "↑↓", cls: "ob-dpad" }],      action: "パラメータ行を選択" },
-  { btns: [{ label: "L Stick ↕", cls: "ob-lstick" }], action: "float / int 値を変更", context: "連続値" },
+  { btns: [{ label: "R Stick ↕", cls: "ob-r3" }], action: "float / int 値を変更", context: "連続値" },
   { btns: [{ label: "←→", cls: "ob-dpad" }],      action: "step / enum を切替", context: "離散値" },
   { btns: [{ label: "R3", cls: "ob-r3" }],         action: "bool toggle / trigger 発火" },
   { btns: [{ label: "○", cls: "ob-circle" }],      action: "アセット on/off（パネル内でも）" },
