@@ -64,7 +64,6 @@ function GpTopBar() {
 
 function GpPreviewRow() {
   const stageMode = useVJStore((s) => s.stageMode);
-  const audio     = useVJStore((s) => s.state.audio);
   const [liveSrc, setLiveSrc] = useState("");
 
   useEffect(() => {
@@ -101,24 +100,6 @@ function GpPreviewRow() {
             : <span className="gpa-preview-placeholder">□ で stage</span>
           }
         </div>
-      </div>
-
-      {/* Audio meters */}
-      <div className="gpa-audio-meters">
-        <div className="gpa-audio-title">AUDIO</div>
-        {([
-          ["VOL",  audio.volume, "var(--live)"],
-          ["BASS", audio.bass,   "#00d4ff"],
-          ["MID",  audio.mid,    "#40c080"],
-          ["HIGH", audio.high,   "var(--magenta)"],
-        ] as [string, number, string][]).map(([label, val, color]) => (
-          <div key={label} className="gpa-audio-row">
-            <span className="gpa-audio-lbl">{label}</span>
-            <div className="gpa-audio-track">
-              <div className="gpa-audio-fill" style={{ width: `${Math.round(val * 100)}%`, background: color }} />
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
