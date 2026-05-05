@@ -156,6 +156,7 @@ export function GamepadParamPanel({ onClose }: Props) {
   // Listen for gamepad events dispatched by GamepadRoot via window custom events
   useEffect(() => {
     const onNav = (e: Event) => {
+      // 横並びなので ←→ で列移動
       const dir = (e as CustomEvent<"up" | "down">).detail;
       setFocusedRow(r => {
         const d2 = dataRef.current;
@@ -165,6 +166,7 @@ export function GamepadParamPanel({ onClose }: Props) {
       });
     };
     const onStep = (e: Event) => {
+      // ↑↓ で step/enum、←→ で float 微調整
       const dir = (e as CustomEvent<"left" | "right">).detail;
       const d2 = dataRef.current;
       if (!d2) return;
@@ -236,9 +238,9 @@ export function GamepadParamPanel({ onClose }: Props) {
             </div>
           )}
 
-          <div className="gp-param-scroll">
+          <div className="gp-param-cols">
             {data.entries.map((entry, i) => (
-              <ParamRow
+              <ParamCol
                 key={i}
                 entry={entry}
                 focused={i === focusedRow}
@@ -261,9 +263,9 @@ export function GamepadParamPanel({ onClose }: Props) {
           </div>
 
           <div className="gp-param-guide">
-            <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">↑↓</span> 行選択</span>
+            <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">←→</span> 選択</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-stick">L ↕</span> 値変更</span>
-            <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">←→</span> step/enum</span>
+            <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">↑↓</span> step/enum</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-r3">R3</span> toggle/fire</span>
           </div>
         </>
@@ -272,9 +274,9 @@ export function GamepadParamPanel({ onClose }: Props) {
   );
 }
 
-// ─── Param row ──────────────────────────────────────────────────────────────
+// ─── Param column (縦スライダー＋横並び) ────────────────────────────────────
 
-function ParamRow({
+function ParamCol({
   entry, focused, onClick, onToggle, onTrigger, onEnumSelect,
 }: {
   entry: ParamEntry;
@@ -284,111 +286,127 @@ function ParamRow({
   onTrigger: () => void;
   onEnumSelect: (val: string) => void;
 }) {
-  const cls = `gp-param-row${focused ? " focused" : ""}`;
+  const cls = `gp-param-col${focused ? " focused" : ""}`;
 
+  // range: 縦2本スライダー (start / end)
   if (entry.type === "range") {
     const min   = entry.startDef.min ?? 0;
     const max   = entry.endDef.max ?? entry.startDef.max ?? 1;
-    const range = max - min;
-    const lPct  = range > 0 ? ((entry.startVal - min) / range) * 100 : 0;
-    const wPct  = range > 0 ? ((entry.endVal - entry.startVal) / range) * 100 : 0;
+    const range = max - min || 1;
+    const sPct  = ((entry.startVal - min) / range) * 100;
+    const ePct  = ((entry.endVal   - min) / range) * 100;
     const label = entry.startDef.key.slice(0, -5) || "range";
     return (
       <div className={cls} onClick={onClick}>
-        <span className="param-label">{label}</span>
-        <div className="gp-range-track">
-          <div className="gp-range-fill" style={{ left: `${lPct}%`, width: `${wPct}%` }} />
+        <span className="gp-col-label">{label}</span>
+        <div className="gp-vslider-pair">
+          <div className="gp-vslider-track">
+            <div className="gp-vslider-fill" style={{ height: `${clamp(sPct, 0, 100)}%` }} />
+          </div>
+          <div className="gp-vslider-track">
+            <div className="gp-vslider-fill" style={{ height: `${clamp(ePct, 0, 100)}%` }} />
+          </div>
         </div>
-        <span className="gp-range-vals">
-          {entry.startVal.toFixed(2)} – {entry.endVal.toFixed(2)}
-        </span>
-        <span className="gp-hint-badge gp-stick">L ↕</span>
+        <span className="gp-col-val">{entry.startVal.toFixed(1)}–{entry.endVal.toFixed(1)}</span>
+        <span className="gp-col-hint gp-stick">L↕</span>
       </div>
     );
   }
 
   const { def, value } = entry;
 
+  // bool: ON/OFF トグル列
   if (def.type === "bool") {
     const on = value === true || value === 1;
     return (
       <div className={cls} onClick={onClick}>
-        <span className="param-label">{def.key}</span>
-        <button className={`param-toggle${on ? " on" : ""}`} onClick={e => { e.stopPropagation(); onToggle(); }}>
-          {on ? "ON" : "OFF"}
-        </button>
-        <span className="gp-hint-badge gp-r3">R3</span>
+        <span className="gp-col-label">{def.key}</span>
+        <div className="gp-col-center">
+          <button
+            className={`gp-col-toggle${on ? " on" : ""}`}
+            onClick={e => { e.stopPropagation(); onToggle(); }}
+          >
+            {on ? "ON" : "OFF"}
+          </button>
+        </div>
+        <span className="gp-col-hint gp-r3">R3</span>
       </div>
     );
   }
 
+  // trigger: FIRE ボタン列
   if (def.type === "trigger") {
     return (
       <div className={cls} onClick={onClick}>
-        <span className="param-label">{def.key}</span>
-        <button className="param-trigger-btn" onClick={e => { e.stopPropagation(); onTrigger(); }}>
-          FIRE
-        </button>
-        <span className="gp-hint-badge gp-r3">R3</span>
+        <span className="gp-col-label">{def.key}</span>
+        <div className="gp-col-center">
+          <button
+            className="gp-col-fire"
+            onClick={e => { e.stopPropagation(); onTrigger(); }}
+          >
+            FIRE
+          </button>
+        </div>
+        <span className="gp-col-hint gp-r3">R3</span>
       </div>
     );
   }
 
+  // enum: チップ列
   if (def.type === "enum" && def.options) {
     return (
-      <div className={cls} onClick={onClick}>
-        <span className="param-label">{def.key}</span>
-        <div className="gp-enum-chips">
+      <div className={`${cls} gp-param-col-wide`} onClick={onClick}>
+        <span className="gp-col-label">{def.key}</span>
+        <div className="gp-col-enum-list">
           {def.options.map(o => (
             <button
               key={o}
-              className={`gp-enum-chip${o === String(value) ? " selected" : ""}`}
+              className={`gp-col-enum-chip${o === String(value) ? " selected" : ""}`}
               onClick={e => { e.stopPropagation(); onEnumSelect(o); }}
             >
               {o}
             </button>
           ))}
         </div>
-        <span className="gp-hint-badge gp-dpad">←→</span>
+        <span className="gp-col-hint gp-dpad">↑↓</span>
       </div>
     );
   }
 
+  // step: ◀ val ▶
   if (isStepParam(def)) {
     const num = typeof value === "number" ? value : Number(value);
     const displayAngle = ((num % 360) + 360) % 360;
     return (
       <div className={cls} onClick={onClick}>
-        <span className="param-label">{def.key}</span>
-        <div className="param-step-group">
-          <button className="param-step-btn" onClick={e => { e.stopPropagation(); }}>◀</button>
-          <span className="param-step-val">{Math.round(displayAngle)}</span>
-          <button className="param-step-btn" onClick={e => { e.stopPropagation(); }}>▶</button>
+        <span className="gp-col-label">{def.key}</span>
+        <div className="gp-col-center">
+          <div className="gp-col-step">
+            <button className="gp-col-step-btn">▲</button>
+            <span className="gp-col-step-val">{Math.round(displayAngle)}</span>
+            <button className="gp-col-step-btn">▼</button>
+          </div>
         </div>
-        <span className="gp-hint-badge gp-dpad">←→</span>
+        <span className="gp-col-hint gp-dpad">↑↓</span>
       </div>
     );
   }
 
-  // float / int
+  // float / int: 縦スライダー
   const num = typeof value === "number" ? value : Number(value);
   const min = def.min ?? 0;
   const max = def.max ?? 1;
   const pct = max > min ? ((num - min) / (max - min)) * 100 : 0;
-  const displayVal = def.type === "int"
-    ? String(Math.round(num))
-    : num.toFixed(2);
+  const displayVal = def.type === "int" ? String(Math.round(num)) : num.toFixed(2);
 
   return (
     <div className={cls} onClick={onClick}>
-      <span className="param-label">{def.key}</span>
-      <div className="gp-param-slider">
-        <div className="gp-slider-track">
-          <div className="gp-slider-fill" style={{ width: `${clamp(pct, 0, 100)}%` }} />
-        </div>
-        <span className="param-val">{displayVal}</span>
+      <span className="gp-col-label">{def.key}</span>
+      <div className="gp-vslider-track">
+        <div className="gp-vslider-fill" style={{ height: `${clamp(pct, 0, 100)}%` }} />
       </div>
-      <span className="gp-hint-badge gp-stick">L ↕</span>
+      <span className="gp-col-val">{displayVal}</span>
+      <span className="gp-col-hint gp-stick">L↕</span>
     </div>
   );
 }

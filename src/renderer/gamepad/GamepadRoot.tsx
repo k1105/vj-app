@@ -176,10 +176,11 @@ export function GamepadRoot() {
       if (button === "triangle")  { fs.closeParamPanel(); return; }
       if (button === "circle")    { handleCircle(); return; }
       // D-pad and R3 handled by GamepadParamPanel via events below
-      if (button === "up")    { paramNavEvent("up");    return; }
-      if (button === "down")  { paramNavEvent("down");  return; }
-      if (button === "left")  { paramStepEvent("left"); return; }
-      if (button === "right") { paramStepEvent("right");return; }
+      // 横並びレイアウト: ←→ で列移動、↑↓ で step/enum 操作
+      if (button === "left")  { paramNavEvent("up");    return; }
+      if (button === "right") { paramNavEvent("down");  return; }
+      if (button === "up")    { paramStepEvent("left"); return; }
+      if (button === "down")  { paramStepEvent("right");return; }
       if (button === "r3")    { paramR3Event();          return; }
       return;
     }
