@@ -501,7 +501,7 @@ export function GamepadApp() {
     <div className={`gpa-root${stageMode ? " stage-active" : ""}`}>
       {stageMode && (
         <div className="gpa-stage-banner">
-          STAGE — Output frozen. □+R1 でコミット、□ でキャンセル
+          STAGE — Output frozen. R2 でコミット、□ でキャンセル
         </div>
       )}
 
