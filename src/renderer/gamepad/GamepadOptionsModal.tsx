@@ -2,7 +2,7 @@ import { useGamepadFocusStore } from "./gamepadFocusStore";
 
 type BtnClass =
   | "ob-circle" | "ob-cross" | "ob-triangle" | "ob-square"
-  | "ob-l1" | "ob-r1" | "ob-l1r1"
+  | "ob-l1" | "ob-r1" | "ob-l2" | "ob-r2" | "ob-l1r1"
   | "ob-l3" | "ob-r3" | "ob-lstick" | "ob-dpad" | "ob-options";
 
 interface MappingRow {
@@ -17,7 +17,7 @@ const GLOBAL_ROWS: MappingRow[] = [
   { btns: [{ label: "△", cls: "ob-triangle" }], action: "パラメータパネルを開く" },
   { btns: [{ label: "✕", cls: "ob-cross" }],    action: "アセット削除（確認あり）" },
   { btns: [{ label: "□", cls: "ob-square" }],   action: "Stage toggle (ON/CANCEL)" },
-  { btns: [{ label: "□", cls: "ob-square" }, { label: "R2", cls: "ob-l2" }], action: "Stage release" },
+  { btns: [{ label: "□", cls: "ob-square" }, { label: "R2", cls: "ob-r2" }], action: "Stage release" },
   { btns: [{ label: "L1", cls: "ob-l1" }],      action: "TAP BPM" },
   { btns: [{ label: "R1", cls: "ob-r1" }],      action: "FLASH" },
   { btns: [{ label: "L1", cls: "ob-l1" }, { label: "R1", cls: "ob-r1" }], action: "BURST" },
