@@ -585,7 +585,7 @@ function ParamCol({
             {on ? "ON" : "OFF"}
           </button>
         </div>
-        <span className="gp-col-hint gp-r3">R3</span>
+        <span className="gp-col-hint gp-circle">○</span>
       </div>
     );
   }
@@ -603,7 +603,7 @@ function ParamCol({
             FIRE
           </button>
         </div>
-        <span className="gp-col-hint gp-r3">R3</span>
+        <span className="gp-col-hint gp-circle">○</span>
       </div>
     );
   }
