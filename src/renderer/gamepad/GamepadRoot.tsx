@@ -225,6 +225,11 @@ export function GamepadRoot() {
     // ── Global navigation ──
     if (button === "up")    { upRepeat.start();    return; }
     if (button === "down")  { downRepeat.start();  return; }
+    // R2 + ←/→ : 各レイヤーの LIVE（active）クリップに順送りジャンプ
+    if ((button === "left" || button === "right") && r2Held.current) {
+      jumpToLiveClip(button === "right" ? 1 : -1);
+      return;
+    }
     if (button === "left")  { leftRepeat.start();  return; }
     if (button === "right") { rightRepeat.start(); return; }
 
@@ -276,6 +281,35 @@ export function GamepadRoot() {
   const paramToggleEvent = ()                    => window.dispatchEvent(new CustomEvent("gp:param-toggle"));
 
   const paramR3Event   = () => window.dispatchEvent(new CustomEvent("gp:param-r3"));
+
+  /**
+   * R2 + ←/→ でアクティブな（LIVE中の）クリップを次々ジャンプする。
+   * activeClipIdx >= 0 のレイヤーをリスト化して、現在位置から ±1 でループ。
+   */
+  const jumpToLiveClip = (dir: 1 | -1) => {
+    const state = useVJStore.getState().state;
+    const liveTargets: { layerIdx: number; clipIdx: number }[] = [];
+    state.layers.forEach((layer, li) => {
+      if (layer.activeClipIdx >= 0) liveTargets.push({ layerIdx: li, clipIdx: layer.activeClipIdx });
+    });
+    if (liveTargets.length === 0) {
+      window.dispatchEvent(new CustomEvent("gp:flash-status",
+        { detail: { msg: "LIVE中のアセットがありません", level: "warn" } }));
+      return;
+    }
+    // 現在のフォーカス位置に最も近い LIVE ターゲットの index を起点にする
+    const fs = useGamepadFocusStore.getState();
+    const t = fs.target;
+    const curLayerIdx = t && (t.kind === "clip" || t.kind === "add") ? t.layerIdx : -1;
+    let curIdx = liveTargets.findIndex(x => x.layerIdx === curLayerIdx);
+    if (curIdx < 0) curIdx = 0;
+    const nextIdx = (curIdx + dir + liveTargets.length) % liveTargets.length;
+    const next = liveTargets[nextIdx];
+    // grid 上の row/col に変換（PostFX が row 0、レイヤーは row 1+）
+    rowRef.current = 1 + next.layerIdx;
+    colRef.current = next.clipIdx;
+    applyTarget();
+  };
 
   const handleCircle = () => {
     const t   = useGamepadFocusStore.getState().target;
