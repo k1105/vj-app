@@ -20,7 +20,8 @@ const GLOBAL_ROWS: MappingRow[] = [
   { btns: [{ label: "□", cls: "ob-square" }],   action: "Stage toggle (ON/CANCEL)" },
   { btns: [{ label: "R2", cls: "ob-r2" }], action: "Stage release（ステージ中のみ）" },
   { btns: [{ label: "L1", cls: "ob-l1" }],      action: "TAP BPM" },
-  { btns: [{ label: "R1", cls: "ob-r1" }],      action: "FLASH" },
+  { btns: [{ label: "R1", cls: "ob-r1" }],      action: "FLASH（視覚的フラッシュ）" },
+  { btns: [{ label: "L3", cls: "ob-l3" }, { label: "/", cls: "ob-dpad" }, { label: "R3", cls: "ob-r3" }], action: "FLASH（スティック押し込み）" },
   { btns: [{ label: "L1", cls: "ob-l1" }, { label: "R1", cls: "ob-r1" }], action: "BURST" },
   { btns: [{ label: "OPTIONS", cls: "ob-options" }], action: "このマッピング表示" },
 ];

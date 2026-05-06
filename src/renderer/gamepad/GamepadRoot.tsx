@@ -251,6 +251,10 @@ export function GamepadRoot() {
       if (isButtonHeld("l1")) { vjs.setBurst(true); return; }
       vjs.triggerFlash(); return;
     }
+    // L3 / R3（スティック押し込み）→ FLASH
+    if (button === "l3" || button === "r3") {
+      vjs.triggerFlash(); return;
+    }
     if (button === "r2") {
       r2Held.current = true;
       if (vjs.stageMode) { vjs.releaseStage?.(); return; }
