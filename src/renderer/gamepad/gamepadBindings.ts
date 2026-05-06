@@ -60,6 +60,53 @@ function focusedLayerIdx(): number | null {
   return t.layerIdx;
 }
 
+/** 同一ターゲットかどうかの比較 */
+function sameTarget(a: FocusTarget, b: FocusTarget | null): boolean {
+  if (!b || a.kind !== b.kind) return false;
+  if (a.kind === "postfx" && b.kind === "postfx") return a.slotIdx === b.slotIdx;
+  if (a.kind === "clip"   && b.kind === "clip")   return a.layerIdx === b.layerIdx && a.clipIdx === b.clipIdx;
+  return false;
+}
+
+/**
+ * パラメータ調整パネルが開ける対象（= 各レイヤーの LIVE クリップ + プラグインが入った PostFX スロット）。
+ * 視覚順: PostFX 上段 → レイヤー上から順。
+ */
+function listParamTargets(): FocusTarget[] {
+  const state = useVJStore.getState().state;
+  const out: FocusTarget[] = [];
+  state.postfx.forEach((slot, i) => {
+    if (slot?.pluginId) out.push({ kind: "postfx", slotIdx: i });
+  });
+  state.layers.forEach((layer, li) => {
+    if (layer.activeClipIdx >= 0 && layer.clips[layer.activeClipIdx]) {
+      out.push({ kind: "clip", layerIdx: li, clipIdx: layer.activeClipIdx });
+    }
+  });
+  return out;
+}
+
+/** R2 + ←/→ (paramPanel 中): 他の調整可能ターゲットへ循環ジャンプ。 */
+function cycleParamTarget(dir: 1 | -1, { rowRef, colRef, applyTarget }: ActionCtx) {
+  const targets = listParamTargets();
+  if (targets.length <= 1) {
+    flashStatus(targets.length === 0 ? "調整可能なターゲットがありません" : "ターゲットは 1 つだけです", "warn");
+    return;
+  }
+  const cur = useGamepadFocusStore.getState().target;
+  let curIdx = targets.findIndex(t => sameTarget(t, cur));
+  if (curIdx < 0) curIdx = 0;
+  const next = targets[(curIdx + dir + targets.length) % targets.length];
+  if (next.kind === "postfx") {
+    rowRef.current = 0;
+    colRef.current = next.slotIdx;
+  } else if (next.kind === "clip") {
+    rowRef.current = 1 + next.layerIdx;
+    colRef.current = next.clipIdx;
+  }
+  applyTarget();
+}
+
 /**
  * R2 + ←/→: 同一レイヤー内のアンカー (先頭 / LIVE / 末尾) を方向付き循環。
  * - 先頭   = clip 0
@@ -125,6 +172,9 @@ export const ACTIONS = {
   // R2 + ←/→: 同一レイヤー内で 先頭 / LIVE / 末尾 を循環
   "nav.cycleAnchorPrev": (ctx: ActionCtx) => cycleLayerAnchor(-1, ctx),
   "nav.cycleAnchorNext": (ctx: ActionCtx) => cycleLayerAnchor(1, ctx),
+  // paramPanel 中の R2 + ←/→: 他のアクティブターゲットへ循環
+  "nav.paramTargetPrev": (ctx: ActionCtx) => cycleParamTarget(-1, ctx),
+  "nav.paramTargetNext": (ctx: ActionCtx) => cycleParamTarget(1, ctx),
 
   // Clip / postfx slot
   "clip.activate": () => {
@@ -274,6 +324,8 @@ export const BINDINGS: Record<ContextId, Partial<Record<Combo, ActionId>>> = {
     "down":        "param.dec",
     "r3":          "param.r3",
     "circle":      "param.toggle",
+    "r2+left":     "nav.paramTargetPrev",
+    "r2+right":    "nav.paramTargetNext",
   },
   layerParam: {
     "triangle":    "panel.closeLayerParam",
