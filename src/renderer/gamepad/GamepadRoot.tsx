@@ -223,13 +223,18 @@ export function GamepadRoot() {
     }
 
     // ── Global navigation ──
-    if (button === "up")    { upRepeat.start();    return; }
-    if (button === "down")  { downRepeat.start();  return; }
-    // R2 + ←/→ : 各レイヤーの LIVE（active）クリップに順送りジャンプ
-    if ((button === "left" || button === "right") && r2Held.current) {
-      jumpToLiveClip(button === "right" ? 1 : -1);
+    // R2 + ↑/↓ : 各レイヤーの LIVE クリップに順送りジャンプ
+    if ((button === "up" || button === "down") && r2Held.current) {
+      jumpToLiveClip(button === "down" ? 1 : -1);
       return;
     }
+    // R2 + ←/→ : 現在フォーカス中のレイヤーの LIVE クリップにスナップ
+    if ((button === "left" || button === "right") && r2Held.current) {
+      jumpToLiveOfCurrentLayer();
+      return;
+    }
+    if (button === "up")    { upRepeat.start();    return; }
+    if (button === "down")  { downRepeat.start();  return; }
     if (button === "left")  { leftRepeat.start();  return; }
     if (button === "right") { rightRepeat.start(); return; }
 
@@ -283,8 +288,24 @@ export function GamepadRoot() {
   const paramR3Event   = () => window.dispatchEvent(new CustomEvent("gp:param-r3"));
 
   /**
-   * R2 + ←/→ でアクティブな（LIVE中の）クリップを次々ジャンプする。
-   * activeClipIdx >= 0 のレイヤーをリスト化して、現在位置から ±1 でループ。
+   * R2 + ←/→: 今フォーカス中のレイヤー内で LIVE クリップにスナップ。
+   * 既に LIVE クリップ上ならノーオペ。
+   */
+  const jumpToLiveOfCurrentLayer = () => {
+    const fs = useGamepadFocusStore.getState();
+    const t = fs.target;
+    if (!t || (t.kind !== "clip" && t.kind !== "add")) return;
+    const layer = useVJStore.getState().state.layers[t.layerIdx];
+    if (!layer || layer.activeClipIdx < 0) return;
+    if (t.kind === "clip" && t.clipIdx === layer.activeClipIdx) return; // 既に上
+    rowRef.current = 1 + t.layerIdx;
+    colRef.current = layer.activeClipIdx;
+    applyTarget();
+  };
+
+  /**
+   * R2 + ↑/↓ でアクティブ（LIVE）クリップ間を順送りジャンプ。
+   * activeClipIdx >= 0 のレイヤーをリスト化し、現在位置から ±1 でループ。
    */
   const jumpToLiveClip = (dir: 1 | -1) => {
     const state = useVJStore.getState().state;
