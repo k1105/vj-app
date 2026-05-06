@@ -21,20 +21,12 @@ function buildEntries(
   params: ParamDef[],
   getVal: (key: string) => number | boolean | string,
 ): ParamEntry[] {
+  // Gamepad UI ではStart/Endを個別の縦スライダー列として並べる
+  // （MIDI側のRangeControlのような2-thumb合体UIは使わない）
   const out: ParamEntry[] = [];
-  let i = 0;
-  while (i < params.length) {
-    const d = params[i];
-    if (d.type === "strings") { i++; continue; }
-    if (d.key.endsWith("Start") && i + 1 < params.length) {
-      const next = params[i + 1];
-      if (next.key === d.key.slice(0, -5) + "End") {
-        out.push({ type: "range", startDef: d, endDef: next, startVal: Number(getVal(d.key)), endVal: Number(getVal(next.key)) });
-        i += 2; continue;
-      }
-    }
+  for (const d of params) {
+    if (d.type === "strings") continue;
     out.push({ type: "single", def: d, value: getVal(d.key) });
-    i++;
   }
   return out;
 }
