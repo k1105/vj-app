@@ -206,7 +206,8 @@ export function GamepadRoot() {
       if (button === "right")    { paramNavEvent("down");  return; }
       if (button === "up")       { paramAdjustEvent("inc"); return; }
       if (button === "down")     { paramAdjustEvent("dec"); return; }
-      if (button === "r3" || button === "l3" || button === "circle") { paramR3Event(); return; }
+      if (button === "r3")       { paramR3Event(); return; }
+      if (button === "circle")   { paramToggleEvent(); return; }
       return;
     }
     if (fs.paramPanelOpen) {
@@ -216,7 +217,8 @@ export function GamepadRoot() {
       if (button === "right")    { paramNavEvent("down");  return; }
       if (button === "up")       { paramAdjustEvent("inc"); return; }
       if (button === "down")     { paramAdjustEvent("dec"); return; }
-      if (button === "r3" || button === "l3" || button === "circle") { paramR3Event(); return; }
+      if (button === "r3")       { paramR3Event(); return; }
+      if (button === "circle")   { paramToggleEvent(); return; }
       return;
     }
 
@@ -271,6 +273,7 @@ export function GamepadRoot() {
   const paramNavEvent    = (dir: "up"|"down")     => window.dispatchEvent(new CustomEvent("gp:param-nav",    { detail: dir }));
   const paramAdjustEvent = (dir: "inc"|"dec")    => window.dispatchEvent(new CustomEvent("gp:param-adjust", { detail: dir }));
   const paramSetEvent    = ()                    => window.dispatchEvent(new CustomEvent("gp:param-set"));
+  const paramToggleEvent = ()                    => window.dispatchEvent(new CustomEvent("gp:param-toggle"));
 
   const paramR3Event   = () => window.dispatchEvent(new CustomEvent("gp:param-r3"));
 

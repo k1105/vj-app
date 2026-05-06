@@ -297,12 +297,15 @@ export function GamepadParamPanel({ onClose }: Props) {
     };
     const flashStatus = (msg: string, level: "info" | "warn" = "info") =>
       window.dispatchEvent(new CustomEvent("gp:flash-status", { detail: { msg, level } }));
-    const toggleAutoSyncFor = (id: string | null | undefined, label: string) => {
-      if (!id) { flashStatus(`${label}: autoSync 対象外`, "warn"); return; }
-      useAutoSyncStore.getState().toggle(id);
-      const isOn = !!useAutoSyncStore.getState().active[id];
-      flashStatus(`${label}: autoSync ${isOn ? "ON" : "OFF"}`);
+    /** direct enable/disable（toggleを経由しない）で確実に切り替える */
+    const flipAutoSync = (id: string | null | undefined): boolean | null => {
+      if (!id) return null;
+      const st = useAutoSyncStore.getState();
+      if (st.active[id]) { st.disable(id); return false; }
+      st.enable(id);
+      return true;
     };
+    /** R3: スライダー系で autoSync をトグルする */
     const onR3 = () => {
       const d2 = dataRef.current as (typeof activeData) | null;
       if (!d2) return;
@@ -312,25 +315,38 @@ export function GamepadParamPanel({ onClose }: Props) {
       if (entry.type === "range") {
         const sId = tFor?.(entry.startDef.key);
         const eId = tFor?.(entry.endDef.key);
-        toggleAutoSyncFor(sId, entry.startDef.key);
-        if (eId) useAutoSyncStore.getState().toggle(eId);
+        const r1 = flipAutoSync(sId);
+        if (eId) flipAutoSync(eId);
+        flashStatus(`${entry.startDef.key.slice(0,-5)||"range"}: autoSync ${r1 ? "ON" : "OFF"}`);
         return;
       }
       if (entry.type === "xy") {
         const xId = tFor?.(entry.xDef.key);
         const yId = tFor?.(entry.yDef.key);
-        toggleAutoSyncFor(xId, entry.xDef.key);
-        if (yId) useAutoSyncStore.getState().toggle(yId);
+        const r1 = flipAutoSync(xId);
+        if (yId) flipAutoSync(yId);
+        flashStatus(`${entry.xDef.key.slice(0,-1)||"xy"}: autoSync ${r1 ? "ON" : "OFF"}`);
         return;
       }
       const def = entry.def;
+      if (def.type !== "float" && def.type !== "int") {
+        flashStatus(`${def.key}: autoSync 対象外`, "warn");
+        return;
+      }
+      const id = tFor?.(def.key);
+      if (!id) { flashStatus(`${def.key}: autoSync 対象外`, "warn"); return; }
+      const result = flipAutoSync(id);
+      flashStatus(`${def.key}: autoSync ${result ? "ON" : "OFF"}`);
+    };
+    /** ○: bool / trigger を操作する。autoSyncはこちらでは扱わない */
+    const onToggle = () => {
+      const d2 = dataRef.current as (typeof activeData) | null;
+      if (!d2) return;
+      const entry = d2.entries[rowRef.current];
+      if (!entry || entry.type !== "single") return;
+      const def = entry.def;
       if (def.type === "bool")    { d2.setValue(def.key, !entry.value); flashStatus(`${def.key}: ${!entry.value ? "ON" : "OFF"}`); return; }
       if (def.type === "trigger") { d2.setValue(def.key, Date.now()); flashStatus(`${def.key}: fired`); return; }
-      if (def.type === "float" || def.type === "int") {
-        toggleAutoSyncFor(tFor?.(def.key), def.key);
-      } else {
-        flashStatus(`${def.key}: 操作不可`, "warn");
-      }
     };
     const onAdjust = (e: Event) => {
       const dir = (e as CustomEvent<"inc" | "dec">).detail;
@@ -403,12 +419,14 @@ export function GamepadParamPanel({ onClose }: Props) {
     window.addEventListener("gp:param-adjust", onAdjust);
     window.addEventListener("gp:param-step",   onStep);
     window.addEventListener("gp:param-r3",     onR3);
+    window.addEventListener("gp:param-toggle", onToggle);
     window.addEventListener("gp:param-set",    onSet);
     return () => {
       window.removeEventListener("gp:param-nav",    onNav);
       window.removeEventListener("gp:param-adjust", onAdjust);
       window.removeEventListener("gp:param-step",   onStep);
       window.removeEventListener("gp:param-r3",     onR3);
+      window.removeEventListener("gp:param-toggle", onToggle);
       window.removeEventListener("gp:param-set",    onSet);
     };
   }, []);
@@ -486,14 +504,8 @@ export function GamepadParamPanel({ onClose }: Props) {
             <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">←→</span> 選択</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-stick">R ↕</span> 連続変更</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">↑↓</span> ステップ変更</span>
-            <span className="gp-guide-item">
-              <span className="gp-btn-badge gp-r3">R3</span>
-              <span className="gp-guide-or">or</span>
-              <span className="gp-btn-badge gp-l3">L3</span>
-              <span className="gp-guide-or">or</span>
-              <span className="gp-btn-badge gp-circle">○</span>
-              <span style={{ marginLeft: 4 }}>auto-sync / toggle / fire</span>
-            </span>
+            <span className="gp-guide-item"><span className="gp-btn-badge gp-r3">R3</span> auto-sync</span>
+            <span className="gp-guide-item"><span className="gp-btn-badge gp-circle">○</span> toggle / fire</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-options">OPTIONS</span> 既定値として保存</span>
           </div>
         </>
