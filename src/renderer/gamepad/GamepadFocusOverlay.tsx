@@ -11,15 +11,14 @@ export function gpidFor(t: FocusTarget): string | null {
 
 /**
  * Renders a focus ring that tracks the currently focused gamepad target.
- * Hidden automatically when any overlay/panel is open so it never floats
- * on top of modals.
+ * Hidden when modals open. paramPanel は R2+←/→ で対象を切り替えるため、
+ * 開いていてもリングを生かしておく。
  */
 export function GamepadFocusOverlay() {
   const target     = useGamepadFocusStore((s) => s.target);
   const active     = useGamepadFocusStore((s) => s.active);
-  // Hide ring whenever any panel/modal is open
   const anyOverlay = useGamepadFocusStore((s) =>
-    s.paramPanelOpen || s.layerParamOpen || s.optionsOpen ||
+    s.layerParamOpen || s.optionsOpen ||
     s.assetPickerLayer !== null || s.deleteTarget !== null
   );
   const ringRef = useRef<HTMLDivElement>(null);
