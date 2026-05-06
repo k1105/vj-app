@@ -70,6 +70,28 @@ export function GamepadParamPanel({ onClose }: Props) {
   const isOpen = panelOpen || layerParamOpen;
 
   const [focusedRow, setFocusedRow] = useState(0);
+  // カメラデバイス一覧（camera型パラメータ用）
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const camerasRef = useRef<MediaDeviceInfo[]>([]);
+  camerasRef.current = cameras;
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const list = await navigator.mediaDevices.enumerateDevices();
+        if (cancelled) return;
+        setCameras(list.filter((d) => d.kind === "videoinput"));
+      } catch { /* ignore */ }
+    };
+    refresh();
+    navigator.mediaDevices.addEventListener?.("devicechange", refresh);
+    return () => {
+      cancelled = true;
+      navigator.mediaDevices.removeEventListener?.("devicechange", refresh);
+    };
+  }, [isOpen]);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const flashSaveStatus = (msg: string) => {
     setSaveMsg(msg);
@@ -262,12 +284,19 @@ export function GamepadParamPanel({ onClose }: Props) {
         d2.setValue(def.key, def.options[(cur + delta + def.options.length) % def.options.length]);
         return;
       }
+      if (def.type === "camera") {
+        const ids = ["", ...camerasRef.current.map(c => c.deviceId)];
+        const cur = Math.max(0, ids.indexOf(String(value)));
+        d2.setValue(def.key, ids[(cur + delta + ids.length) % ids.length]);
+        return;
+      }
       if (isStepParam(def)) {
         const cur = typeof value === "number" ? value : Number(value);
         d2.setValue(def.key, clamp(cur + def.step! * delta, def.min ?? 0, def.max ?? 1));
         return;
       }
-      // float / int
+      // float / int — それ以外の型は数値変換しない
+      if (def.type !== "float" && def.type !== "int") return;
       const cur = typeof value === "number" ? value : Number(value);
       const step = def.step ?? ((def.max ?? 1) - (def.min ?? 0)) / 20;
       const next = clamp(cur + step * delta, def.min ?? 0, def.max ?? 1);
@@ -342,6 +371,7 @@ export function GamepadParamPanel({ onClose }: Props) {
               <ParamCol
                 key={i}
                 entry={entry}
+                cameras={cameras}
                 focused={i === focusedRow}
                 onClick={() => setFocusedRow(i)}
                 onToggle={() => {
@@ -377,9 +407,10 @@ export function GamepadParamPanel({ onClose }: Props) {
 // ─── Param column (縦スライダー＋横並び) ────────────────────────────────────
 
 function ParamCol({
-  entry, focused, onClick, onToggle, onTrigger, onEnumSelect,
+  entry, cameras, focused, onClick, onToggle, onTrigger, onEnumSelect,
 }: {
   entry: ParamEntry;
+  cameras: MediaDeviceInfo[];
   focused: boolean;
   onClick: () => void;
   onToggle: () => void;
@@ -465,6 +496,30 @@ function ParamCol({
               onClick={e => { e.stopPropagation(); onEnumSelect(o); }}
             >
               {o}
+            </button>
+          ))}
+        </div>
+        <span className="gp-col-hint gp-dpad">↑↓</span>
+      </div>
+    );
+  }
+
+  if (def.type === "camera") {
+    const ids = ["", ...cameras.map(c => c.deviceId)];
+    const labels = ["Default camera", ...cameras.map(c => c.label || `camera ${c.deviceId.slice(0, 6)}`)];
+    const curIdx = Math.max(0, ids.indexOf(String(value ?? "")));
+    return (
+      <div className={`${cls} gp-param-col-wide`} onClick={onClick}>
+        <span className="gp-col-label">{def.key}</span>
+        <div className="gp-col-enum-list">
+          {ids.map((id, i) => (
+            <button
+              key={id || "default"}
+              className={`gp-col-enum-chip${i === curIdx ? " selected" : ""}`}
+              onClick={e => { e.stopPropagation(); onEnumSelect(id); }}
+              title={labels[i]}
+            >
+              {labels[i]}
             </button>
           ))}
         </div>
