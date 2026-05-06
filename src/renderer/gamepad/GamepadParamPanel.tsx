@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useVJStore } from "../state/vjStore";
+import { useAutoSyncStore } from "../state/autoSyncStore";
 import { useGamepadFocusStore } from "./gamepadFocusStore";
 import { readRStickY } from "./gamepadManager";
 import type { ParamDef } from "../../shared/types";
@@ -67,6 +68,8 @@ export function GamepadParamPanel({ onClose }: Props) {
   const setLayerMute       = useVJStore((s) => s.setLayerMute);
   const setLayerSolo       = useVJStore((s) => s.setLayerSolo);
 
+  const autoSyncActive = useAutoSyncStore((s) => s.active);
+
   const isOpen = panelOpen || layerParamOpen;
 
   const [focusedRow, setFocusedRow] = useState(0);
@@ -121,6 +124,7 @@ export function GamepadParamPanel({ onClose }: Props) {
         setValue: (key: string, val: number | boolean | string) =>
           setClipParam(target.layerIdx, target.clipIdx, key, val),
         saveDefaults: () => window.vj.setPluginDefaults(plugin.kind, plugin.id, clip.params),
+        targetIdFor: (key: string) => `clip:${target.layerIdx}:${key}`,
       };
     }
     if (target.kind === "postfx") {
@@ -140,6 +144,7 @@ export function GamepadParamPanel({ onClose }: Props) {
         setValue: (key: string, val: number | boolean | string) =>
           setPostFXSlotParam(target.slotIdx, key, val),
         saveDefaults: () => window.vj.setPluginDefaults("postfx", plugin.id, slot.params ?? {}),
+        targetIdFor: (key: string) => `postfx-slot:${target.slotIdx}:param:${key}`,
       };
     }
     return null;
@@ -168,6 +173,7 @@ export function GamepadParamPanel({ onClose }: Props) {
         if (key === "mute")    setLayerMute(layerParamIdx, val as boolean);
         if (key === "solo")    setLayerSolo(layerParamIdx, val as boolean);
       },
+      targetIdFor: (key: string) => key === "opacity" ? `layer-opacity-${layerParamIdx}` : null,
     };
   })();
 
@@ -252,13 +258,27 @@ export function GamepadParamPanel({ onClose }: Props) {
       }
     };
     const onR3 = () => {
-      const d2 = dataRef.current;
+      const d2 = dataRef.current as (typeof activeData) | null;
       if (!d2) return;
       const entry = d2.entries[rowRef.current];
-      if (!entry || entry.type !== "single") return;
+      if (!entry) return;
+      const tFor = (d2 as { targetIdFor?: (key: string) => string | null }).targetIdFor;
+      if (entry.type === "range") {
+        // range: start / end の両方をトグル
+        const sId = tFor?.(entry.startDef.key);
+        const eId = tFor?.(entry.endDef.key);
+        if (sId) useAutoSyncStore.getState().toggle(sId);
+        if (eId) useAutoSyncStore.getState().toggle(eId);
+        return;
+      }
       const def = entry.def;
-      if (def.type === "bool")    d2.setValue(def.key, !entry.value);
-      if (def.type === "trigger") d2.setValue(def.key, Date.now());
+      if (def.type === "bool")    { d2.setValue(def.key, !entry.value); return; }
+      if (def.type === "trigger") { d2.setValue(def.key, Date.now());   return; }
+      // float / int → autoSync をトグル（sine/triangle 駆動）
+      if (def.type === "float" || def.type === "int") {
+        const id = tFor?.(def.key);
+        if (id) useAutoSyncStore.getState().toggle(id);
+      }
     };
     const onAdjust = (e: Event) => {
       const dir = (e as CustomEvent<"inc" | "dec">).detail;
@@ -367,12 +387,17 @@ export function GamepadParamPanel({ onClose }: Props) {
           )}
 
           <div className="gp-param-cols">
-            {activeData.entries.map((entry, i) => (
+            {activeData.entries.map((entry, i) => {
+              const key = entry.type === "single" ? entry.def.key : entry.startDef.key;
+              const targetId = activeData.targetIdFor?.(key) ?? null;
+              const syncActive = targetId ? !!autoSyncActive[targetId] : false;
+              return (
               <ParamCol
                 key={i}
                 entry={entry}
                 cameras={cameras}
                 focused={i === focusedRow}
+                syncActive={syncActive}
                 onClick={() => setFocusedRow(i)}
                 onToggle={() => {
                   if (entry.type === "single" && entry.def.type === "bool") {
@@ -388,14 +413,15 @@ export function GamepadParamPanel({ onClose }: Props) {
                   if (entry.type === "single") activeData.setValue(entry.def.key, val);
                 }}
               />
-            ))}
+              );
+            })}
           </div>
 
           <div className="gp-param-guide">
             <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">←→</span> 選択</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-stick">R ↕</span> 連続変更</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">↑↓</span> ステップ変更</span>
-            <span className="gp-guide-item"><span className="gp-btn-badge gp-r3">R3</span> / <span className="gp-btn-badge gp-circle">○</span> toggle/fire</span>
+            <span className="gp-guide-item"><span className="gp-btn-badge gp-r3">R3</span> / <span className="gp-btn-badge gp-circle">○</span> toggle/fire/auto-sync</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-options">OPTIONS</span> 既定値として保存</span>
           </div>
         </>
@@ -407,17 +433,18 @@ export function GamepadParamPanel({ onClose }: Props) {
 // ─── Param column (縦スライダー＋横並び) ────────────────────────────────────
 
 function ParamCol({
-  entry, cameras, focused, onClick, onToggle, onTrigger, onEnumSelect,
+  entry, cameras, focused, syncActive, onClick, onToggle, onTrigger, onEnumSelect,
 }: {
   entry: ParamEntry;
   cameras: MediaDeviceInfo[];
   focused: boolean;
+  syncActive: boolean;
   onClick: () => void;
   onToggle: () => void;
   onTrigger: () => void;
   onEnumSelect: (val: string) => void;
 }) {
-  const cls = `gp-param-col${focused ? " focused" : ""}`;
+  const cls = `gp-param-col${focused ? " focused" : ""}${syncActive ? " sync-active" : ""}`;
 
   // range: 縦2本スライダー (start / end)
   if (entry.type === "range") {
