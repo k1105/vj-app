@@ -60,14 +60,33 @@ function focusedLayerIdx(): number | null {
   return t.layerIdx;
 }
 
-function jumpToLiveOfCurrentLayer({ rowRef, colRef, applyTarget }: ActionCtx) {
+/**
+ * R2 + ←/→: 同一レイヤー内のアンカー (先頭 / LIVE / 末尾) を方向付き循環。
+ * - 先頭   = clip 0
+ * - LIVE   = activeClipIdx (>= 0 のときだけ参加)
+ * - 末尾   = "+追加" ボタン（col = clips.length）
+ * 重複（LIVE が先頭と一致など）は除き、現在位置から進行方向の次へ移動。
+ */
+function cycleLayerAnchor(dir: 1 | -1, { rowRef, colRef, applyTarget }: ActionCtx) {
   const t = useGamepadFocusStore.getState().target;
   if (!t || (t.kind !== "clip" && t.kind !== "add")) return;
   const layer = useVJStore.getState().state.layers[t.layerIdx];
-  if (!layer || layer.activeClipIdx < 0) return;
-  if (t.kind === "clip" && t.clipIdx === layer.activeClipIdx) return;
+  if (!layer) return;
+
+  const set = new Set<number>();
+  if (layer.clips.length > 0) set.add(0);
+  if (layer.activeClipIdx >= 0) set.add(layer.activeClipIdx);
+  set.add(layer.clips.length); // add ボタン
+  const anchors = [...set].sort((a, b) => a - b);
+  if (anchors.length <= 1) return;
+
+  const cur = t.kind === "clip" ? t.clipIdx : layer.clips.length;
+  const next = dir === 1
+    ? (anchors.find(a => a > cur) ?? anchors[0])
+    : ([...anchors].reverse().find(a => a < cur) ?? anchors[anchors.length - 1]);
+
   rowRef.current = 1 + t.layerIdx;
-  colRef.current = layer.activeClipIdx;
+  colRef.current = next;
   applyTarget();
 }
 
@@ -103,7 +122,9 @@ export const ACTIONS = {
   // R2 + d-pad: live-clip jumps
   "nav.liveJumpPrev":    (ctx: ActionCtx) => jumpToLiveClip(-1, ctx),
   "nav.liveJumpNext":    (ctx: ActionCtx) => jumpToLiveClip(1, ctx),
-  "nav.snapLiveOfLayer": (ctx: ActionCtx) => jumpToLiveOfCurrentLayer(ctx),
+  // R2 + ←/→: 同一レイヤー内で 先頭 / LIVE / 末尾 を循環
+  "nav.cycleAnchorPrev": (ctx: ActionCtx) => cycleLayerAnchor(-1, ctx),
+  "nav.cycleAnchorNext": (ctx: ActionCtx) => cycleLayerAnchor(1, ctx),
 
   // Clip / postfx slot
   "clip.activate": () => {
@@ -230,8 +251,8 @@ export const BINDINGS: Record<ContextId, Partial<Record<Combo, ActionId>>> = {
     "right":       "nav.right",
     "r2+up":       "nav.liveJumpPrev",
     "r2+down":     "nav.liveJumpNext",
-    "r2+left":     "nav.snapLiveOfLayer",
-    "r2+right":    "nav.snapLiveOfLayer",
+    "r2+left":     "nav.cycleAnchorPrev",
+    "r2+right":    "nav.cycleAnchorNext",
     "circle":      "clip.activate",
     "cross":       "clip.deleteAsk",
     "triangle":    "panel.openParam",
