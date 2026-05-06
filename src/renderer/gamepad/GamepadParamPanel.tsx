@@ -142,7 +142,6 @@ export function GamepadParamPanel({ onClose }: Props) {
         title: plugin.name,
         subtitle: `L${target.layerIdx + 1}`,
         entries,
-        layer: { idx: target.layerIdx, opacity: layer.opacity, blend: layer.blend },
         setValue: (key: string, val: number | boolean | string) =>
           setClipParam(target.layerIdx, target.clipIdx, key, val),
         saveDefaults: () => window.vj.setPluginDefaults(plugin.kind, plugin.id, clip.params),
@@ -162,7 +161,6 @@ export function GamepadParamPanel({ onClose }: Props) {
         title: plugin.name,
         subtitle: `PostFX ${target.slotIdx + 1}`,
         entries: buildEntries(plugin.params, getVal),
-        layer: null,
         setValue: (key: string, val: number | boolean | string) =>
           setPostFXSlotParam(target.slotIdx, key, val),
         saveDefaults: () => window.vj.setPluginDefaults("postfx", plugin.id, slot.params ?? {}),
@@ -188,7 +186,6 @@ export function GamepadParamPanel({ onClose }: Props) {
       title: `L${layerParamIdx + 1} — Layer`,
       subtitle: "",
       entries,
-      layer: null,
       setValue: (key: string, val: number | boolean | string) => {
         if (key === "opacity") setLayerOpacity(layerParamIdx, val as number);
         if (key === "blend")   setLayerBlend(layerParamIdx, val as "normal"|"add"|"multiply"|"screen");
@@ -455,27 +452,6 @@ export function GamepadParamPanel({ onClose }: Props) {
               <span className="gp-btn-badge gp-tri">△</span> 閉じる
             </button>
           </div>
-
-          {activeData.layer && (
-            <div className="gp-layer-strip">
-              <span className="gp-strip-label">Opacity</span>
-              <div className="gp-opacity-track">
-                <div className="gp-opacity-fill" style={{ width: `${Math.round(activeData.layer.opacity * 100)}%` }} />
-              </div>
-              <span className="gp-opacity-val">{Math.round(activeData.layer.opacity * 100)}</span>
-              <div className="gp-sep" />
-              <span className="gp-strip-label">Blend</span>
-              {(["normal", "add", "multiply", "screen"] as const).map(b => (
-                <button
-                  key={b}
-                  className={`gp-blend-opt${activeData.layer!.blend === b ? " active" : ""}`}
-                  onClick={() => setLayerBlend(activeData.layer!.idx, b)}
-                >
-                  {b === "normal" ? "NRM" : b === "multiply" ? "MUL" : b.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          )}
 
           <div className="gp-param-cols">
             {activeData.entries.map((entry, i) => {
