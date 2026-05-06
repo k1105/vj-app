@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import { useGamepadFocusStore } from "./gamepadFocusStore";
+import { startAutoSyncDriver } from "../autoSync/autoSyncDriver";
 import { GamepadRoot }         from "./GamepadRoot";
 import { GamepadParamPanel }   from "./GamepadParamPanel";
 import { GamepadOptionsModal } from "./GamepadOptionsModal";
@@ -494,6 +495,11 @@ function useVJSession() {
   useEffect(() => {
     return window.vj.onRequestStateRebroadcast(() => broadcastState());
   }, [broadcastState]);
+
+  // autoSync driver — useAutoSyncStore.active の各ターゲットを毎フレーム動かす
+  useEffect(() => {
+    return startAutoSyncDriver();
+  }, []);
 }
 
 export function GamepadApp() {
