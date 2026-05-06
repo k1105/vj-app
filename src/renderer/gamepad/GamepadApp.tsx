@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import { useVJStore } from "../state/vjStore";
-import { useGamepadFocusStore, type FocusTarget } from "./gamepadFocusStore";
+import { useGamepadFocusStore } from "./gamepadFocusStore";
 import { GamepadRoot }         from "./GamepadRoot";
 import { GamepadParamPanel }   from "./GamepadParamPanel";
 import { GamepadOptionsModal } from "./GamepadOptionsModal";
@@ -117,20 +117,10 @@ function GpLayerStack() {
   const setLayerMute      = useVJStore((s) => s.setLayerMute);
   const setLayerSolo      = useVJStore((s) => s.setLayerSolo);
   const triggerClip       = useVJStore((s) => s.triggerClip);
-  const target            = useGamepadFocusStore((s) => s.target);
   const openAssetPicker   = useGamepadFocusStore((s) => s.openAssetPicker);
 
   const pluginName = (id: string) => plugins.find(p => p.id === id)?.name ?? id;
   const thumbnailUrl = (id: string) => plugins.find(p => p.id === id)?.thumbnailUrl;
-
-  const isFocused = (t: FocusTarget): boolean => {
-    if (!target) return false;
-    if (t.kind !== target.kind) return false;
-    if (t.kind === "clip"   && target.kind === "clip")   return t.layerIdx === target.layerIdx && t.clipIdx === target.clipIdx;
-    if (t.kind === "add"    && target.kind === "add")    return t.layerIdx === target.layerIdx;
-    if (t.kind === "postfx" && target.kind === "postfx") return t.slotIdx  === target.slotIdx;
-    return false;
-  };
 
   return (
     <div className="gpa-layer-stack">
@@ -181,34 +171,29 @@ function GpLayerStack() {
               </div>
             </div>
 
-            {/* Clip grid */}
-            <div className="gpa-clip-grid">
+            {/* Clip grid — MIDI UI と同じ .material-grid + .mat-thumb */}
+            <div className="material-grid">
               {layer.clips.map((clip, ci) => {
-                const focused   = isFocused({ kind: "clip", layerIdx: li, clipIdx: ci });
-                const isActive  = ci === layer.activeClipIdx;
-                const isNext    = ci === layer.nextClipIdx && ci !== layer.activeClipIdx;
-                const thumb     = thumbnailUrl(clip.pluginId);
+                const isActive = ci === layer.activeClipIdx;
+                const isNext   = ci === layer.nextClipIdx && ci !== layer.activeClipIdx;
+                const thumb    = thumbnailUrl(clip.pluginId);
+                const bgStyle  = thumb
+                  ? { backgroundImage: `url("${thumb}")`, backgroundSize: "cover" as const, backgroundPosition: "center" as const }
+                  : undefined;
                 return (
                   <div
                     key={ci}
                     data-gpid={`clip-${li}-${ci}`}
                     className={[
-                      "gpa-clip-card",
-                      isActive  ? "active"      : "",
-                      isNext    ? "next-active" : "",
-                      focused   ? "focused"     : "",
+                      "mat-thumb",
+                      isActive ? "live-active" : "",
+                      isNext   ? "next-active" : "",
                     ].filter(Boolean).join(" ")}
+                    style={bgStyle}
                     onClick={() => triggerClip(li, ci)}
                     title={pluginName(clip.pluginId)}
                   >
-                    {(isActive || isNext) && <div className="gpa-clip-dot" />}
-                    <div
-                      className="gpa-clip-thumb"
-                      style={thumb ? { backgroundImage: `url("${thumb}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
-                    >
-                      {!thumb && <span className="gpa-clip-icon">{pluginName(clip.pluginId)[0]}</span>}
-                    </div>
-                    <div className="gpa-clip-name">{pluginName(clip.pluginId)}</div>
+                    <div className="mat-name">{pluginName(clip.pluginId)}</div>
                   </div>
                 );
               })}
@@ -216,7 +201,7 @@ function GpLayerStack() {
               {/* + add slot */}
               <div
                 data-gpid={`add-${li}`}
-                className={`gpa-add-slot${isFocused({ kind: "add", layerIdx: li }) ? " focused" : ""}`}
+                className="gpa-add-slot"
                 onClick={() => openAssetPicker(li)}
                 title="Add asset"
               >
@@ -261,37 +246,35 @@ function GpPostFXRow() {
   const plugins          = useVJStore((s) => s.plugins);
   const postfx           = useVJStore((s) => s.state.postfx);
   const togglePostFXSlot = useVJStore((s) => s.togglePostFXSlot);
-  const target           = useGamepadFocusStore((s) => s.target);
 
   const available = plugins.filter(p => p.kind === "postfx" && !p.hidden);
 
   return (
-    <div className="gpa-postfx-row">
-      <div className="gpa-section-hdr">
-        <span className="gpa-section-label">PostFX</span>
-        <span className="gpa-section-hint">8 SLOTS</span>
+    <div className="postfx-slots-band">
+      <div className="postfx-rack-header">
+        <span>PostFX — 8 SLOTS</span>
       </div>
-      <div className="gpa-postfx-slots">
+      <div className="postfx-slots-row">
         {Array.from({ length: 8 }, (_, i) => {
-          const slot    = postfx[i];
-          const on      = !!slot?.enabled && !!slot?.pluginId;
-          const meta    = slot?.pluginId ? available.find(p => p.id === slot.pluginId) : null;
-          const focused = target?.kind === "postfx" && target.slotIdx === i;
+          const slot = postfx[i];
+          const on   = !!slot?.enabled && !!slot?.pluginId;
+          const meta = slot?.pluginId ? available.find(p => p.id === slot.pluginId) : null;
           return (
             <div
               key={i}
               data-gpid={`postfx-${i}`}
-              className={[
-                "gpa-postfx-slot",
-                on      ? "on"      : "",
-                focused ? "focused" : "",
-                !slot?.pluginId ? "empty" : "",
-              ].filter(Boolean).join(" ")}
+              className={`postfx-slot ${on ? "on" : ""} ${!slot?.pluginId ? "empty" : ""}`}
               onClick={() => { if (slot?.pluginId) togglePostFXSlot(i); }}
             >
-              <div className="gpa-pfx-dot" />
-              <span className="gpa-pfx-num">{i + 1}</span>
-              <span className="gpa-pfx-name">{meta?.name ?? <span style={{ color: "var(--text-muted)" }}>empty</span>}</span>
+              <div className="postfx-slot-num">{i + 1}</div>
+              <button
+                className={`postfx-slot-power ${on ? "on" : ""}`}
+                onClick={(e) => { e.stopPropagation(); if (slot?.pluginId) togglePostFXSlot(i); }}
+                disabled={!slot?.pluginId}
+              />
+              <div className="postfx-slot-name">
+                {meta?.name ?? <span className="dim">empty</span>}
+              </div>
             </div>
           );
         })}
@@ -509,8 +492,8 @@ export function GamepadApp() {
       <GpPreviewRow />
 
       <div className="gpa-main">
-        <GpLayerStack />
         <GpPostFXRow />
+        <GpLayerStack />
       </div>
 
       <GpTransportBar />
