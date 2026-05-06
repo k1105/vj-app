@@ -504,6 +504,20 @@
 .gpa-ms-btn.muted { background: var(--danger-dim); color: var(--danger); border-color: rgba(255,46,91,0.3); }
 .gpa-ms-btn.solo  { background: var(--accent-dim); color: var(--accent); border-color: rgba(255,176,32,0.3); }
 
+/* MIDI UI の mat-thumb をベースにしつつ Gamepad モードではサイズだけ大きく保つ */
+.gpa-root .material-grid {
+  padding: 8px;
+  gap: 5px;
+}
+.gpa-root .mat-thumb {
+  width: 84px;
+  height: 70px;
+}
+.gpa-root .mat-thumb .mat-name {
+  font-size: 9px;
+  padding: 3px 0;
+}
+
 /* Clip grid */
 .gpa-clip-grid {
   display: flex; gap: 5px; flex: 1; min-width: 0;
