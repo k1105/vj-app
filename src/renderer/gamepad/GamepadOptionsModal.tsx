@@ -20,8 +20,7 @@ const GLOBAL_ROWS: MappingRow[] = [
   { btns: [{ label: "□", cls: "ob-square" }],   action: "Stage toggle (ON/CANCEL)" },
   { btns: [{ label: "R2", cls: "ob-r2" }], action: "Stage release（ステージ中のみ）" },
   { btns: [{ label: "L1", cls: "ob-l1" }],      action: "TAP BPM" },
-  { btns: [{ label: "R1", cls: "ob-r1" }],      action: "FLASH（視覚的フラッシュ）" },
-  { btns: [{ label: "L3", cls: "ob-l3" }, { label: "/", cls: "ob-dpad" }, { label: "R3", cls: "ob-r3" }], action: "FLASH（スティック押し込み）" },
+  { btns: [{ label: "R1", cls: "ob-r1" }],      action: "FLASH" },
   { btns: [{ label: "L1", cls: "ob-l1" }, { label: "R1", cls: "ob-r1" }], action: "BURST" },
   { btns: [{ label: "OPTIONS", cls: "ob-options" }], action: "このマッピング表示" },
 ];
@@ -30,7 +29,7 @@ const PANEL_ROWS: MappingRow[] = [
   { btns: [{ label: "↑↓", cls: "ob-dpad" }],      action: "パラメータ行を選択" },
   { btns: [{ label: "R Stick ↕", cls: "ob-r3" }], action: "float / int 値を変更", context: "連続値" },
   { btns: [{ label: "←→", cls: "ob-dpad" }],      action: "step / enum を切替", context: "離散値" },
-  { btns: [{ label: "R3", cls: "ob-r3" }],         action: "bool toggle / trigger 発火" },
+  { btns: [{ label: "R3", cls: "ob-r3" }, { label: "/", cls: "ob-dpad" }, { label: "L3", cls: "ob-l3" }, { label: "/", cls: "ob-dpad" }, { label: "○", cls: "ob-circle" }], action: "bool toggle / trigger / autoSync" },
   { btns: [{ label: "○", cls: "ob-circle" }],      action: "アセット on/off（パネル内でも）" },
   { btns: [{ label: "△", cls: "ob-triangle" }],    action: "パネルを閉じる" },
   { btns: [{ label: "OPTIONS", cls: "ob-options" }], action: "現在のパラメータを既定値として保存" },

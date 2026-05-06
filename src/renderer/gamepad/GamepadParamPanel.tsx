@@ -477,7 +477,7 @@ export function GamepadParamPanel({ onClose }: Props) {
             <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">←→</span> 選択</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-stick">R ↕</span> 連続変更</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">↑↓</span> ステップ変更</span>
-            <span className="gp-guide-item"><span className="gp-btn-badge gp-r3">R3</span> / <span className="gp-btn-badge gp-circle">○</span> toggle/fire/auto-sync</span>
+            <span className="gp-guide-item"><span className="gp-btn-badge gp-r3">R3</span> / L3 / <span className="gp-btn-badge gp-circle">○</span> toggle/fire/auto-sync</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-options">OPTIONS</span> 既定値として保存</span>
           </div>
         </>

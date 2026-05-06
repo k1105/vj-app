@@ -206,7 +206,7 @@ export function GamepadRoot() {
       if (button === "right")    { paramNavEvent("down");  return; }
       if (button === "up")       { paramAdjustEvent("inc"); return; }
       if (button === "down")     { paramAdjustEvent("dec"); return; }
-      if (button === "r3" || button === "circle") { paramR3Event(); return; }
+      if (button === "r3" || button === "l3" || button === "circle") { paramR3Event(); return; }
       return;
     }
     if (fs.paramPanelOpen) {
@@ -216,7 +216,7 @@ export function GamepadRoot() {
       if (button === "right")    { paramNavEvent("down");  return; }
       if (button === "up")       { paramAdjustEvent("inc"); return; }
       if (button === "down")     { paramAdjustEvent("dec"); return; }
-      if (button === "r3" || button === "circle") { paramR3Event(); return; }
+      if (button === "r3" || button === "l3" || button === "circle") { paramR3Event(); return; }
       return;
     }
 
@@ -249,10 +249,6 @@ export function GamepadRoot() {
     }
     if (button === "r1") {
       if (isButtonHeld("l1")) { vjs.setBurst(true); return; }
-      vjs.triggerFlash(); return;
-    }
-    // L3 / R3（スティック押し込み）→ FLASH
-    if (button === "l3" || button === "r3") {
       vjs.triggerFlash(); return;
     }
     if (button === "r2") {
