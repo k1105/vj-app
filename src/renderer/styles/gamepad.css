@@ -505,7 +505,15 @@
 .gpa-ms-btn.solo  { background: var(--accent-dim); color: var(--accent); border-color: rgba(255,176,32,0.3); }
 
 /* Clip grid */
-.gpa-clip-grid { display: flex; gap: 5px; flex: 1; align-items: center; padding: 8px; flex-wrap: wrap; }
+.gpa-clip-grid {
+  display: flex; gap: 5px; flex: 1; min-width: 0;
+  align-items: center; padding: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.gpa-clip-grid::-webkit-scrollbar { display: none; }
 
 /* Clip card */
 .gpa-clip-card {
