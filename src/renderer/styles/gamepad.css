@@ -186,6 +186,45 @@
   display: flex; gap: 3px; flex: 1; align-items: stretch;
 }
 
+/* xy 2Dパッド (R スティック両軸操作用) */
+.gp-param-col-xy { width: 110px; }
+.gp-xy-pad {
+  width: 96px; height: 96px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+.gp-xy-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 25% 25%;
+}
+.gp-xy-pad::before {
+  content: ""; position: absolute;
+  left: 50%; top: 0; bottom: 0; width: 1px;
+  background: rgba(255,255,255,0.08);
+}
+.gp-xy-pad::after {
+  content: ""; position: absolute;
+  top: 50%; left: 0; right: 0; height: 1px;
+  background: rgba(255,255,255,0.08);
+}
+.gp-xy-dot {
+  position: absolute;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transform: translate(-50%, 50%);
+  box-shadow: 0 0 0 2px var(--bg-inset);
+  transition: background 0.1s;
+}
+.gp-param-col.focused .gp-xy-dot { background: var(--accent); box-shadow: 0 0 0 2px var(--bg-inset), 0 0 6px var(--accent); }
+.gp-param-col.sync-active .gp-xy-dot { background: var(--info); }
+
 /* ─── Bool / Trigger / Step controls ─── */
 .gp-col-center {
   flex: 1;

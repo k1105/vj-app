@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useVJStore } from "../state/vjStore";
 import { useAutoSyncStore } from "../state/autoSyncStore";
 import { useGamepadFocusStore } from "./gamepadFocusStore";
-import { readRStickY } from "./gamepadManager";
+import { readRStickY, readRStickX } from "./gamepadManager";
 import type { ParamDef } from "../../shared/types";
 
 const PARAM_SPEED = 0.012; // value delta per frame at full stick deflection
@@ -15,18 +15,38 @@ function clamp(v: number, min: number, max: number) {
 
 type ParamEntry =
   | { type: "single"; def: ParamDef; value: number | boolean | string }
-  | { type: "range";  startDef: ParamDef; endDef: ParamDef; startVal: number; endVal: number };
+  | { type: "range";  startDef: ParamDef; endDef: ParamDef; startVal: number; endVal: number }
+  | { type: "xy";     xDef: ParamDef; yDef: ParamDef; xVal: number; yVal: number };
 
 function buildEntries(
   params: ParamDef[],
   getVal: (key: string) => number | boolean | string,
 ): ParamEntry[] {
-  // Gamepad UI ではStart/Endを個別の縦スライダー列として並べる
-  // （MIDI側のRangeControlのような2-thumb合体UIは使わない）
   const out: ParamEntry[] = [];
-  for (const d of params) {
-    if (d.type === "strings") continue;
+  const consumed = new Set<number>();
+
+  // *X/*Y ペアを 2D パッドにまとめる（R スティック同時操作用）
+  for (let i = 0; i < params.length; i++) {
+    if (consumed.has(i)) continue;
+    const d = params[i];
+    if (d.type === "strings") { consumed.add(i); continue; }
+    if (d.key.endsWith("X") && (d.type === "float" || d.type === "int")) {
+      const prefix = d.key.slice(0, -1);
+      const yIdx = params.findIndex((p, j) =>
+        j !== i && !consumed.has(j) && p.key === `${prefix}Y` && (p.type === "float" || p.type === "int")
+      );
+      if (yIdx >= 0) {
+        const y = params[yIdx];
+        out.push({
+          type: "xy", xDef: d, yDef: y,
+          xVal: Number(getVal(d.key)), yVal: Number(getVal(y.key)),
+        });
+        consumed.add(i); consumed.add(yIdx);
+        continue;
+      }
+    }
     out.push({ type: "single", def: d, value: getVal(d.key) });
+    consumed.add(i);
   }
   return out;
 }
@@ -186,11 +206,29 @@ export function GamepadParamPanel({ onClose }: Props) {
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const ly = readRStickY();
-      if (Math.abs(ly) < 0.01) return;
+      const lx = readRStickX();
       const d = dataRef.current;
       if (!d) return;
       const entry = d.entries[rowRef.current];
       if (!entry) return;
+
+      // xy エントリは X/Y 両軸を同時に動かす
+      if (entry.type === "xy") {
+        if (Math.abs(lx) < 0.01 && Math.abs(ly) < 0.01) return;
+        const apply = (def: ParamDef, cur: number, axis: number) => {
+          const min = def.min ?? 0;
+          const max = def.max ?? 1;
+          const delta = axis * PARAM_SPEED * (max - min);
+          const next = clamp(cur + delta, min, max);
+          d.setValue(def.key, def.type === "int" ? Math.round(next) : next);
+        };
+        // X 軸: 右がプラス、Y 軸: 上方向（-ly）がプラス
+        apply(entry.xDef, entry.xVal,  lx);
+        apply(entry.yDef, entry.yVal, -ly);
+        return;
+      }
+
+      if (Math.abs(ly) < 0.01) return;
       if (entry.type === "single") {
         const def = entry.def;
         if (def.type !== "float" && def.type !== "int") return;
@@ -202,7 +240,6 @@ export function GamepadParamPanel({ onClose }: Props) {
         const final = def.type === "int" ? Math.round(next) : next;
         d.setValue(def.key, final);
       } else if (entry.type === "range") {
-        // L stick moves both handles together (shift)
         const min = entry.startDef.min ?? 0;
         const max = entry.endDef.max ?? entry.startDef.max ?? 1;
         const delta = -ly * PARAM_SPEED * (max - min);
@@ -229,24 +266,33 @@ export function GamepadParamPanel({ onClose }: Props) {
       });
     };
     const onStep = (e: Event) => {
-      // ↑↓ で step/enum、←→ で float 微調整
       const dir = (e as CustomEvent<"left" | "right">).detail;
       const d2 = dataRef.current;
       if (!d2) return;
       const entry = d2.entries[rowRef.current];
-      if (!entry || entry.type !== "single") return;
+      if (!entry) return;
+      const delta2 = dir === "right" ? 1 : -1;
+      if (entry.type === "xy") {
+        // ←→ は X 軸のみを step 動かす
+        const xMin = entry.xDef.min ?? 0;
+        const xMax = entry.xDef.max ?? 1;
+        const step = entry.xDef.step ?? ((xMax - xMin) / 20);
+        const next = clamp(entry.xVal + step * delta2, xMin, xMax);
+        d2.setValue(entry.xDef.key, entry.xDef.type === "int" ? Math.round(next) : next);
+        return;
+      }
+      if (entry.type !== "single") return;
       const def = entry.def;
-      const delta = dir === "right" ? 1 : -1;
       if (def.type === "enum" && def.options) {
         const cur = def.options.indexOf(String(entry.value));
-        d2.setValue(def.key, def.options[(cur + delta + def.options.length) % def.options.length]);
+        d2.setValue(def.key, def.options[(cur + delta2 + def.options.length) % def.options.length]);
       } else if (isStepParam(def)) {
         const cur = typeof entry.value === "number" ? entry.value : Number(entry.value);
-        d2.setValue(def.key, clamp(cur + def.step! * delta, def.min ?? 0, def.max ?? 1));
+        d2.setValue(def.key, clamp(cur + def.step! * delta2, def.min ?? 0, def.max ?? 1));
       } else if (def.type === "float" || def.type === "int") {
         const step = def.step ?? ((def.max ?? 1) - (def.min ?? 0)) / 20;
         const cur  = typeof entry.value === "number" ? entry.value : Number(entry.value);
-        d2.setValue(def.key, clamp(cur + step * delta, def.min ?? 0, def.max ?? 1));
+        d2.setValue(def.key, clamp(cur + step * delta2, def.min ?? 0, def.max ?? 1));
       }
     };
     const onR3 = () => {
@@ -256,17 +302,22 @@ export function GamepadParamPanel({ onClose }: Props) {
       if (!entry) return;
       const tFor = (d2 as { targetIdFor?: (key: string) => string | null }).targetIdFor;
       if (entry.type === "range") {
-        // range: start / end の両方をトグル
         const sId = tFor?.(entry.startDef.key);
         const eId = tFor?.(entry.endDef.key);
         if (sId) useAutoSyncStore.getState().toggle(sId);
         if (eId) useAutoSyncStore.getState().toggle(eId);
         return;
       }
+      if (entry.type === "xy") {
+        const xId = tFor?.(entry.xDef.key);
+        const yId = tFor?.(entry.yDef.key);
+        if (xId) useAutoSyncStore.getState().toggle(xId);
+        if (yId) useAutoSyncStore.getState().toggle(yId);
+        return;
+      }
       const def = entry.def;
       if (def.type === "bool")    { d2.setValue(def.key, !entry.value); return; }
       if (def.type === "trigger") { d2.setValue(def.key, Date.now());   return; }
-      // float / int → autoSync をトグル（sine/triangle 駆動）
       if (def.type === "float" || def.type === "int") {
         const id = tFor?.(def.key);
         if (id) useAutoSyncStore.getState().toggle(id);
@@ -280,12 +331,20 @@ export function GamepadParamPanel({ onClose }: Props) {
       if (!entry) return;
       const delta = dir === "inc" ? 1 : -1;
       if (entry.type === "range") {
-        // range: shift both handles
         const min = entry.startDef.min ?? 0;
         const max = entry.endDef.max ?? entry.startDef.max ?? 1;
         const step = entry.startDef.step ?? ((max - min) / 20);
         d2.setValue(entry.startDef.key, clamp(entry.startVal + step * delta, min, entry.endVal));
         d2.setValue(entry.endDef.key,   clamp(entry.endVal   + step * delta, entry.startVal, max));
+        return;
+      }
+      if (entry.type === "xy") {
+        // ↑↓ は Y 軸のみを step 動かす
+        const yMin = entry.yDef.min ?? 0;
+        const yMax = entry.yDef.max ?? 1;
+        const step = entry.yDef.step ?? ((yMax - yMin) / 20);
+        const next = clamp(entry.yVal + step * delta, yMin, yMax);
+        d2.setValue(entry.yDef.key, entry.yDef.type === "int" ? Math.round(next) : next);
         return;
       }
       const { def, value } = entry;
@@ -383,7 +442,9 @@ export function GamepadParamPanel({ onClose }: Props) {
 
           <div className="gp-param-cols">
             {activeData.entries.map((entry, i) => {
-              const key = entry.type === "single" ? entry.def.key : entry.startDef.key;
+              const key = entry.type === "single" ? entry.def.key
+                        : entry.type === "range"  ? entry.startDef.key
+                        : entry.xDef.key;
               const targetId = activeData.targetIdFor?.(key) ?? null;
               const syncActive = targetId ? !!autoSyncActive[targetId] : false;
               return (
@@ -440,6 +501,34 @@ function ParamCol({
   onEnumSelect: (val: string) => void;
 }) {
   const cls = `gp-param-col${focused ? " focused" : ""}${syncActive ? " sync-active" : ""}`;
+
+  // xy: 2D パッド (R スティック両軸で同時操作)
+  if (entry.type === "xy") {
+    const xMin = entry.xDef.min ?? 0;
+    const xMax = entry.xDef.max ?? 1;
+    const yMin = entry.yDef.min ?? 0;
+    const yMax = entry.yDef.max ?? 1;
+    const xPct = xMax > xMin ? ((entry.xVal - xMin) / (xMax - xMin)) * 100 : 50;
+    // Y は上方向が大きい値となるよう下から計算
+    const yPct = yMax > yMin ? ((entry.yVal - yMin) / (yMax - yMin)) * 100 : 50;
+    const label = entry.xDef.key.slice(0, -1) || "xy"; // 共通プレフィックス
+    return (
+      <div className={`${cls} gp-param-col-xy`} onClick={onClick}>
+        <span className="gp-col-label">{label}</span>
+        <div className="gp-xy-pad">
+          <div className="gp-xy-grid" />
+          <div
+            className="gp-xy-dot"
+            style={{ left: `${clamp(xPct, 0, 100)}%`, bottom: `${clamp(yPct, 0, 100)}%` }}
+          />
+        </div>
+        <span className="gp-col-val">
+          {entry.xVal.toFixed(2)}, {entry.yVal.toFixed(2)}
+        </span>
+        <span className="gp-col-hint gp-stick">R↕↔</span>
+      </div>
+    );
+  }
 
   // range: 縦2本スライダー (start / end)
   if (entry.type === "range") {
