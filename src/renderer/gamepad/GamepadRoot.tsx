@@ -8,10 +8,7 @@ import {
   readRStickY,
   type ButtonName,
 } from "./gamepadManager";
-import { GamepadFocusOverlay, gpidFor } from "./GamepadFocusOverlay";
-import { GamepadParamPanel }   from "./GamepadParamPanel";
-import { GamepadOptionsModal } from "./GamepadOptionsModal";
-import { GamepadAssetPicker }  from "./GamepadAssetPicker";
+import { gpidFor } from "./GamepadFocusOverlay";
 
 // ─── Navigation grid ────────────────────────────────────────────────────────
 
@@ -335,15 +332,11 @@ export function GamepadRoot() {
     return plugins.find(p => p.id === clip?.pluginId)?.name ?? "?";
   })();
 
+  // Note: GamepadFocusOverlay/ParamPanel/OptionsModal/AssetPicker は
+  // GamepadApp 側で描画する。ここで描画すると二重マウントになり
+  // window event listener が二重登録 → 押下イベントが二重発火する。
   return (
     <>
-      <GamepadFocusOverlay />
-      <GamepadParamPanel
-        onClose={() => useGamepadFocusStore.getState().closeParamPanel()}
-      />
-      <GamepadOptionsModal />
-      <GamepadAssetPicker />
-
       {/* Delete confirm */}
       {deleteTarget && (
         <div className="gp-modal-overlay open" onClick={closeDelete}>
