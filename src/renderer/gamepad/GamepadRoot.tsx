@@ -208,6 +208,7 @@ export function GamepadRoot() {
     }
     if (fs.paramPanelOpen) {
       if (button === "triangle") { fs.closeParamPanel(); return; }
+      if (button === "options")  { paramSetEvent(); return; }
       if (button === "left")     { paramNavEvent("up");    return; }
       if (button === "right")    { paramNavEvent("down");  return; }
       if (button === "up")       { paramAdjustEvent("inc"); return; }
@@ -266,6 +267,7 @@ export function GamepadRoot() {
   // GamepadParamPanel can respond without prop drilling).
   const paramNavEvent    = (dir: "up"|"down")     => window.dispatchEvent(new CustomEvent("gp:param-nav",    { detail: dir }));
   const paramAdjustEvent = (dir: "inc"|"dec")    => window.dispatchEvent(new CustomEvent("gp:param-adjust", { detail: dir }));
+  const paramSetEvent    = ()                    => window.dispatchEvent(new CustomEvent("gp:param-set"));
 
   const paramR3Event   = () => window.dispatchEvent(new CustomEvent("gp:param-r3"));
 

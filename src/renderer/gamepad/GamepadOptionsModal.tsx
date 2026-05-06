@@ -32,6 +32,7 @@ const PANEL_ROWS: MappingRow[] = [
   { btns: [{ label: "R3", cls: "ob-r3" }],         action: "bool toggle / trigger 発火" },
   { btns: [{ label: "○", cls: "ob-circle" }],      action: "アセット on/off（パネル内でも）" },
   { btns: [{ label: "△", cls: "ob-triangle" }],    action: "パネルを閉じる" },
+  { btns: [{ label: "OPTIONS", cls: "ob-options" }], action: "現在のパラメータを既定値として保存" },
 ];
 
 const PICKER_ROWS: MappingRow[] = [

@@ -70,6 +70,11 @@ export function GamepadParamPanel({ onClose }: Props) {
   const isOpen = panelOpen || layerParamOpen;
 
   const [focusedRow, setFocusedRow] = useState(0);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const flashSaveStatus = (msg: string) => {
+    setSaveMsg(msg);
+    setTimeout(() => setSaveMsg(null), 2000);
+  };
 
   // Compute data from the focused target
   const data = (() => {
@@ -93,6 +98,7 @@ export function GamepadParamPanel({ onClose }: Props) {
         layer: { idx: target.layerIdx, opacity: layer.opacity, blend: layer.blend },
         setValue: (key: string, val: number | boolean | string) =>
           setClipParam(target.layerIdx, target.clipIdx, key, val),
+        saveDefaults: () => window.vj.setPluginDefaults(plugin.kind, plugin.id, clip.params),
       };
     }
     if (target.kind === "postfx") {
@@ -111,6 +117,7 @@ export function GamepadParamPanel({ onClose }: Props) {
         layer: null,
         setValue: (key: string, val: number | boolean | string) =>
           setPostFXSlotParam(target.slotIdx, key, val),
+        saveDefaults: () => window.vj.setPluginDefaults("postfx", plugin.id, slot.params ?? {}),
       };
     }
     return null;
@@ -266,15 +273,31 @@ export function GamepadParamPanel({ onClose }: Props) {
       const next = clamp(cur + step * delta, def.min ?? 0, def.max ?? 1);
       d2.setValue(def.key, def.type === "int" ? Math.round(next) : next);
     };
+    const onSet = () => {
+      const d2 = dataRef.current;
+      // saveDefaults はclip / postfxにのみ存在（layerには無い）
+      const fn = (d2 as { saveDefaults?: () => Promise<unknown> } | null)?.saveDefaults;
+      if (!fn) {
+        flashSaveStatus("not available");
+        return;
+      }
+      flashSaveStatus("saving…");
+      Promise.resolve(fn()).then(
+        () => flashSaveStatus("✓ saved as default"),
+        (err: Error) => flashSaveStatus(`✗ ${err.message}`),
+      );
+    };
     window.addEventListener("gp:param-nav",    onNav);
     window.addEventListener("gp:param-adjust", onAdjust);
     window.addEventListener("gp:param-step",   onStep);
     window.addEventListener("gp:param-r3",     onR3);
+    window.addEventListener("gp:param-set",    onSet);
     return () => {
       window.removeEventListener("gp:param-nav",    onNav);
       window.removeEventListener("gp:param-adjust", onAdjust);
       window.removeEventListener("gp:param-step",   onStep);
       window.removeEventListener("gp:param-r3",     onR3);
+      window.removeEventListener("gp:param-set",    onSet);
     };
   }, []);
 
@@ -287,6 +310,7 @@ export function GamepadParamPanel({ onClose }: Props) {
           <div className="gp-panel-header">
             <span className="gp-panel-title">{activeData.title}</span>
             <span className="gp-panel-subtitle">{activeData.subtitle}</span>
+            {saveMsg && <span className="gp-save-toast">{saveMsg}</span>}
             <button className="gp-panel-close" onClick={handleClose}>
               <span className="gp-btn-badge gp-tri">△</span> 閉じる
             </button>
@@ -342,6 +366,7 @@ export function GamepadParamPanel({ onClose }: Props) {
             <span className="gp-guide-item"><span className="gp-btn-badge gp-stick">R ↕</span> 連続変更</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">↑↓</span> ステップ変更</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-r3">R3</span> / <span className="gp-btn-badge gp-circle">○</span> toggle/fire</span>
+            <span className="gp-guide-item"><span className="gp-btn-badge gp-options">OPTIONS</span> 既定値として保存</span>
           </div>
         </>
       )}

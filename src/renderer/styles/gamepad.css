@@ -247,6 +247,16 @@
 .gp-l1      { background: rgba(255,176,32,0.18); color: var(--accent); }
 .gp-r1      { background: rgba(0,255,156,0.14);  color: var(--live); }
 .gp-r3      { background: rgba(255,62,165,0.18); color: var(--magenta); }
+.gp-options { background: rgba(255,255,255,0.1);  color: var(--text); }
+
+.gp-save-toast {
+  font-size: 9px; color: var(--live);
+  font-family: var(--font-mono);
+  margin-left: 6px;
+  padding: 1px 6px; border-radius: 2px;
+  background: var(--live-dim);
+  border: 1px solid rgba(0,255,156,0.3);
+}
 
 /* (reuse for hint badges) */
 .gp-hint-badge.gp-stick { background: rgba(255,176,32,0.14); color: var(--accent); }
