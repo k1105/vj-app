@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PS4 Controller UI — VJ App Prototype v1</title>
+<style>
+:root {
+  --bg-primary: #05070a;
+  --bg-panel: #0a0d12;
+  --bg-panel-hi: #0d1016;
+  --bg-card: #0f131a;
+  --bg-card-hover: #131820;
+  --bg-active: #1a2028;
+  --bg-inset: #020406;
+  --border: #1b2430;
+  --border-strong: #253040;
+  --text: #c8d4d8;
+  --text-strong: #ffffff;
+  --text-dim: #566876;
+  --text-muted: #2a3540;
+  --accent: #ffb020;
+  --accent-dim: rgba(255,176,32,0.16);
+  --live: #00ff9c;
+  --live-dim: rgba(0,255,156,0.14);
+  --danger: #ff2e5b;
+  --danger-dim: rgba(255,46,91,0.16);
+  --info: #00e5ff;
+  --info-dim: rgba(0,229,255,0.14);
+  --magenta: #ff3ea5;
+  --font-ui: "Inter", -apple-system, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono","SF Mono",monospace;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body {
+  font-family:var(--font-ui);
+  background:var(--bg-primary);
+  color:var(--text);
+  font-size:11px;
+  height:100vh;
+  overflow:hidden;
+  user-select:none;
+}
+
+/* ─── App grid ─── */
+.app {
+  display:grid;
+  grid-template-rows: 28px auto 1fr 18px 44px 26px;
+  height:100vh;
+}
+
+/* ─── Top bar ─── */
+.topbar {
+  display:flex; align-items:center; gap:10px;
+  padding:0 10px;
+  background:var(--bg-panel);
+  border-bottom:1px solid var(--border);
+}
+.topbar-title { font-size:9px; font-weight:700; letter-spacing:0.14em; color:var(--text-muted); text-transform:uppercase; }
+.bpm-display { font-family:var(--font-mono); font-size:16px; font-weight:700; color:var(--accent); letter-spacing:-0.02em; }
+.bpm-unit { font-size:8px; color:var(--text-dim); margin-left:2px; }
+.beat-dots { display:flex; gap:4px; align-items:center; }
+.beat-dot { width:7px; height:7px; border-radius:50%; background:var(--border-strong); transition:background 0.06s; }
+.beat-dot.active { background:var(--accent); box-shadow:0 0 5px var(--accent); }
+.topbar-spacer { flex:1; }
+/* perf bar */
+.perf-bar { display:flex; gap:6px; align-items:center; font-size:9px; color:var(--text-dim); font-family:var(--font-mono); }
+.perf-stat { color:var(--text-dim); }
+.perf-stat.warn { color:var(--danger); }
+.perf-unit { font-size:8px; opacity:0.6; }
+.mode-badge { font-size:9px; font-weight:700; letter-spacing:0.1em; padding:2px 7px; border-radius:2px; background:var(--accent-dim); color:var(--accent); border:1px solid rgba(255,176,32,0.3); text-transform:uppercase; }
+
+/* ─── Stage mode ─── */
+.stage-banner {
+  display:none; position:fixed; top:0; left:0; right:0; z-index:50;
+  background:rgba(255,176,32,0.12); border-bottom:1px solid var(--accent);
+  color:var(--accent); font-size:10px; font-weight:700; letter-spacing:0.1em;
+  text-transform:uppercase; text-align:center;
+  padding:5px 10px;
+  gap:16px;
+}
+.stage-banner.visible { display:flex; align-items:center; justify-content:center; }
+.stage-banner-actions { display:flex; gap:8px; }
+.stage-btn {
+  padding:3px 12px; border-radius:3px;
+  border:1px solid var(--accent); background:transparent; color:var(--accent);
+  font-size:9px; font-weight:700; cursor:pointer; font-family:var(--font-ui); letter-spacing:0.08em;
+}
+.stage-btn.release { background:var(--accent); color:#000; }
+.stage-btn.cancel  { border-color:var(--danger); color:var(--danger); }
+/* shift content down when stage banner is visible */
+.app.stage-active { padding-top:28px; }
+
+/* ─── Preview row ─── */
+.preview-row {
+  display:grid;
+  grid-template-columns: 1fr 1fr auto;
+  background:var(--bg-panel);
+  border-bottom:1px solid var(--border-strong);
+  gap:0;
+}
+.preview-box {
+  display:flex; flex-direction:column;
+  padding:6px 8px;
+  border-right:1px solid var(--border);
+}
+.preview-box:last-of-type { border-right:none; }
+.preview-header { display:flex; align-items:center; gap:5px; margin-bottom:4px; }
+.preview-label { font-size:8px; font-weight:700; letter-spacing:0.14em; color:var(--text-dim); text-transform:uppercase; }
+.preview-badge-live { font-size:8px; font-weight:700; color:var(--live); }
+.preview-badge-next { font-size:8px; font-weight:700; color:var(--accent); }
+.preview-canvas-mock {
+  aspect-ratio:16/9;
+  background:#000;
+  border:1px solid var(--border-strong);
+  border-radius:2px;
+  position:relative;
+  overflow:hidden;
+  flex:1;
+  display:flex; align-items:center; justify-content:center;
+  font-size:9px; color:var(--text-muted);
+}
+.preview-box.live .preview-canvas-mock { border-color:var(--live); }
+.preview-box.next .preview-canvas-mock { border-color:var(--border-strong); }
+/* fake composited layers in the NEXT preview */
+.preview-layer {
+  position:absolute; inset:0;
+  background-size:cover; background-position:center;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* ─── Audio meters ─── */
+.audio-sidebar {
+  width:100px;
+  display:flex; flex-direction:column;
+  padding:6px 8px;
+  gap:3px;
+  justify-content:center;
+}
+.audio-sidebar-title { font-size:8px; font-weight:700; color:var(--text-muted); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:2px; }
+.audio-row { display:flex; align-items:center; gap:5px; }
+.audio-row-label { font-size:8px; color:var(--text-muted); font-family:var(--font-mono); width:26px; }
+.audio-bar-wrap { flex:1; height:5px; background:var(--bg-inset); border-radius:2px; overflow:hidden; }
+.audio-bar-fill { height:100%; border-radius:2px; background:var(--live); transition:width 0.05s; }
+.audio-row.bass .audio-bar-fill { background:#00d4ff; }
+.audio-row.mid  .audio-bar-fill { background:#40c080; }
+.audio-row.high .audio-bar-fill { background:var(--magenta); }
+
+/* ─── Main: scrollable layer stack ─── */
+.main {
+  overflow-y:auto;
+  display:flex; flex-direction:column;
+}
+.layers-area {
+  padding:6px 8px;
+  flex:1;
+}
+.layers-header { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+.area-label { font-size:9px; font-weight:700; letter-spacing:0.14em; color:var(--text-dim); text-transform:uppercase; }
+.live-dot { font-size:9px; color:var(--live); }
+
+/* ─── PostFX boundary slot ─── */
+.pfx-boundary {
+  display:flex; align-items:center; gap:8px;
+  height:18px; margin:2px 0; cursor:pointer;
+  position:relative;
+}
+.pfx-boundary-line {
+  flex:1; height:1px; background:var(--border);
+}
+.pfx-boundary-label {
+  font-size:8px; font-weight:700; letter-spacing:0.1em;
+  color:var(--text-muted); text-transform:uppercase;
+  white-space:nowrap;
+  padding:1px 6px;
+  border:1px solid var(--border);
+  border-radius:2px;
+  background:var(--bg-card);
+  transition:color 0.1s, border-color 0.1s, background 0.1s;
+}
+.pfx-boundary.active .pfx-boundary-label {
+  color:var(--info); border-color:var(--info);
+  background:var(--info-dim);
+}
+.pfx-boundary.focused .pfx-boundary-label {
+  color:var(--accent); border-color:var(--accent);
+  background:var(--accent-dim);
+  box-shadow:0 0 0 1px var(--accent);
+}
+.pfx-boundary.active.focused .pfx-boundary-label {
+  color:var(--info); border-color:var(--info);
+  box-shadow:0 0 0 1px var(--info);
+}
+
+/* ─── Layer row ─── */
+.layer-row {
+  display:flex; align-items:stretch; gap:0;
+  border:1px solid var(--border); border-radius:4px;
+  background:var(--bg-card);
+  margin-bottom:2px;
+  min-height:88px;
+  overflow:hidden;
+  transition:border-color 0.12s, opacity 0.15s;
+}
+.layer-row.muted { opacity:0.45; }
+.layer-row.layer-focused { border-color:rgba(0,229,255,0.4); }
+
+/* opacity track */
+.layer-opacity-track {
+  width:6px; flex-shrink:0; background:var(--bg-inset);
+  position:relative; cursor:ns-resize;
+  title:'opacity';
+}
+.layer-opacity-fill {
+  position:absolute; bottom:0; left:0; right:0;
+  background:var(--text-muted); border-radius:0 0 3px 3px;
+  transition:height 0.12s;
+}
+.layer-row.layer-focused .layer-opacity-fill { background:var(--info); }
+
+/* layer meta */
+.layer-meta {
+  width:46px; flex-shrink:0;
+  display:flex; flex-direction:column; align-items:center;
+  justify-content:space-between;
+  padding:6px 4px;
+  border-right:1px solid var(--border);
+  gap:3px;
+}
+.layer-num { font-size:10px; font-weight:700; color:var(--text-dim); font-family:var(--font-mono); }
+.layer-opacity-val { font-size:9px; color:var(--text-dim); font-family:var(--font-mono); }
+.layer-row.layer-focused .layer-opacity-val { color:var(--info); }
+.blend-badge {
+  font-size:8px; font-weight:700; letter-spacing:0.03em;
+  color:var(--text-dim); text-transform:uppercase;
+  padding:1px 3px; border:1px solid var(--border-strong); border-radius:2px;
+}
+.layer-ms-row { display:flex; gap:3px; }
+.ms-btn {
+  width:18px; height:14px; border-radius:2px;
+  border:1px solid var(--border-strong); background:var(--bg-inset);
+  color:var(--text-muted); font-size:8px; font-weight:700;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:all 0.1s;
+}
+.ms-btn.on-mute { background:var(--danger-dim); color:var(--danger); border-color:rgba(255,46,91,0.3); }
+.ms-btn.on-solo { background:var(--accent-dim); color:var(--accent); border-color:rgba(255,176,32,0.3); }
+
+/* clip grid */
+.clip-grid {
+  display:flex; gap:5px; flex:1; min-width:0;
+  align-items:center; padding:7px;
+  flex-wrap:wrap;
+}
+
+/* ─── Clip card ─── */
+.clip-card {
+  width:84px; height:70px;
+  border:1px solid var(--border); border-radius:3px;
+  background:var(--bg-panel-hi);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:4px; cursor:pointer; position:relative;
+  transition:border-color 0.1s, background 0.1s; flex-shrink:0;
+}
+.clip-card.active  { border-color:var(--live);   background:var(--live-dim); }
+.clip-card.next-active { border-color:var(--accent); background:var(--accent-dim); }
+.clip-card.focused {
+  border-color:var(--info);
+  box-shadow:0 0 0 1px var(--info),0 0 10px rgba(0,229,255,0.18);
+  background:var(--info-dim);
+}
+.clip-card.focused.active,
+.clip-card.focused.next-active { border-color:var(--info); box-shadow:0 0 0 1px var(--info); }
+.clip-state-dot {
+  position:absolute; top:4px; left:4px;
+  width:5px; height:5px; border-radius:50%;
+}
+.clip-card.active .clip-state-dot { background:var(--live); box-shadow:0 0 4px var(--live); }
+.clip-card.next-active .clip-state-dot { background:var(--accent); }
+.clip-thumb { width:46px; height:32px; background:var(--bg-inset); border-radius:2px; display:flex; align-items:center; justify-content:center; }
+.clip-thumb-inner { font-size:17px; opacity:0.4; }
+.clip-card.active .clip-thumb-inner { opacity:1; }
+.clip-card.focused .clip-thumb-inner { opacity:0.8; }
+.clip-name { font-size:9px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:78px; padding:0 4px; text-align:center; }
+.clip-card.active .clip-name { color:var(--live); font-weight:700; }
+.clip-card.next-active .clip-name { color:var(--accent); }
+
+/* add slot */
+.clip-add-slot {
+  width:84px; height:70px;
+  border:1px dashed var(--border-strong); border-radius:3px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:2px; cursor:pointer; color:var(--text-muted);
+  transition:border-color 0.1s,color 0.1s,background 0.1s; flex-shrink:0; font-size:20px;
+}
+.clip-add-slot:hover,.clip-add-slot.focused { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+.clip-add-slot.focused { box-shadow:0 0 0 1px var(--accent); }
+.clip-add-label { font-size:8px; color:inherit; }
+
+/* ─── PostFX band ─── */
+.postfx-band { padding:5px 8px 7px; border-top:1px solid var(--border); }
+.postfx-slots { display:flex; gap:3px; margin-top:4px; }
+.postfx-slot {
+  flex:1; min-width:0; height:44px;
+  border:1px solid var(--border); border-radius:3px;
+  background:var(--bg-card);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:2px; cursor:pointer; transition:border-color 0.12s,background 0.12s;
+}
+.postfx-slot.on .postfx-slot-name { color:var(--live); font-weight:600; }
+.postfx-slot.on { border-color:rgba(0,255,156,0.25); }
+.postfx-slot.focused { border-color:var(--info); background:var(--info-dim); box-shadow:0 0 0 1px var(--info); }
+.postfx-slot.focused.on { border-color:var(--info); }
+.postfx-slot-num { font-size:8px; color:var(--text-muted); font-family:var(--font-mono); }
+.postfx-slot-name { font-size:9px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; padding:0 3px; text-align:center; }
+.postfx-power-dot { width:4px; height:4px; border-radius:50%; background:var(--text-muted); }
+.postfx-slot.on .postfx-power-dot { background:var(--live); box-shadow:0 0 3px var(--live); }
+
+/* ─── Audio meters strip ─── */
+.audio-strip {
+  display:flex; align-items:center; gap:10px;
+  padding:0 10px;
+  background:var(--bg-inset);
+  border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+}
+.audio-strip-label { font-size:8px; font-weight:700; color:var(--text-muted); letter-spacing:0.1em; text-transform:uppercase; }
+.audio-strip-status { font-size:8px; color:var(--live); }
+.audio-strip-meters { display:flex; gap:8px; flex:1; }
+.am-row { display:flex; align-items:center; gap:4px; flex:1; }
+.am-lbl { font-size:8px; color:var(--text-muted); font-family:var(--font-mono); width:24px; }
+.am-bar { flex:1; height:5px; background:var(--bg-card); border-radius:2px; overflow:hidden; }
+.am-fill { height:100%; border-radius:2px; transition:width 0.08s; }
+.am-vol  .am-fill { background:var(--live); }
+.am-bass .am-fill { background:#00d4ff; }
+.am-mid  .am-fill { background:#40c080; }
+.am-high .am-fill { background:var(--magenta); }
+
+/* ─── Transport ─── */
+.transport-bar {
+  display:flex; align-items:center; gap:7px;
+  padding:0 10px;
+  background:var(--bg-panel); border-top:1px solid var(--border);
+}
+.btn-t {
+  display:flex; align-items:center; gap:4px;
+  padding:5px 11px; border:1px solid var(--border-strong); border-radius:3px;
+  background:var(--bg-card); color:var(--text); cursor:pointer;
+  font-size:10px; font-weight:600; letter-spacing:0.05em; font-family:var(--font-ui);
+  transition:background 0.08s, border-color 0.08s;
+}
+.btn-t.pressed        { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+.btn-t.flash.pressed  { background:var(--live-dim);   border-color:var(--live);   color:var(--live); }
+.btn-t.burst.pressed  { background:var(--danger-dim); border-color:var(--danger); color:var(--danger); }
+.ps-b { font-size:8px; font-weight:700; padding:1px 5px; border-radius:10px; }
+.ps-l1   { background:rgba(255,176,32,0.2); color:var(--accent); }
+.ps-r1   { background:rgba(0,255,156,0.15); color:var(--live); }
+.ps-l1r1 { background:rgba(255,46,91,0.18); color:var(--danger); }
+.t-sep   { width:1px; height:20px; background:var(--border); flex-shrink:0; }
+.focus-readout { flex:1; padding-left:6px; font-size:9px; color:var(--text-dim); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.focus-readout span { color:var(--info); font-family:var(--font-mono); }
+
+/* ─── Status hint bar ─── */
+.statusbar {
+  display:flex; align-items:center; gap:10px;
+  padding:0 10px;
+  background:var(--bg-inset); border-top:1px solid var(--border);
+}
+.status-focus { font-size:9px; color:var(--info); font-family:var(--font-mono); }
+.status-hints { display:flex; gap:8px; align-items:center; margin-left:auto; }
+.hi { display:flex; align-items:center; gap:3px; font-size:9px; color:var(--text-dim); }
+.hb { font-size:8px; font-weight:700; padding:0 5px; border-radius:10px; line-height:14px; }
+.h-o { background:rgba(232,160,48,0.2); color:#e8a030; }
+.h-t { background:rgba(64,192,128,0.2); color:#40c080; }
+.h-x { background:rgba(80,144,224,0.2); color:#5090e0; }
+.h-d { background:rgba(255,255,255,0.07); color:var(--text-dim); }
+
+/* ─── Overlays ─── */
+.overlay-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:100; align-items:flex-end; }
+.overlay-backdrop.open { display:flex; }
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:200; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.help-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.72); z-index:300; align-items:center; justify-content:center; }
+.help-overlay.open { display:flex; }
+
+/* ─── Param panel (MIDI UI style vertical list) ─── */
+.param-panel { width:100%; background:var(--bg-panel); border-top:1px solid var(--border-strong); padding:0; max-height:65vh; display:flex; flex-direction:column; }
+.panel-hdr { display:flex; align-items:center; gap:8px; padding:10px 12px 8px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.panel-title { font-size:12px; font-weight:700; color:var(--text-strong); }
+.panel-subtitle { font-size:9px; color:var(--text-dim); }
+.panel-close { margin-left:auto; font-size:9px; color:var(--text-dim); cursor:pointer; display:flex; align-items:center; gap:4px; }
+
+/* layer-level row (opacity + blend) */
+.layer-param-row {
+  display:flex; align-items:center; gap:10px;
+  padding:7px 12px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg-card);
+  flex-shrink:0;
+}
+.lp-label { font-size:8px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.1em; width:36px; flex-shrink:0; }
+.opacity-mock { flex:1; height:4px; background:var(--bg-inset); border-radius:2px; position:relative; overflow:hidden; }
+.opacity-mock-fill { position:absolute; left:0; top:0; height:100%; background:var(--info); border-radius:2px; transition:width 0.1s; }
+.opacity-val { font-family:var(--font-mono); font-size:11px; font-weight:700; color:var(--info); min-width:22px; text-align:right; }
+.blend-opts { display:flex; gap:3px; }
+.blend-opt { padding:2px 7px; border-radius:2px; border:1px solid var(--border-strong); background:var(--bg-card); color:var(--text-dim); font-size:8px; font-weight:700; cursor:pointer; text-transform:uppercase; }
+.blend-opt.active { background:var(--info-dim); color:var(--info); border-color:var(--info); }
+
+/* scrollable param list */
+.param-scroll { overflow-y:auto; flex:1; }
+
+/* param row — same density as MIDI UI */
+.param-row {
+  display:flex; align-items:center; gap:0;
+  height:32px; padding:0 12px 0 0;
+  border-bottom:1px solid var(--border-subtle, #0d1218);
+  cursor:pointer;
+  transition:background 0.08s;
+}
+.param-row:last-child { border-bottom:none; }
+.param-row:hover { background:var(--bg-card-hover); }
+.param-row.focused {
+  background:var(--bg-active);
+  border-left:2px solid var(--accent);
+  padding-left:0;
+}
+.param-row.focused .p-label { color:var(--accent); }
+
+/* focus indicator left strip */
+.p-focus-strip {
+  width:2px; flex-shrink:0; align-self:stretch;
+  margin-right:10px;
+}
+.param-row.focused .p-focus-strip { background:var(--accent); }
+
+.p-label {
+  font-size:10px; color:var(--text-dim); letter-spacing:0.02em;
+  width:80px; flex-shrink:0; padding-left:10px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.param-row.focused .p-label { padding-left:8px; } /* compensate 2px border */
+
+/* float/int: bar + value */
+.p-slider-wrap { flex:1; display:flex; align-items:center; gap:8px; }
+.p-bar-track { flex:1; height:3px; background:var(--bg-inset); border-radius:2px; overflow:hidden; cursor:pointer; }
+.p-bar-fill { height:100%; border-radius:2px; background:var(--text-dim); transition:width 0.06s; }
+.param-row.focused .p-bar-fill { background:var(--accent); }
+.p-val { font-family:var(--font-mono); font-size:11px; font-weight:700; color:var(--text); min-width:32px; text-align:right; }
+.param-row.focused .p-val { color:var(--accent); }
+
+/* range (start–end) */
+.p-range-wrap { flex:1; display:flex; align-items:center; gap:6px; }
+.p-range-track { flex:1; height:3px; background:var(--bg-inset); border-radius:2px; position:relative; overflow:hidden; }
+.p-range-fill { position:absolute; top:0; height:100%; background:var(--text-dim); border-radius:2px; transition:left 0.06s,width 0.06s; }
+.param-row.focused .p-range-fill { background:var(--accent); }
+.p-range-vals { font-family:var(--font-mono); font-size:10px; color:var(--text-dim); white-space:nowrap; }
+.param-row.focused .p-range-vals { color:var(--accent); }
+
+/* bool toggle */
+.p-toggle {
+  padding:2px 10px; border-radius:2px;
+  border:1px solid var(--border-strong); background:var(--bg-inset);
+  color:var(--text-dim); font-size:9px; font-weight:700; cursor:pointer;
+  transition:all 0.1s; letter-spacing:0.06em;
+}
+.p-toggle.on { background:var(--live-dim); color:var(--live); border-color:rgba(0,255,156,0.3); }
+.param-row.focused .p-toggle { border-color:var(--accent); }
+.param-row.focused .p-toggle.on { border-color:var(--live); }
+
+/* enum: chip row */
+.p-enum-wrap { flex:1; display:flex; gap:3px; align-items:center; }
+.p-enum-chip {
+  padding:2px 7px; border-radius:2px;
+  border:1px solid var(--border); background:var(--bg-inset);
+  color:var(--text-muted); font-size:8px; font-weight:700; cursor:pointer;
+  white-space:nowrap; text-transform:uppercase;
+}
+.p-enum-chip.selected { background:var(--accent-dim); color:var(--accent); border-color:rgba(255,176,32,0.4); }
+
+/* step: ◀ val ▶ */
+.p-step-wrap { display:flex; align-items:center; gap:4px; }
+.p-step-btn { width:20px; height:18px; border:1px solid var(--border-strong); background:var(--bg-inset); color:var(--text-dim); border-radius:2px; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center; }
+.param-row.focused .p-step-btn { border-color:var(--accent); color:var(--accent); }
+.p-step-val { font-family:var(--font-mono); font-size:11px; font-weight:700; color:var(--text); min-width:28px; text-align:center; }
+
+/* trigger button */
+.p-trigger-btn {
+  padding:3px 12px; border-radius:2px;
+  border:1px solid var(--border-strong); background:var(--bg-inset);
+  color:var(--text-dim); font-size:9px; font-weight:700; cursor:pointer;
+  letter-spacing:0.06em;
+}
+.p-trigger-btn:active, .p-trigger-btn.fired { background:var(--magenta); color:#fff; border-color:var(--magenta); }
+.param-row.focused .p-trigger-btn { border-color:var(--magenta); color:var(--magenta); }
+
+/* gamepad hint badge inline */
+.p-gp-hint {
+  font-size:7px; font-weight:700; padding:0 4px; border-radius:8px; margin-left:4px;
+  white-space:nowrap; flex-shrink:0;
+}
+.ph-stick { background:rgba(255,176,32,0.15); color:var(--accent); }
+.ph-dpad  { background:rgba(255,255,255,0.07); color:var(--text-dim); }
+.ph-r3    { background:rgba(255,62,165,0.15); color:var(--magenta); }
+
+/* section divider */
+.param-section-hdr {
+  padding:5px 12px 4px;
+  font-size:8px; font-weight:700; letter-spacing:0.12em;
+  color:var(--text-muted); text-transform:uppercase;
+  background:var(--bg-inset);
+  border-bottom:1px solid var(--border);
+}
+
+/* controller guide strip at bottom of panel */
+.param-guide {
+  display:flex; gap:14px; align-items:center;
+  padding:7px 12px;
+  border-top:1px solid var(--border);
+  background:var(--bg-inset);
+  flex-shrink:0;
+}
+.pg-item { display:flex; align-items:center; gap:4px; font-size:9px; color:var(--text-dim); }
+.pg-badge { font-size:8px; font-weight:700; padding:1px 6px; border-radius:10px; }
+.pg-stick { background:rgba(255,176,32,0.18); color:var(--accent); }
+.pg-dpad  { background:rgba(255,255,255,0.07); color:var(--text); }
+.pg-r3    { background:rgba(255,62,165,0.18); color:var(--magenta); }
+.pg-tri   { background:rgba(64,192,128,0.18); color:#40c080; }
+
+/* ─── OPTIONS modal ─── */
+.options-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.78); z-index:400; align-items:center; justify-content:center; }
+.options-overlay.open { display:flex; }
+.options-card {
+  background:var(--bg-panel); border:1px solid var(--border-strong);
+  border-radius:6px; padding:18px 22px; width:520px;
+}
+.options-title { font-size:12px; font-weight:700; color:var(--text-strong); letter-spacing:0.08em; margin-bottom:14px; }
+.options-grid { display:grid; grid-template-columns:1fr 1fr; gap:0; }
+.options-col-title { font-size:8px; font-weight:700; letter-spacing:0.14em; color:var(--text-muted); text-transform:uppercase; padding-bottom:6px; margin-bottom:6px; border-bottom:1px solid var(--border); }
+.opt-row { display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px solid var(--border-subtle, #0d1218); }
+.opt-row:last-child { border-bottom:none; }
+.opt-btns { display:flex; gap:3px; flex-shrink:0; }
+.opt-btn {
+  font-size:8px; font-weight:700; padding:2px 7px;
+  border-radius:10px; white-space:nowrap;
+}
+.ob-circle   { background:rgba(232,160,48,0.2); color:#e8a030; }
+.ob-cross    { background:rgba(80,144,224,0.2); color:#5090e0; }
+.ob-triangle { background:rgba(64,192,128,0.2); color:#40c080; }
+.ob-square   { background:rgba(208,64,160,0.2); color:#d040a0; }
+.ob-l1       { background:rgba(255,176,32,0.15); color:var(--accent); }
+.ob-r1       { background:rgba(0,255,156,0.12); color:var(--live); }
+.ob-l1r1     { background:rgba(255,46,91,0.15); color:var(--danger); }
+.ob-l2       { background:rgba(100,180,255,0.15); color:#64b4ff; }
+.ob-r2       { background:rgba(180,100,255,0.15); color:#b464ff; }
+.ob-l3       { background:rgba(255,176,32,0.1); color:var(--accent); border:1px solid rgba(255,176,32,0.3); border-radius:10px; }
+.ob-r3       { background:rgba(255,62,165,0.15); color:var(--magenta); }
+.ob-dpad     { background:rgba(255,255,255,0.07); color:var(--text); }
+.ob-lstick   { background:rgba(255,176,32,0.12); color:var(--accent); }
+.ob-options  { background:rgba(255,255,255,0.1); color:var(--text); }
+.opt-action { font-size:10px; color:var(--text-dim); flex:1; }
+.opt-context { font-size:8px; color:var(--text-muted); margin-left:auto; }
+.options-col { padding:0 10px; }
+.options-col:first-child { border-right:1px solid var(--border); padding-left:0; }
+.options-col:last-child { padding-right:0; }
+.options-foot { margin-top:12px; padding-top:10px; border-top:1px solid var(--border); font-size:9px; color:var(--text-muted); text-align:center; }
+
+/* asset browser */
+.asset-panel { width:100%; background:var(--bg-panel); border-top:1px solid var(--border-strong); padding:12px; max-height:58vh; overflow-y:auto; }
+.asset-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:5px; margin-top:8px; }
+.asset-item { border:1px solid var(--border); border-radius:3px; background:var(--bg-card); padding:9px 5px; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; transition:border-color 0.1s,background 0.1s; }
+.asset-item:hover,.asset-item.focused { border-color:var(--accent); background:var(--accent-dim); }
+.asset-item.focused { box-shadow:0 0 0 1px var(--accent); }
+.asset-icon { font-size:20px; opacity:0.55; }
+.asset-item:hover .asset-icon,.asset-item.focused .asset-icon { opacity:1; }
+.asset-name { font-size:9px; color:var(--text); text-align:center; }
+
+/* delete modal */
+.modal-card { background:var(--bg-panel); border:1px solid var(--border-strong); border-radius:5px; padding:20px 24px; width:280px; display:flex; flex-direction:column; gap:12px; }
+.modal-icon { font-size:26px; text-align:center; }
+.modal-title { font-size:13px; font-weight:700; color:var(--text-strong); text-align:center; }
+.modal-body { font-size:11px; color:var(--text-dim); text-align:center; line-height:1.5; }
+.modal-actions { display:flex; gap:8px; justify-content:center; }
+.modal-btn { padding:6px 16px; border-radius:3px; border:1px solid var(--border-strong); background:var(--bg-card); color:var(--text); cursor:pointer; font-size:11px; font-weight:600; font-family:var(--font-ui); display:flex; align-items:center; gap:4px; }
+.modal-btn.danger { border-color:rgba(255,46,91,0.4); background:var(--danger-dim); color:var(--danger); }
+
+/* help */
+.help-card { background:var(--bg-panel); border:1px solid var(--border-strong); border-radius:5px; padding:16px 20px; width:380px; display:grid; grid-template-columns:1fr 1fr; gap:6px 18px; }
+.help-title { grid-column:1/-1; font-size:11px; font-weight:700; color:var(--accent); margin-bottom:4px; letter-spacing:0.08em; }
+.help-row { display:flex; align-items:center; gap:7px; font-size:10px; color:var(--text-dim); }
+.help-row kbd { font-family:var(--font-mono); background:var(--bg-active); border:1px solid var(--border-strong); padding:1px 5px; border-radius:2px; color:var(--text); white-space:nowrap; }
+.help-foot { grid-column:1/-1; text-align:center; font-size:9px; color:var(--text-muted); margin-top:4px; }
+</style>
+</head>
+<body>
+<!-- ─── Stage banner (fixed overlay, above app) ─── -->
+<div class="stage-banner" id="stageBanner">
+  <span>STAGE — Output frozen</span>
+  <div class="stage-banner-actions">
+    <button class="stage-btn release" onclick="releaseStage()">RELEASE <span style="opacity:.7;font-size:8px;">□+R1</span></button>
+    <button class="stage-btn cancel"  onclick="cancelStage()">CANCEL <span style="opacity:.7;font-size:8px;">□</span></button>
+  </div>
+</div>
+
+<div class="app" id="appRoot">
+
+  <!-- ─── Top bar: BPM + beat + perf ─── -->
+  <div class="topbar">
+    <div class="topbar-title">VJ · PS4</div>
+    <div class="bpm-display" id="bpmDisplay">128<span class="bpm-unit">BPM</span></div>
+    <div class="beat-dots">
+      <div class="beat-dot" id="d0"></div><div class="beat-dot" id="d1"></div>
+      <div class="beat-dot" id="d2"></div><div class="beat-dot" id="d3"></div>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="perf-bar">
+      <span class="perf-stat" id="perfFps">58.3</span><span class="perf-unit">FPS</span>
+      <span style="color:var(--border-strong)">·</span>
+      <span class="perf-stat">412</span><span class="perf-unit">MB</span>
+      <span style="color:var(--border-strong)">·</span>
+      <span class="perf-stat">24<span class="perf-unit">tex</span> 8<span class="perf-unit">geo</span></span>
+      <span style="color:var(--border-strong)">·</span>
+      <span class="perf-stat">3<span class="perf-unit">plug</span></span>
+    </div>
+    <div class="t-sep" style="margin:0 4px;"></div>
+    <div class="mode-badge">GAMEPAD</div>
+  </div>
+
+  <!-- ─── Preview row: LIVE OUT + NEXT OUT + audio ─── -->
+  <div class="preview-row">
+    <!-- LIVE OUT -->
+    <div class="preview-box live">
+      <div class="preview-header">
+        <div class="preview-label">LIVE OUT</div>
+        <div class="preview-badge-live">● LIVE</div>
+      </div>
+      <div class="preview-canvas-mock">
+        <!-- fake composited content -->
+        <div class="preview-layer" style="background:radial-gradient(ellipse at 40% 60%, rgba(0,255,100,0.25) 0%, transparent 70%);"></div>
+        <div class="preview-layer" style="background:radial-gradient(ellipse at 70% 30%, rgba(255,176,32,0.15) 0%, transparent 60%);"></div>
+        <div style="position:absolute;bottom:4px;left:6px;font-size:8px;color:var(--live);font-weight:700;letter-spacing:0.1em;">Particles + Grid Wave</div>
+      </div>
+    </div>
+    <!-- NEXT OUT -->
+    <div class="preview-box next" id="nextPreviewBox">
+      <div class="preview-header">
+        <div class="preview-label">NEXT OUT</div>
+        <div class="preview-badge-next" id="nextBadge">◎ STAGE OFF</div>
+      </div>
+      <div class="preview-canvas-mock" id="nextCanvasMock" style="color:var(--text-muted);font-size:9px;text-align:center;">
+        <span id="nextPlaceholder">□ ボタンでステージモード</span>
+        <!-- staged content shown when active -->
+        <div id="nextStagedContent" style="display:none;position:absolute;inset:0;">
+          <div class="preview-layer" style="background:radial-gradient(ellipse at 50% 50%, rgba(0,229,255,0.3) 0%, transparent 65%);"></div>
+          <div class="preview-layer" style="background:radial-gradient(ellipse at 30% 70%, rgba(255,62,165,0.2) 0%, transparent 55%);"></div>
+          <div style="position:absolute;bottom:4px;left:6px;font-size:8px;color:var(--info);font-weight:700;letter-spacing:0.1em;">Tunnel + Grid Wave</div>
+        </div>
+      </div>
+    </div>
+    <!-- Audio sidebar -->
+    <div class="audio-sidebar">
+      <div class="audio-sidebar-title">Audio</div>
+      <div class="audio-row"><div class="audio-row-label">VOL</div><div class="audio-bar-wrap"><div class="audio-bar-fill" id="avol" style="width:70%"></div></div></div>
+      <div class="audio-row bass"><div class="audio-row-label">BASS</div><div class="audio-bar-wrap"><div class="audio-bar-fill" id="abas" style="width:55%;background:#00d4ff"></div></div></div>
+      <div class="audio-row mid"><div class="audio-row-label">MID</div><div class="audio-bar-wrap"><div class="audio-bar-fill" id="amid" style="width:40%;background:#40c080"></div></div></div>
+      <div class="audio-row high"><div class="audio-row-label">HIGH</div><div class="audio-bar-wrap"><div class="audio-bar-fill" id="ahigh" style="width:20%;background:var(--magenta)"></div></div></div>
+    </div>
+  </div>
+
+  <!-- ─── Main: layer stack ─── -->
+  <div class="main">
+    <div class="layers-area">
+      <div class="layers-header">
+        <span class="area-label">Layers</span>
+        <span class="live-dot">● LIVE</span>
+      </div>
+
+      <!-- PostFX boundary: ALL (top) -->
+      <div class="pfx-boundary active" data-id="BND0" onclick="focusItem('BND0');setBoundary(0)">
+        <div class="pfx-boundary-line"></div>
+        <div class="pfx-boundary-label">POSTFX · ALL</div>
+        <div class="pfx-boundary-line"></div>
+      </div>
+
+      <!-- Layer 1 -->
+      <div class="layer-row" id="row-L1">
+        <div class="layer-opacity-track" onclick="cycleOpacity('L1')"><div class="layer-opacity-fill" id="opf-L1" style="height:85%"></div></div>
+        <div class="layer-meta">
+          <div class="layer-num">L1</div>
+          <div class="layer-opacity-val" id="opv-L1">85</div>
+          <div class="blend-badge" id="bld-L1">ADD</div>
+          <div class="layer-ms-row">
+            <div class="ms-btn" id="mut-L1" onclick="toggleMute('L1')">M</div>
+            <div class="ms-btn" id="sol-L1" onclick="toggleSolo('L1')">S</div>
+          </div>
+        </div>
+        <div class="clip-grid">
+          <div class="clip-card active focused" data-id="L1C0" onclick="focusItem('L1C0')">
+            <div class="clip-state-dot"></div>
+            <div class="clip-thumb"><div class="clip-thumb-inner">◈</div></div>
+            <div class="clip-name">Particles</div>
+          </div>
+          <div class="clip-card next-active" data-id="L1C1" onclick="focusItem('L1C1')">
+            <div class="clip-state-dot"></div>
+            <div class="clip-thumb"><div class="clip-thumb-inner">≋</div></div>
+            <div class="clip-name">Tunnel</div>
+          </div>
+          <div class="clip-card" data-id="L1C2" onclick="focusItem('L1C2')">
+            <div class="clip-thumb"><div class="clip-thumb-inner">✦</div></div>
+            <div class="clip-name">Plasma</div>
+          </div>
+          <div class="clip-add-slot" data-id="L1ADD" onclick="openAssetBrowser('L1')">
+            <span>+</span><span class="clip-add-label">ADD</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PostFX boundary: between L1 and L2 -->
+      <div class="pfx-boundary" data-id="BND1" onclick="focusItem('BND1');setBoundary(1)">
+        <div class="pfx-boundary-line"></div>
+        <div class="pfx-boundary-label">POSTFX ↓ L2…</div>
+        <div class="pfx-boundary-line"></div>
+      </div>
+
+      <!-- Layer 2 -->
+      <div class="layer-row" id="row-L2">
+        <div class="layer-opacity-track" onclick="cycleOpacity('L2')"><div class="layer-opacity-fill" id="opf-L2" style="height:60%"></div></div>
+        <div class="layer-meta">
+          <div class="layer-num">L2</div>
+          <div class="layer-opacity-val" id="opv-L2">60</div>
+          <div class="blend-badge" id="bld-L2">NRM</div>
+          <div class="layer-ms-row">
+            <div class="ms-btn" id="mut-L2" onclick="toggleMute('L2')">M</div>
+            <div class="ms-btn" id="sol-L2" onclick="toggleSolo('L2')">S</div>
+          </div>
+        </div>
+        <div class="clip-grid">
+          <div class="clip-card active" data-id="L2C0" onclick="focusItem('L2C0')">
+            <div class="clip-state-dot"></div>
+            <div class="clip-thumb"><div class="clip-thumb-inner">⬡</div></div>
+            <div class="clip-name">Grid Wave</div>
+          </div>
+          <div class="clip-add-slot" data-id="L2ADD" onclick="openAssetBrowser('L2')">
+            <span>+</span><span class="clip-add-label">ADD</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PostFX boundary: between L2 and L3 -->
+      <div class="pfx-boundary" data-id="BND2" onclick="focusItem('BND2');setBoundary(2)">
+        <div class="pfx-boundary-line"></div>
+        <div class="pfx-boundary-label">POSTFX ↓ L3…</div>
+        <div class="pfx-boundary-line"></div>
+      </div>
+
+      <!-- Layer 3 -->
+      <div class="layer-row" id="row-L3">
+        <div class="layer-opacity-track" onclick="cycleOpacity('L3')"><div class="layer-opacity-fill" id="opf-L3" style="height:100%"></div></div>
+        <div class="layer-meta">
+          <div class="layer-num">L3</div>
+          <div class="layer-opacity-val" id="opv-L3">100</div>
+          <div class="blend-badge" id="bld-L3">SCR</div>
+          <div class="layer-ms-row">
+            <div class="ms-btn on-mute" id="mut-L3" onclick="toggleMute('L3')">M</div>
+            <div class="ms-btn" id="sol-L3" onclick="toggleSolo('L3')">S</div>
+          </div>
+        </div>
+        <div class="clip-grid">
+          <div class="clip-add-slot" data-id="L3ADD" onclick="openAssetBrowser('L3')">
+            <span>+</span><span class="clip-add-label">ADD</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PostFX boundary: between L3 and L4 -->
+      <div class="pfx-boundary" data-id="BND3" onclick="focusItem('BND3');setBoundary(3)">
+        <div class="pfx-boundary-line"></div>
+        <div class="pfx-boundary-label">POSTFX ↓ L4…</div>
+        <div class="pfx-boundary-line"></div>
+      </div>
+
+      <!-- Layer 4 -->
+      <div class="layer-row" id="row-L4">
+        <div class="layer-opacity-track" onclick="cycleOpacity('L4')"><div class="layer-opacity-fill" id="opf-L4" style="height:100%"></div></div>
+        <div class="layer-meta">
+          <div class="layer-num">L4</div>
+          <div class="layer-opacity-val" id="opv-L4">100</div>
+          <div class="blend-badge" id="bld-L4">NRM</div>
+          <div class="layer-ms-row">
+            <div class="ms-btn" id="mut-L4" onclick="toggleMute('L4')">M</div>
+            <div class="ms-btn" id="sol-L4" onclick="toggleSolo('L4')">S</div>
+          </div>
+        </div>
+        <div class="clip-grid">
+          <div class="clip-add-slot" data-id="L4ADD" onclick="openAssetBrowser('L4')">
+            <span>+</span><span class="clip-add-label">ADD</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PostFX boundary: OFF (bottom) -->
+      <div class="pfx-boundary" data-id="BND4" onclick="focusItem('BND4');setBoundary(4)">
+        <div class="pfx-boundary-line"></div>
+        <div class="pfx-boundary-label">POSTFX · OFF</div>
+        <div class="pfx-boundary-line"></div>
+      </div>
+
+      <!-- PostFX slots -->
+      <div class="postfx-band">
+        <div class="layers-header"><span class="area-label">PostFX</span><span style="font-size:8px;color:var(--text-muted);margin-left:4px;">8 SLOTS</span></div>
+        <div class="postfx-slots">
+          <div class="postfx-slot on"  data-id="PFX0" onclick="focusItem('PFX0')"><div class="postfx-power-dot"></div><div class="postfx-slot-num">1</div><div class="postfx-slot-name">Bloom</div></div>
+          <div class="postfx-slot"     data-id="PFX1" onclick="focusItem('PFX1')"><div class="postfx-power-dot"></div><div class="postfx-slot-num">2</div><div class="postfx-slot-name">Glitch</div></div>
+          <div class="postfx-slot"     data-id="PFX2" onclick="focusItem('PFX2')"><div class="postfx-power-dot"></div><div class="postfx-slot-num">3</div><div class="postfx-slot-name">RGB Shift</div></div>
+          <div class="postfx-slot"     data-id="PFX3" onclick="focusItem('PFX3')"><div class="postfx-power-dot"></div><div class="postfx-slot-num">4</div><div class="postfx-slot-name" style="color:var(--text-muted)">empty</div></div>
+          <div class="postfx-slot"     data-id="PFX4" onclick="focusItem('PFX4')"><div class="postfx-power-dot"></div><div class="postfx-slot-num">5</div><div class="postfx-slot-name" style="color:var(--text-muted)">empty</div></div>
+          <div class="postfx-slot"     data-id="PFX5" onclick="focusItem('PFX5')"><div class="postfx-power-dot"></div><div class="postfx-slot-num">6</div><div class="postfx-slot-name" style="color:var(--text-muted)">empty</div></div>
+          <div class="postfx-slot"     data-id="PFX6" onclick="focusItem('PFX6')"><div class="postfx-power-dot"></div><div class="postfx-slot-num">7</div><div class="postfx-slot-name" style="color:var(--text-muted)">empty</div></div>
+          <div class="postfx-slot"     data-id="PFX7" onclick="focusItem('PFX7')"><div class="postfx-power-dot"></div><div class="postfx-slot-num">8</div><div class="postfx-slot-name" style="color:var(--text-muted)">empty</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Audio meters strip ─── -->
+  <div class="audio-strip">
+    <div class="audio-strip-label">Audio</div>
+    <div class="audio-strip-status">live</div>
+    <div class="audio-strip-meters">
+      <div class="am-row am-vol"><div class="am-lbl">VOL</div><div class="am-bar"><div class="am-fill" id="sm-vol" style="width:68%"></div></div></div>
+      <div class="am-row am-bass"><div class="am-lbl">BASS</div><div class="am-bar"><div class="am-fill" id="sm-bas" style="width:52%"></div></div></div>
+      <div class="am-row am-mid"><div class="am-lbl">MID</div><div class="am-bar"><div class="am-fill" id="sm-mid" style="width:38%"></div></div></div>
+      <div class="am-row am-high"><div class="am-lbl">HIGH</div><div class="am-bar"><div class="am-fill" id="sm-high" style="width:18%"></div></div></div>
+    </div>
+  </div>
+
+  <!-- ─── Transport ─── -->
+  <div class="transport-bar">
+    <button class="btn-t" id="btnTap" onmousedown="pressTap()" onmouseup="releaseTap()">
+      <span class="ps-b ps-l1">L1</span> TAP
+    </button>
+    <div class="t-sep"></div>
+    <button class="btn-t flash" id="btnFlash" onmousedown="pressFlash()" onmouseup="releaseFlash()">
+      <span class="ps-b ps-r1">R1</span> FLASH
+    </button>
+    <div class="t-sep"></div>
+    <button class="btn-t burst" id="btnBurst" onmousedown="pressBurst()" onmouseup="releaseBurst()">
+      <span class="ps-b ps-l1r1">L1+R1</span> BURST
+    </button>
+    <div class="t-sep"></div>
+    <div class="focus-readout">Focus: <span id="focusReadout">L1 · Particles [LIVE]</span></div>
+    <button class="btn-t" onclick="showHelp()" style="margin-left:auto;padding:4px 9px;font-size:9px;color:var(--text-dim);">? help</button>
+  </div>
+
+  <!-- ─── Status hint bar ─── -->
+  <div class="statusbar">
+    <div class="status-focus" id="statusFocus">L1C0</div>
+    <div class="status-hints" id="statusHints"></div>
+  </div>
+
+</div>
+
+<!-- ─── OVERLAY: Param panel ─── -->
+<div class="overlay-backdrop" id="paramOverlay" onclick="backdropClose(event,'paramOverlay')">
+<div class="param-panel" onclick="event.stopPropagation()">
+  <div class="panel-hdr">
+    <div class="panel-title" id="paramTitle">Particles</div>
+    <div class="panel-subtitle" id="paramSubtitle">L1 · 8 params</div>
+    <div class="panel-close" onclick="closeOverlay('paramOverlay')"><span class="hb h-t">△</span> close</div>
+  </div>
+  <!-- layer-level: opacity + blend (only for clip params, hidden for postfx) -->
+  <div class="layer-param-row" id="layerParamRow">
+    <div class="lp-label">Opacity</div>
+    <div class="opacity-mock"><div class="opacity-mock-fill" id="opSliderFill" style="width:85%"></div></div>
+    <div class="opacity-val" id="opSliderVal">85</div>
+    <div class="t-sep" style="margin:0 6px;height:14px;"></div>
+    <div class="lp-label">Blend</div>
+    <div class="blend-opts" id="blendOpts">
+      <div class="blend-opt active" onclick="selectBlend(this)">NRM</div>
+      <div class="blend-opt" onclick="selectBlend(this)">ADD</div>
+      <div class="blend-opt" onclick="selectBlend(this)">MUL</div>
+      <div class="blend-opt" onclick="selectBlend(this)">SCR</div>
+    </div>
+  </div>
+  <!-- param rows — filled by JS -->
+  <div class="param-scroll" id="paramScroll">
+    <div id="paramList"></div>
+  </div>
+  <!-- controller guide -->
+  <div class="param-guide">
+    <div class="pg-item"><span class="pg-badge pg-dpad">↑↓</span> 行選択</div>
+    <div class="pg-item"><span class="pg-badge pg-stick">L Stick ↕</span> float/int 値変更</div>
+    <div class="pg-item"><span class="pg-badge pg-dpad">←→</span> step/enum 切替</div>
+    <div class="pg-item"><span class="pg-badge pg-r3">R3</span> bool toggle / trigger 発火</div>
+    <div class="pg-item"><span class="pg-badge pg-tri">△</span> 閉じる</div>
+  </div>
+</div>
+</div>
+
+<!-- ─── OVERLAY: Asset browser ─── -->
+<div class="overlay-backdrop" id="assetOverlay" onclick="backdropClose(event,'assetOverlay')">
+<div class="asset-panel" onclick="event.stopPropagation()">
+  <div class="panel-hdr">
+    <div class="panel-title" id="assetTitle">アセット追加</div>
+    <div class="panel-close" onclick="closeOverlay('assetOverlay')"><span class="hb h-x">✕</span> close</div>
+  </div>
+  <div class="asset-grid">
+    <div class="asset-item focused" onclick="selectAsset('Particles')"><div class="asset-icon">◈</div><div class="asset-name">Particles</div></div>
+    <div class="asset-item" onclick="selectAsset('Tunnel')"><div class="asset-icon">≋</div><div class="asset-name">Tunnel</div></div>
+    <div class="asset-item" onclick="selectAsset('Grid Wave')"><div class="asset-icon">⬡</div><div class="asset-name">Grid Wave</div></div>
+    <div class="asset-item" onclick="selectAsset('Plasma')"><div class="asset-icon">✦</div><div class="asset-name">Plasma</div></div>
+    <div class="asset-item" onclick="selectAsset('Video 1')"><div class="asset-icon">▶</div><div class="asset-name">Video 1</div></div>
+    <div class="asset-item" onclick="selectAsset('Fractal')"><div class="asset-icon">❋</div><div class="asset-name">Fractal</div></div>
+    <div class="asset-item" onclick="selectAsset('Waveform')"><div class="asset-icon">∿</div><div class="asset-name">Waveform</div></div>
+    <div class="asset-item" onclick="selectAsset('Liquid')"><div class="asset-icon">◉</div><div class="asset-name">Liquid</div></div>
+    <div class="asset-item" onclick="selectAsset('Strobe')"><div class="asset-icon">◻</div><div class="asset-name">Strobe</div></div>
+    <div class="asset-item" onclick="selectAsset('Text')"><div class="asset-icon">T</div><div class="asset-name">Text</div></div>
+    <div class="asset-item" onclick="selectAsset('Geometry')"><div class="asset-icon">△</div><div class="asset-name">Geometry</div></div>
+    <div class="asset-item" onclick="selectAsset('Noise')"><div class="asset-icon">▒</div><div class="asset-name">Noise</div></div>
+  </div>
+  <div style="margin-top:9px;font-size:9px;color:var(--text-dim);">D-PAD で選択 · ⭕ で追加 · △/✕ で閉じる</div>
+</div>
+</div>
+
+<!-- ─── Delete modal ─── -->
+<div class="modal-overlay" id="deleteModal">
+<div class="modal-card">
+  <div class="modal-icon">⚠️</div>
+  <div class="modal-title">削除しますか？</div>
+  <div class="modal-body" id="deleteBody">このアセットを削除します。</div>
+  <div class="modal-actions">
+    <button class="modal-btn" onclick="closeOverlay('deleteModal')"><span class="hb h-t">△</span> キャンセル</button>
+    <button class="modal-btn danger" onclick="confirmDelete()"><span class="hb h-x">✕</span> 削除</button>
+  </div>
+</div>
+</div>
+
+<!-- ─── OPTIONS button mapping ─── -->
+<div class="options-overlay" id="optionsOverlay" onclick="closeOverlay('optionsOverlay')">
+<div class="options-card" onclick="event.stopPropagation()">
+  <div class="options-title">OPTIONS — ボタンマッピング</div>
+  <div class="options-grid">
+    <!-- Left column: global -->
+    <div class="options-col">
+      <div class="options-col-title">グローバル / ナビゲーション</div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-dpad">D-PAD</span></div>
+        <div class="opt-action">フォーカス移動</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-circle">○</span></div>
+        <div class="opt-action">アセット / PostFX on/off</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-triangle">△</span></div>
+        <div class="opt-action">パラメータパネルを開く</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-cross">✕</span></div>
+        <div class="opt-action">アセット削除（確認あり）</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-square">□</span></div>
+        <div class="opt-action">Stage toggle（ON/CANCEL）</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-square">□</span><span class="opt-btn ob-r1">R1</span></div>
+        <div class="opt-action">Stage release（Output更新）</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-l1">L1</span></div>
+        <div class="opt-action">TAP BPM</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-r1">R1</span></div>
+        <div class="opt-action">FLASH（一時全白）</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-l1">L1</span><span class="opt-btn ob-r1">R1</span></div>
+        <div class="opt-action">BURST（強調演出）</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-options">OPTIONS</span></div>
+        <div class="opt-action">このマッピング表示</div>
+      </div>
+    </div>
+    <!-- Right column: param panel context -->
+    <div class="options-col">
+      <div class="options-col-title">パラメータパネル内</div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-dpad">↑↓</span></div>
+        <div class="opt-action">パラメータ行を選択</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-lstick">L Stick ↕</span></div>
+        <div class="opt-action">float / int 値を変更</div>
+        <div class="opt-context">連続値</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-dpad">←→</span></div>
+        <div class="opt-action">step / enum を切替</div>
+        <div class="opt-context">離散値</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-r3">R3</span></div>
+        <div class="opt-action">bool toggle / trigger 発火</div>
+        <div class="opt-context">ボタン系</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-circle">○</span></div>
+        <div class="opt-action">アセット on/off（パネル内でも）</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-triangle">△</span></div>
+        <div class="opt-action">パラメータパネルを閉じる</div>
+      </div>
+      <div class="options-col-title" style="margin-top:12px;">アセットブラウザ内</div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-dpad">D-PAD</span></div>
+        <div class="opt-action">アセット選択</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-circle">○</span></div>
+        <div class="opt-action">アセットを追加</div>
+      </div>
+      <div class="opt-row">
+        <div class="opt-btns"><span class="opt-btn ob-triangle">△</span><span style="font-size:9px;color:var(--text-muted);margin:0 2px;">/</span><span class="opt-btn ob-cross">✕</span></div>
+        <div class="opt-action">閉じる</div>
+      </div>
+    </div>
+  </div>
+  <div class="options-foot">OPTIONS ボタンまたは Esc で閉じる</div>
+</div>
+</div>
+
+<!-- ─── Help ─── -->
+<div class="help-overlay" id="helpOverlay" onclick="closeOverlay('helpOverlay')">
+<div class="help-card" onclick="event.stopPropagation()">
+  <div class="help-title">操作ガイド — PC キーボードシミュレート</div>
+  <div class="help-row"><kbd>← → ↑ ↓</kbd> D-pad ナビゲート</div>
+  <div class="help-row"><kbd>O</kbd> ⭕ — on/off toggle</div>
+  <div class="help-row"><kbd>T</kbd> △ — パラメータパネル</div>
+  <div class="help-row"><kbd>X</kbd> ✕ — 削除確認</div>
+  <div class="help-row"><kbd>Q</kbd> L1 — TAP BPM</div>
+  <div class="help-row"><kbd>E</kbd> R1 — FLASH</div>
+  <div class="help-row"><kbd>W</kbd> L1+R1 — BURST</div>
+  <div class="help-row"><kbd>M</kbd> Mute フォーカスレイヤー</div>
+  <div class="help-row"><kbd>S</kbd> Solo フォーカスレイヤー</div>
+  <div class="help-row"><kbd>B</kbd> PostFX boundary 移動</div>
+  <div class="help-row"><kbd>Z</kbd> □ — Stage on/cancel</div>
+  <div class="help-row"><kbd>Space</kbd> □+R1 — Stage release</div>
+  <div class="help-row"><kbd>P</kbd> OPTIONS — ボタンマッピング</div>
+  <div class="help-row"><kbd>R</kbd> R3 — bool toggle / trigger（パネル内）</div>
+  <div class="help-foot">クリックまたは Esc で閉じる</div>
+</div>
+</div>
+
+<script>
+// ─── Focus map: [row][col] ───
+// Boundaries are interleaved between layer rows
+const FM = [
+  ['L1C0','L1C1','L1C2','L1ADD'],  // row 0: layer 1 clips
+  ['BND1'],                          // row 1: boundary below L1
+  ['L2C0','L2ADD'],                  // row 2: layer 2
+  ['BND2'],                          // row 3: boundary below L2
+  ['L3ADD'],                         // row 4: layer 3
+  ['BND3'],                          // row 5: boundary below L3
+  ['L4ADD'],                         // row 6: layer 4
+  ['BND4'],                          // row 7: boundary OFF
+  ['PFX0','PFX1','PFX2','PFX3','PFX4','PFX5','PFX6','PFX7'], // row 8: postfx
+];
+let cr = 0, cc = 0;
+let pendingDelete = null;
+let targetLayer = null;
+let activeBoundary = 0;
+
+// param types: float, int, bool, enum, step, range, trigger, color
+const PARAMS = {
+  L1C0:{name:'Particles',layer:'L1',params:[
+    {k:'count',   type:'float', v:0.72},
+    {k:'speed',   type:'float', v:0.45},
+    {k:'size',    type:'float', v:0.33},
+    {k:'spread',  type:'float', v:0.60},
+    {k:'colorH',  type:'float', v:0.18},
+    {k:'colorS',  type:'float', v:0.80},
+    {k:'lifetime',type:'float', v:0.55},
+    {k:'gravity', type:'float', v:0.10},
+    {k:'loop',    type:'bool',  v:true},
+    {k:'blend',   type:'enum',  v:'add', options:['normal','add','screen','multiply']},
+    {k:'sizeRange',type:'range',vStart:0.10, vEnd:0.80},
+    {k:'burst',   type:'trigger'},
+  ]},
+  L1C1:{name:'Tunnel',layer:'L1',params:[
+    {k:'zoom',   type:'float', v:0.55},
+    {k:'twist',  type:'float', v:0.30},
+    {k:'rings',  type:'int',   v:0.65},
+    {k:'speed',  type:'float', v:0.50},
+    {k:'angle',  type:'step',  v:0, step:45, min:0, max:315, options:['0°','45°','90°','135°','180°','225°','270°','315°']},
+    {k:'colorH', type:'float', v:0.70},
+    {k:'invert', type:'bool',  v:false},
+  ]},
+  L1C2:{name:'Plasma',layer:'L1',params:[
+    {k:'freq',  type:'float', v:0.40},
+    {k:'scale', type:'float', v:0.60},
+    {k:'speed', type:'float', v:0.35},
+    {k:'hue',   type:'float', v:0.20},
+    {k:'mode',  type:'enum',  v:'classic', options:['classic','electric','acid']},
+  ]},
+  L2C0:{name:'Grid Wave',layer:'L2',params:[
+    {k:'freqX', type:'float', v:0.40},
+    {k:'freqY', type:'float', v:0.40},
+    {k:'amp',   type:'float', v:0.60},
+    {k:'speed', type:'float', v:0.35},
+    {k:'gridN', type:'int',   v:0.50},
+    {k:'size',  type:'range', vStart:0.10, vEnd:0.80},
+    {k:'flash', type:'trigger'},
+  ]},
+  PFX0:{name:'Bloom',layer:null,params:[
+    {k:'intensity', type:'float', v:0.65},
+    {k:'threshold', type:'float', v:0.70},
+    {k:'radius',    type:'float', v:0.40},
+    {k:'enabled',   type:'bool',  v:true},
+  ]},
+  PFX1:{name:'Glitch',layer:null,params:[
+    {k:'amount', type:'float', v:0.35},
+    {k:'speed',  type:'float', v:0.50},
+    {k:'seed',   type:'int',   v:0.20},
+    {k:'color',  type:'bool',  v:false},
+  ]},
+  PFX2:{name:'RGB Shift',layer:null,params:[
+    {k:'offset', type:'float', v:0.25},
+    {k:'angle',  type:'step',  v:0, step:90, min:0, max:270, options:['0°','90°','180°','270°']},
+  ]},
+};
+const OP = {L1:85,L2:60,L3:100,L4:100};
+const BLEND = {L1:'ADD',L2:'NRM',L3:'SCR',L4:'NRM'};
+
+function cid() { return FM[cr]?.[cc] ?? FM[0][0]; }
+
+function focusItem(id) {
+  for (let r=0;r<FM.length;r++) { const c=FM[r].indexOf(id); if(c>=0){cr=r;cc=c;break;} }
+  applyFocus();
+}
+
+function applyFocus() {
+  const id = cid();
+  document.querySelectorAll('.clip-card.focused,.postfx-slot.focused,.clip-add-slot.focused,.pfx-boundary.focused')
+    .forEach(e=>e.classList.remove('focused'));
+  const el = document.querySelector(`[data-id="${id}"]`);
+  if (el) { el.classList.add('focused'); el.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+  updateUI(id);
+}
+
+function updateUI(id) {
+  let label='', hints=[];
+  if (id.startsWith('L') && id.includes('C') && !id.endsWith('ADD')) {
+    const el=document.querySelector(`[data-id="${id}"]`);
+    const name=el?.querySelector('.clip-name')?.textContent??id;
+    const alive=el?.classList.contains('active'), anext=el?.classList.contains('next-active');
+    label=`${id} · ${name}${alive?' [LIVE]':anext?' [NEXT]':''}`;
+    hints=[{c:'h-o',s:'○',t:'ON/OFF'},{c:'h-t',s:'△',t:'Params'},{c:'h-x',s:'✕',t:'Remove'},{c:'h-d',s:'D-PAD',t:'Navigate'}];
+  } else if (id.endsWith('ADD')) {
+    label=`${id.replace('ADD','')} · + Add`;
+    hints=[{c:'h-o',s:'○',t:'Open browser'},{c:'h-d',s:'D-PAD',t:'Navigate'}];
+  } else if (id.startsWith('PFX')) {
+    const n=parseInt(id.replace('PFX',''))+1;
+    const el=document.querySelector(`[data-id="${id}"]`);
+    const nm=el?.querySelector('.postfx-slot-name')?.textContent??`FX${n}`;
+    const on=el?.classList.contains('on');
+    label=`PostFX ${n} · ${nm} ${on?'[ON]':'[OFF]'}`;
+    hints=[{c:'h-o',s:'○',t:'Toggle'},{c:'h-t',s:'△',t:'Params'},{c:'h-d',s:'D-PAD',t:'Navigate'}];
+  } else if (id.startsWith('BND')) {
+    const n=parseInt(id.replace('BND',''));
+    const labels=['ALL','↓ L2…','↓ L3…','↓ L4…','OFF'];
+    label=`PostFX Boundary · ${labels[n]??n}`;
+    hints=[{c:'h-o',s:'○',t:'Set here'},{c:'h-d',s:'D-PAD',t:'Navigate'}];
+  }
+  document.getElementById('statusFocus').textContent=label;
+  document.getElementById('focusReadout').textContent=label;
+  const hel=document.getElementById('statusHints');
+  hel.innerHTML=hints.map(h=>`<div class="hi"><span class="hb ${h.c}">${h.s}</span>${h.t}</div>`).join('');
+}
+
+function navigate(dir) {
+  if (anyOpen()) return;
+  if (dir==='right') cc=Math.min(cc+1,(FM[cr]?.length??1)-1);
+  else if (dir==='left') cc=Math.max(cc-1,0);
+  else if (dir==='down') { cr=Math.min(cr+1,FM.length-1); cc=Math.min(cc,(FM[cr]?.length??1)-1); }
+  else if (dir==='up') { cr=Math.max(cr-1,0); cc=Math.min(cc,(FM[cr]?.length??1)-1); }
+  applyFocus();
+}
+
+function toggleFocused() {
+  const id=cid();
+  const el=document.querySelector(`[data-id="${id}"]`);
+  if (!el) return;
+  if (id.endsWith('ADD')) { openAssetBrowser(id.replace('ADD','')); return; }
+  if (id.startsWith('BND')) { setBoundary(parseInt(id.replace('BND',''))); return; }
+  if (id.startsWith('L')&&id.includes('C')) { el.classList.toggle('active'); updateUI(id); }
+  else if (id.startsWith('PFX')) { el.classList.toggle('on'); updateUI(id); }
+}
+
+function setBoundary(n) {
+  activeBoundary=n;
+  document.querySelectorAll('.pfx-boundary').forEach((el,i)=>{
+    el.classList.toggle('active', i===n);
+  });
+  flashMsg(`PostFX boundary → ${['ALL','↓ L2…','↓ L3…','↓ L4…','OFF'][n]??n}`, 'var(--info)');
+}
+
+let paramFocusIdx = 0;
+let openParamId = null;
+
+function openParamPanel(id) {
+  id = id ?? cid();
+  const d = PARAMS[id]; if (!d) return;
+  openParamId = id;
+  paramFocusIdx = 0;
+
+  document.getElementById('paramTitle').textContent = d.name;
+  document.getElementById('paramSubtitle').textContent = (d.layer ? d.layer + ' · ' : '') + d.params.length + ' params';
+
+  const lpr = document.getElementById('layerParamRow');
+  if (d.layer) {
+    document.getElementById('opSliderFill').style.width = (OP[d.layer]??100) + '%';
+    document.getElementById('opSliderVal').textContent = OP[d.layer]??100;
+    document.querySelectorAll('#blendOpts .blend-opt').forEach(o => o.classList.toggle('active', o.textContent === (BLEND[d.layer]??'NRM')));
+    lpr.style.display = 'flex';
+  } else { lpr.style.display = 'none'; }
+
+  renderParamList(d);
+  document.getElementById('paramOverlay').classList.add('open');
+}
+
+function renderParamList(d) {
+  const list = document.getElementById('paramList'); list.innerHTML = '';
+  d.params.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'param-row' + (i === paramFocusIdx ? ' focused' : '');
+    row.dataset.idx = i;
+    row.onclick = e => { e.stopPropagation(); paramFocusIdx = i; renderParamList(d); };
+
+    let controlHTML = '';
+    let hintHTML = '';
+
+    if (p.type === 'float' || p.type === 'int') {
+      const pct = Math.round(p.v * 100);
+      const displayVal = p.type === 'int' ? Math.round(p.v * 127) : pct;
+      controlHTML = `<div class="p-slider-wrap"><div class="p-bar-track"><div class="p-bar-fill" style="width:${pct}%"></div></div><div class="p-val">${displayVal}</div></div>`;
+      hintHTML = `<span class="p-gp-hint ph-stick">L Stick ↕</span>`;
+    } else if (p.type === 'range') {
+      const l = Math.round(p.vStart * 100), r = Math.round(p.vEnd * 100);
+      controlHTML = `<div class="p-range-wrap"><div class="p-range-track"><div class="p-range-fill" style="left:${l}%;width:${r-l}%"></div></div><div class="p-range-vals">${l} – ${r}</div></div>`;
+      hintHTML = `<span class="p-gp-hint ph-stick">L Stick ↕</span>`;
+    } else if (p.type === 'bool') {
+      const on = p.v === true;
+      controlHTML = `<button class="p-toggle${on?' on':''}" onclick="event.stopPropagation();toggleBool(${i})">${on?'ON':'OFF'}</button>`;
+      hintHTML = `<span class="p-gp-hint ph-r3">R3</span>`;
+    } else if (p.type === 'enum') {
+      const opts = p.options ?? [];
+      controlHTML = `<div class="p-enum-wrap">${opts.map(o=>`<div class="p-enum-chip${o===p.v?' selected':''}" onclick="event.stopPropagation();selectEnum(${i},'${o}')">${o}</div>`).join('')}</div>`;
+      hintHTML = `<span class="p-gp-hint ph-dpad">←→</span>`;
+    } else if (p.type === 'step') {
+      const opts = p.options ?? [];
+      const stepIdx = Math.round(p.v / (p.step||1)) % opts.length;
+      const disp = opts[stepIdx] ?? p.v;
+      controlHTML = `<div class="p-step-wrap"><button class="p-step-btn" onclick="event.stopPropagation();stepParam(${i},-1)">◀</button><div class="p-step-val">${disp}</div><button class="p-step-btn" onclick="event.stopPropagation();stepParam(${i},1)">▶</button></div>`;
+      hintHTML = `<span class="p-gp-hint ph-dpad">←→</span>`;
+    } else if (p.type === 'trigger') {
+      controlHTML = `<button class="p-trigger-btn" id="trig-${i}" onclick="event.stopPropagation();fireTrigger(${i})">FIRE</button>`;
+      hintHTML = `<span class="p-gp-hint ph-r3">R3</span>`;
+    } else if (p.type === 'color') {
+      controlHTML = `<div style="display:flex;align-items:center;gap:6px;"><div style="width:16px;height:16px;border-radius:2px;background:${p.v??'#ffffff'};border:1px solid var(--border-strong);"></div><span style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);">${p.v??'#ffffff'}</span></div>`;
+      hintHTML = `<span class="p-gp-hint ph-r3">R3</span>`;
+    }
+
+    row.innerHTML = `<div class="p-focus-strip"></div><div class="p-label">${p.k}</div>${controlHTML}${hintHTML}`;
+    list.appendChild(row);
+  });
+}
+
+function toggleBool(idx) {
+  const d = PARAMS[openParamId]; if (!d) return;
+  d.params[idx].v = !d.params[idx].v;
+  renderParamList(d);
+}
+function selectEnum(idx, val) {
+  const d = PARAMS[openParamId]; if (!d) return;
+  d.params[idx].v = val;
+  renderParamList(d);
+}
+function stepParam(idx, dir) {
+  const d = PARAMS[openParamId]; if (!d) return;
+  const p = d.params[idx]; if (!p) return;
+  const opts = p.options ?? [];
+  if (!opts.length) return;
+  const cur = Math.round(p.v / (p.step||1)) % opts.length;
+  p.v = ((cur + dir + opts.length) % opts.length) * (p.step||1);
+  renderParamList(d);
+}
+function fireTrigger(idx) {
+  const btn = document.getElementById(`trig-${idx}`);
+  if (btn) { btn.classList.add('fired'); setTimeout(() => btn.classList.remove('fired'), 300); }
+}
+function navigateParam(dir) {
+  const d = PARAMS[openParamId]; if (!d) return;
+  if (dir === 'up')   paramFocusIdx = Math.max(0, paramFocusIdx - 1);
+  if (dir === 'down') paramFocusIdx = Math.min(d.params.length - 1, paramFocusIdx + 1);
+  if (dir === 'left' || dir === 'right') {
+    const p = d.params[paramFocusIdx];
+    if (p.type === 'step' || p.type === 'enum') stepParam(paramFocusIdx, dir === 'right' ? 1 : -1);
+    else return;
+  }
+  renderParamList(d);
+  document.querySelector('.param-row.focused')?.scrollIntoView({block:'nearest'});
+}
+function r3Press() {
+  const d = PARAMS[openParamId]; if (!d) return;
+  const p = d.params[paramFocusIdx]; if (!p) return;
+  if (p.type === 'bool') toggleBool(paramFocusIdx);
+  else if (p.type === 'trigger') fireTrigger(paramFocusIdx);
+}
+
+function selectBlend(el) { document.querySelectorAll('#blendOpts .blend-opt').forEach(o => o.classList.remove('active')); el.classList.add('active'); }
+
+function openAssetBrowser(layer) {
+  targetLayer=layer;
+  document.getElementById('assetTitle').textContent=`アセット追加 — ${layer}`;
+  document.getElementById('assetOverlay').classList.add('open');
+}
+function selectAsset(name) { closeOverlay('assetOverlay'); flashMsg(`✓ "${name}" → ${targetLayer}`, 'var(--live)'); }
+
+function openDeleteModal(id) {
+  id=id??cid();
+  if (!id.startsWith('L')||!id.includes('C')||id.endsWith('ADD')) return;
+  pendingDelete=id;
+  const name=document.querySelector(`[data-id="${id}"]`)?.querySelector('.clip-name')?.textContent??id;
+  document.getElementById('deleteBody').textContent=`「${name}」をレイヤーから削除します。`;
+  document.getElementById('deleteModal').classList.add('open');
+}
+function confirmDelete() {
+  if(pendingDelete){ const el=document.querySelector(`[data-id="${pendingDelete}"]`); if(el){el.style.opacity='0.15';el.style.pointerEvents='none';} }
+  closeOverlay('deleteModal'); flashMsg('削除しました','var(--danger)');
+}
+
+function toggleMute(l) {
+  const b=document.getElementById(`mut-${l}`); b.classList.toggle('on-mute');
+  document.getElementById(`row-${l}`).classList.toggle('muted', b.classList.contains('on-mute'));
+}
+function toggleSolo(l) { document.getElementById(`sol-${l}`).classList.toggle('on-solo'); }
+
+const OP_STEPS=[25,50,75,100]; const opStepIdx={L1:2,L2:1,L3:3,L4:3};
+function cycleOpacity(l) {
+  opStepIdx[l]=(opStepIdx[l]+1)%OP_STEPS.length;
+  const v=OP_STEPS[opStepIdx[l]]; OP[l]=v;
+  document.getElementById(`opf-${l}`).style.height=v+'%';
+  document.getElementById(`opv-${l}`).textContent=v;
+}
+
+// ─── Stage mode ───
+let stageActive = false;
+function enterStage() {
+  if (stageActive) return;
+  stageActive = true;
+  document.getElementById('stageBanner').classList.add('visible');
+  document.getElementById('appRoot').classList.add('stage-active');
+  document.getElementById('nextBadge').textContent = '● STAGED';
+  document.getElementById('nextBadge').style.color = 'var(--info)';
+  document.getElementById('nextPlaceholder').style.display = 'none';
+  document.getElementById('nextStagedContent').style.display = 'block';
+  document.getElementById('nextPreviewBox').style.borderColor = 'var(--info)';
+  flashMsg('STAGE ON — output frozen', 'var(--accent)');
+}
+function releaseStage() {
+  if (!stageActive) return;
+  stageActive = false;
+  document.getElementById('stageBanner').classList.remove('visible');
+  document.getElementById('appRoot').classList.remove('stage-active');
+  document.getElementById('nextBadge').textContent = '◎ STAGE OFF';
+  document.getElementById('nextBadge').style.color = '';
+  document.getElementById('nextPlaceholder').style.display = '';
+  document.getElementById('nextStagedContent').style.display = 'none';
+  document.getElementById('nextPreviewBox').style.borderColor = '';
+  flashMsg('RELEASED — output updated', 'var(--live)');
+}
+function cancelStage() {
+  if (!stageActive) return;
+  stageActive = false;
+  document.getElementById('stageBanner').classList.remove('visible');
+  document.getElementById('appRoot').classList.remove('stage-active');
+  document.getElementById('nextBadge').textContent = '◎ STAGE OFF';
+  document.getElementById('nextBadge').style.color = '';
+  document.getElementById('nextPlaceholder').style.display = '';
+  document.getElementById('nextStagedContent').style.display = 'none';
+  document.getElementById('nextPreviewBox').style.borderColor = '';
+  flashMsg('CANCELLED — reverted', 'var(--danger)');
+}
+function toggleStage() { stageActive ? cancelStage() : enterStage(); }
+
+let tapT=[];
+function pressTap() {
+  document.getElementById('btnTap').classList.add('pressed');
+  const now=performance.now(); tapT.push(now); if(tapT.length>8)tapT.shift();
+  if(tapT.length>=2){ const avg=(tapT[tapT.length-1]-tapT[0])/(tapT.length-1); const bpm=Math.round(60000/avg); if(bpm>40&&bpm<300) document.getElementById('bpmDisplay').innerHTML=`${bpm}<span class="bpm-unit">BPM</span>`; }
+}
+function releaseTap()   { document.getElementById('btnTap').classList.remove('pressed'); }
+function pressFlash()   { document.getElementById('btnFlash').classList.add('pressed'); }
+function releaseFlash() { document.getElementById('btnFlash').classList.remove('pressed'); }
+function pressBurst()   { document.getElementById('btnBurst').classList.add('pressed'); }
+function releaseBurst() { document.getElementById('btnBurst').classList.remove('pressed'); }
+
+function anyOpen() { return document.querySelectorAll('.overlay-backdrop.open,.modal-overlay.open,.help-overlay.open').length>0; }
+function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
+function backdropClose(e,id) { if(e.target===document.getElementById(id))closeOverlay(id); }
+function showHelp() { document.getElementById('helpOverlay').classList.add('open'); }
+function flashMsg(msg,col) {
+  const el=document.getElementById('statusFocus'); const pv=el.textContent,pc=el.style.color;
+  el.textContent=msg; el.style.color=col;
+  setTimeout(()=>{el.textContent=pv; el.style.color=pc;},1800);
+}
+
+// beat + audio animation
+let bi=0;
+setInterval(()=>{
+  document.querySelectorAll('.beat-dot').forEach((d,i)=>d.classList.toggle('active',i===bi));
+  bi=(bi+1)%4;
+},Math.round(60000/128));
+function fakeAudio() {
+  const t=Date.now()/1000;
+  const vol=0.5+0.3*Math.sin(t*1.1); const bas=0.4+0.35*Math.abs(Math.sin(t*0.8));
+  const mid=0.3+0.2*Math.sin(t*1.7); const hi=0.1+0.15*Math.abs(Math.sin(t*3.1));
+  ['sm-vol','sm-bas','sm-mid','sm-high'].forEach((id,i)=>{
+    const v=[vol,bas,mid,hi][i]; document.getElementById(id).style.width=Math.round(v*100)+'%';
+  });
+}
+setInterval(fakeAudio,80);
+
+// keyboard
+document.addEventListener('keydown',e=>{
+  const tag=e.target.tagName; if(tag==='INPUT'||tag==='TEXTAREA')return;
+  if(document.getElementById('deleteModal').classList.contains('open')) {
+    if(e.key==='Escape'||e.key==='t'||e.key==='T')closeOverlay('deleteModal');
+    if(e.key==='x'||e.key==='X')confirmDelete(); return;
+  }
+  if(document.getElementById('helpOverlay').classList.contains('open')) { closeOverlay('helpOverlay'); return; }
+  if(document.getElementById('paramOverlay').classList.contains('open')) {
+    if(e.key==='t'||e.key==='T'||e.key==='Escape'){ closeOverlay('paramOverlay'); return; }
+    if(e.key==='ArrowUp')   { navigateParam('up');    return; }
+    if(e.key==='ArrowDown') { navigateParam('down');  return; }
+    if(e.key==='ArrowLeft') { navigateParam('left');  return; }
+    if(e.key==='ArrowRight'){ navigateParam('right'); return; }
+    if(e.key==='r'||e.key==='R') { r3Press(); return; }
+    if(e.key==='o'||e.key==='O') { toggleFocused(); return; }
+    return;
+  }
+  if(document.getElementById('assetOverlay').classList.contains('open')) {
+    if(e.key==='Escape'||e.key==='x'||e.key==='X'||e.key==='t'||e.key==='T')closeOverlay('assetOverlay');
+    if(e.key==='o'||e.key==='O'||e.key==='Enter')selectAsset('Selected'); return;
+  }
+  switch(e.key) {
+    case 'ArrowRight': navigate('right'); break; case 'ArrowLeft': navigate('left'); break;
+    case 'ArrowDown':  navigate('down');  break; case 'ArrowUp':   navigate('up');   break;
+    case 'o': case 'O': toggleFocused(); break;
+    case 't': case 'T': openParamPanel(); break;
+    case 'x': case 'X': openDeleteModal(); break;
+    case 'm': case 'M': { const id=cid(); if(id.startsWith('L'))toggleMute(id[1]); break; }
+    case 's': case 'S': { const id=cid(); if(id.startsWith('L'))toggleSolo(id[1]); break; }
+    case 'b': case 'B': { const id=cid(); if(id.startsWith('BND'))setBoundary(parseInt(id.replace('BND',''))); break; }
+    case 'z': case 'Z': toggleStage(); break;
+    case ' ': e.preventDefault(); if(stageActive) releaseStage(); break;
+    case 'q': case 'Q': pressTap(); setTimeout(releaseTap,100); break;
+    case 'e': case 'E': pressFlash(); setTimeout(releaseFlash,200); break;
+    case 'w': case 'W': pressBurst(); setTimeout(releaseBurst,200); break;
+    case 'p': case 'P': document.getElementById('optionsOverlay').classList.add('open'); break;
+    case 'r': case 'R': r3Press(); break;
+    case '?': case '/': case 'h': case 'H': showHelp(); break;
+    case 'Escape': break;
+  }
+});
+
+applyFocus();
+</script>
+</body>
+</html>
