@@ -3,12 +3,19 @@ import { useVJStore } from "../state/vjStore";
 import { useGamepadFocusStore, type FocusTarget } from "./gamepadFocusStore";
 import {
   addGamepadListener,
-  isButtonHeld,
   isGamepadConnected,
   readRStickY,
   type ButtonName,
 } from "./gamepadManager";
 import { gpidFor } from "./GamepadFocusOverlay";
+import {
+  ACTIONS,
+  BINDINGS,
+  comboFor,
+  currentContext,
+  type ActionCtx,
+  type DpadDir,
+} from "./gamepadBindings";
 
 // ─── Navigation grid ────────────────────────────────────────────────────────
 
@@ -39,7 +46,7 @@ function buildGrid(
 const REPEAT_DELAY = 380;
 const REPEAT_RATE  = 80;
 
-function useRepeat(_key: ButtonName, onFire: () => void) {
+function useRepeat(onFire: () => void) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // 最新の onFire を ref に保持し、関数自体は安定参照にする
@@ -67,7 +74,6 @@ export function GamepadRoot() {
   const gridRef  = useRef<FocusTarget[][]>([]);
   const rowRef   = useRef(0);
   const colRef   = useRef(0);
-  const r2Held   = useRef(false); // R2 押下を自前追跡
 
   // Keep grid in sync with layers (layers の参照変化のみで反応)
   const layers = useVJStore((s) => s.state.layers);
@@ -157,127 +163,34 @@ export function GamepadRoot() {
   }, [applyTarget]);
 
   // D-pad repeats
-  const upRepeat    = useRepeat("up",    moveUp);
-  const downRepeat  = useRepeat("down",  moveDown);
-  const leftRepeat  = useRepeat("left",  moveLeft);
-  const rightRepeat = useRepeat("right", moveRight);
+  const upRepeat    = useRepeat(moveUp);
+  const downRepeat  = useRepeat(moveDown);
+  const leftRepeat  = useRepeat(moveLeft);
+  const rightRepeat = useRepeat(moveRight);
 
   const stopAllRepeats = useCallback(() => {
     upRepeat.stop(); downRepeat.stop(); leftRepeat.stop(); rightRepeat.stop();
   }, [upRepeat, downRepeat, leftRepeat, rightRepeat]);
 
-  // ─── Button actions ───────────────────────────────────────────────────────
+  const startRepeat = useCallback((d: DpadDir) => {
+    if (d === "up")    return upRepeat.start();
+    if (d === "down")  return downRepeat.start();
+    if (d === "left")  return leftRepeat.start();
+    if (d === "right") return rightRepeat.start();
+  }, [upRepeat, downRepeat, leftRepeat, rightRepeat]);
+
+  // ─── Dispatcher ───────────────────────────────────────────────────────────
 
   const onPress = useCallback((button: ButtonName) => {
-    const fs  = useGamepadFocusStore.getState();
-    const vjs = useVJStore.getState();
-
-    // Modals take priority
-    if (fs.optionsOpen) {
-      if (button === "options" || button === "cross" || button === "triangle") fs.closeOptions();
-      return;
-    }
-    if (fs.assetPickerLayer !== null) {
-      if (button === "triangle" || button === "cross") fs.closeAssetPicker();
-      // ○ to confirm: handled by GamepadAssetPicker internally
-      return;
-    }
-    if (fs.deleteTarget) {
-      // 確定は ○、キャンセルは ✕ または △
-      if (button === "triangle" || button === "cross") {
-        fs.closeDeleteConfirm();
-        return;
-      }
-      if (button === "circle") {
-        const t = fs.deleteTarget;
-        if (t.kind === "clip") {
-          vjs.removeClip(t.layerIdx, t.clipIdx);
-          const newMax = (gridRef.current[t.layerIdx]?.length ?? 1) - 1;
-          colRef.current = Math.min(colRef.current, newMax);
-          applyTarget();
-        }
-        fs.closeDeleteConfirm();
-      }
-      return;
-    }
-    if (fs.layerParamOpen) {
-      if (button === "triangle") { fs.closeLayerParam(); return; }
-      if (button === "left")     { paramNavEvent("up");    return; }
-      if (button === "right")    { paramNavEvent("down");  return; }
-      if (button === "up")       { paramAdjustEvent("inc"); return; }
-      if (button === "down")     { paramAdjustEvent("dec"); return; }
-      if (button === "r3")       { paramR3Event(); return; }
-      if (button === "circle")   { paramToggleEvent(); return; }
-      return;
-    }
-    if (fs.paramPanelOpen) {
-      if (button === "triangle") { fs.closeParamPanel(); return; }
-      if (button === "options")  { paramSetEvent(); return; }
-      if (button === "left")     { paramNavEvent("up");    return; }
-      if (button === "right")    { paramNavEvent("down");  return; }
-      if (button === "up")       { paramAdjustEvent("inc"); return; }
-      if (button === "down")     { paramAdjustEvent("dec"); return; }
-      if (button === "r3")       { paramR3Event(); return; }
-      if (button === "circle")   { paramToggleEvent(); return; }
-      return;
-    }
-
-    // ── Global navigation ──
-    // R2 + ↑/↓ : 各レイヤーの LIVE クリップに順送りジャンプ
-    if ((button === "up" || button === "down") && r2Held.current) {
-      jumpToLiveClip(button === "down" ? 1 : -1);
-      return;
-    }
-    // R2 + ←/→ : 現在フォーカス中のレイヤーの LIVE クリップにスナップ
-    if ((button === "left" || button === "right") && r2Held.current) {
-      jumpToLiveOfCurrentLayer();
-      return;
-    }
-    if (button === "up")    { upRepeat.start();    return; }
-    if (button === "down")  { downRepeat.start();  return; }
-    if (button === "left")  { leftRepeat.start();  return; }
-    if (button === "right") { rightRepeat.start(); return; }
-
-    if (button === "triangle") {
-      const t = fs.target;
-      if (r2Held.current && t && (t.kind === "clip" || t.kind === "add")) {
-        stopAllRepeats();
-        fs.openLayerParam(t.layerIdx);
-        return;
-      }
-      if (t && (t.kind === "clip" || t.kind === "postfx")) {
-        stopAllRepeats();
-        fs.openParamPanel();
-      }
-      return;
-    }
-    if (button === "options") { stopAllRepeats(); fs.openOptions(); return; }
-    // R2 + ○ : フォーカス中レイヤーの solo トグル
-    if (button === "circle" && r2Held.current) {
-      toggleLayerSoloForFocus();
-      return;
-    }
-    // R2 + ✕ : フォーカス中レイヤーの mute トグル
-    if (button === "cross" && r2Held.current) {
-      toggleLayerMuteForFocus();
-      return;
-    }
-    if (button === "circle")  { handleCircle(); return; }
-    if (button === "cross")   { handleCross();  return; }
-    if (button === "square")  { handleSquare(); return; }
-    if (button === "l1") {
-      if (isButtonHeld("r1")) { vjs.setBurst(true); return; }
-      vjs.tap(); return;
-    }
-    if (button === "r1") {
-      if (isButtonHeld("l1")) { vjs.setBurst(true); return; }
-      vjs.triggerFlash(); return;
-    }
-    if (button === "r2") {
-      r2Held.current = true;
-      if (vjs.stageMode) { vjs.releaseStage?.(); return; }
-    }
-  }, [applyTarget, upRepeat, downRepeat, leftRepeat, rightRepeat]);
+    const ctx: ActionCtx = {
+      gridRef, rowRef, colRef,
+      applyTarget, stopAllRepeats, startRepeat,
+    };
+    const cid = currentContext();
+    const combo = comboFor(button);
+    const id = BINDINGS[cid]?.[combo];
+    if (id) ACTIONS[id](ctx);
+  }, [applyTarget, stopAllRepeats, startRepeat]);
 
   const onRelease = useCallback((button: ButtonName) => {
     if (button === "up")    upRepeat.stop();
@@ -285,119 +198,7 @@ export function GamepadRoot() {
     if (button === "left")  leftRepeat.stop();
     if (button === "right") rightRepeat.stop();
     if (button === "l1" || button === "r1") useVJStore.getState().setBurst(false);
-    if (button === "r2") r2Held.current = false;
   }, [upRepeat, downRepeat, leftRepeat, rightRepeat]);
-
-  // Param panel D-pad/R3 events (dispatched as custom DOM events so
-  // GamepadParamPanel can respond without prop drilling).
-  const paramNavEvent    = (dir: "up"|"down")     => window.dispatchEvent(new CustomEvent("gp:param-nav",    { detail: dir }));
-  const paramAdjustEvent = (dir: "inc"|"dec")    => window.dispatchEvent(new CustomEvent("gp:param-adjust", { detail: dir }));
-  const paramSetEvent    = ()                    => window.dispatchEvent(new CustomEvent("gp:param-set"));
-  const paramToggleEvent = ()                    => window.dispatchEvent(new CustomEvent("gp:param-toggle"));
-
-  const paramR3Event   = () => window.dispatchEvent(new CustomEvent("gp:param-r3"));
-
-  const focusedLayerIdx = (): number | null => {
-    const t = useGamepadFocusStore.getState().target;
-    if (!t || (t.kind !== "clip" && t.kind !== "add")) return null;
-    return t.layerIdx;
-  };
-
-  const toggleLayerMuteForFocus = () => {
-    const li = focusedLayerIdx();
-    if (li === null) return;
-    const vjs = useVJStore.getState();
-    const layer = vjs.state.layers[li];
-    if (!layer) return;
-    vjs.setLayerMute(li, !layer.mute);
-    window.dispatchEvent(new CustomEvent("gp:flash-status",
-      { detail: { msg: `L${li + 1}: mute ${!layer.mute ? "ON" : "OFF"}` } }));
-  };
-
-  const toggleLayerSoloForFocus = () => {
-    const li = focusedLayerIdx();
-    if (li === null) return;
-    const vjs = useVJStore.getState();
-    const layer = vjs.state.layers[li];
-    if (!layer) return;
-    vjs.setLayerSolo(li, !layer.solo);
-    window.dispatchEvent(new CustomEvent("gp:flash-status",
-      { detail: { msg: `L${li + 1}: solo ${!layer.solo ? "ON" : "OFF"}` } }));
-  };
-
-  /**
-   * R2 + ←/→: 今フォーカス中のレイヤー内で LIVE クリップにスナップ。
-   * 既に LIVE クリップ上ならノーオペ。
-   */
-  const jumpToLiveOfCurrentLayer = () => {
-    const fs = useGamepadFocusStore.getState();
-    const t = fs.target;
-    if (!t || (t.kind !== "clip" && t.kind !== "add")) return;
-    const layer = useVJStore.getState().state.layers[t.layerIdx];
-    if (!layer || layer.activeClipIdx < 0) return;
-    if (t.kind === "clip" && t.clipIdx === layer.activeClipIdx) return; // 既に上
-    rowRef.current = 1 + t.layerIdx;
-    colRef.current = layer.activeClipIdx;
-    applyTarget();
-  };
-
-  /**
-   * R2 + ↑/↓ でアクティブ（LIVE）クリップ間を順送りジャンプ。
-   * activeClipIdx >= 0 のレイヤーをリスト化し、現在位置から ±1 でループ。
-   */
-  const jumpToLiveClip = (dir: 1 | -1) => {
-    const state = useVJStore.getState().state;
-    const liveTargets: { layerIdx: number; clipIdx: number }[] = [];
-    state.layers.forEach((layer, li) => {
-      if (layer.activeClipIdx >= 0) liveTargets.push({ layerIdx: li, clipIdx: layer.activeClipIdx });
-    });
-    if (liveTargets.length === 0) {
-      window.dispatchEvent(new CustomEvent("gp:flash-status",
-        { detail: { msg: "LIVE中のアセットがありません", level: "warn" } }));
-      return;
-    }
-    // 現在のフォーカス位置に最も近い LIVE ターゲットの index を起点にする
-    const fs = useGamepadFocusStore.getState();
-    const t = fs.target;
-    const curLayerIdx = t && (t.kind === "clip" || t.kind === "add") ? t.layerIdx : -1;
-    let curIdx = liveTargets.findIndex(x => x.layerIdx === curLayerIdx);
-    if (curIdx < 0) curIdx = 0;
-    const nextIdx = (curIdx + dir + liveTargets.length) % liveTargets.length;
-    const next = liveTargets[nextIdx];
-    // grid 上の row/col に変換（PostFX が row 0、レイヤーは row 1+）
-    rowRef.current = 1 + next.layerIdx;
-    colRef.current = next.clipIdx;
-    applyTarget();
-  };
-
-  const handleCircle = () => {
-    const t   = useGamepadFocusStore.getState().target;
-    const vjs = useVJStore.getState();
-    if (!t) return;
-    if (t.kind === "add")    { useGamepadFocusStore.getState().openAssetPicker(t.layerIdx); return; }
-    if (t.kind === "clip")   { vjs.triggerClip(t.layerIdx, t.clipIdx); return; }
-    if (t.kind === "postfx") { vjs.togglePostFXSlot(t.slotIdx); return; }
-  };
-
-  const handleCross = () => {
-    const t = useGamepadFocusStore.getState().target;
-    if (!t || t.kind !== "clip") return;
-    // online（activeClip）のクリップは削除不可
-    const layer = useVJStore.getState().state.layers[t.layerIdx];
-    if (layer && layer.activeClipIdx === t.clipIdx) {
-      window.dispatchEvent(new CustomEvent("gp:flash-status", {
-        detail: { msg: "LIVE中のアセットは削除できません", level: "warn" },
-      }));
-      return;
-    }
-    useGamepadFocusStore.getState().openDeleteConfirm(t);
-  };
-
-  const handleSquare = () => {
-    const vjs = useVJStore.getState();
-    if (vjs.stageMode) vjs.cancelStage();
-    else vjs.enterStage();
-  };
 
   // Wire up gamepad listener
   useEffect(() => {
@@ -406,9 +207,6 @@ export function GamepadRoot() {
       if (ev.type === "release") onRelease(ev.button);
     });
   }, [onPress, onRelease]);
-
-  // Wire param-panel events to GamepadParamPanel
-  // (GamepadParamPanel listens on window itself)
 
   // ─── Delete confirm modal (inline, small) ────────────────────────────────
   const deleteTarget = useGamepadFocusStore((s) => s.deleteTarget);
