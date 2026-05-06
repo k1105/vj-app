@@ -252,6 +252,16 @@ export function GamepadRoot() {
       return;
     }
     if (button === "options") { stopAllRepeats(); fs.openOptions(); return; }
+    // R2 + ○ : フォーカス中レイヤーの solo トグル
+    if (button === "circle" && r2Held.current) {
+      toggleLayerSoloForFocus();
+      return;
+    }
+    // R2 + ✕ : フォーカス中レイヤーの mute トグル
+    if (button === "cross" && r2Held.current) {
+      toggleLayerMuteForFocus();
+      return;
+    }
     if (button === "circle")  { handleCircle(); return; }
     if (button === "cross")   { handleCross();  return; }
     if (button === "square")  { handleSquare(); return; }
@@ -286,6 +296,34 @@ export function GamepadRoot() {
   const paramToggleEvent = ()                    => window.dispatchEvent(new CustomEvent("gp:param-toggle"));
 
   const paramR3Event   = () => window.dispatchEvent(new CustomEvent("gp:param-r3"));
+
+  const focusedLayerIdx = (): number | null => {
+    const t = useGamepadFocusStore.getState().target;
+    if (!t || (t.kind !== "clip" && t.kind !== "add")) return null;
+    return t.layerIdx;
+  };
+
+  const toggleLayerMuteForFocus = () => {
+    const li = focusedLayerIdx();
+    if (li === null) return;
+    const vjs = useVJStore.getState();
+    const layer = vjs.state.layers[li];
+    if (!layer) return;
+    vjs.setLayerMute(li, !layer.mute);
+    window.dispatchEvent(new CustomEvent("gp:flash-status",
+      { detail: { msg: `L${li + 1}: mute ${!layer.mute ? "ON" : "OFF"}` } }));
+  };
+
+  const toggleLayerSoloForFocus = () => {
+    const li = focusedLayerIdx();
+    if (li === null) return;
+    const vjs = useVJStore.getState();
+    const layer = vjs.state.layers[li];
+    if (!layer) return;
+    vjs.setLayerSolo(li, !layer.solo);
+    window.dispatchEvent(new CustomEvent("gp:flash-status",
+      { detail: { msg: `L${li + 1}: solo ${!layer.solo ? "ON" : "OFF"}` } }));
+  };
 
   /**
    * R2 + ←/→: 今フォーカス中のレイヤー内で LIVE クリップにスナップ。

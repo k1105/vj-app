@@ -15,6 +15,8 @@ const GLOBAL_ROWS: MappingRow[] = [
   { btns: [{ label: "D-PAD", cls: "ob-dpad" }], action: "フォーカス移動" },
   { btns: [{ label: "R2", cls: "ob-r2" }, { label: "↑↓", cls: "ob-dpad" }], action: "各レイヤーのLIVEクリップを順送りジャンプ" },
   { btns: [{ label: "R2", cls: "ob-r2" }, { label: "←→", cls: "ob-dpad" }], action: "現在のレイヤーのLIVEクリップにスナップ" },
+  { btns: [{ label: "R2", cls: "ob-r2" }, { label: "✕", cls: "ob-cross" }], action: "フォーカス中レイヤーの mute トグル" },
+  { btns: [{ label: "R2", cls: "ob-r2" }, { label: "○", cls: "ob-circle" }], action: "フォーカス中レイヤーの solo トグル" },
   { btns: [{ label: "○", cls: "ob-circle" }],   action: "アセット / PostFX on/off" },
   { btns: [{ label: "△", cls: "ob-triangle" }],                                    action: "アセットパラメータパネルを開く" },
   { btns: [{ label: "R2", cls: "ob-r2" }, { label: "△", cls: "ob-triangle" }],    action: "レイヤーパラメータパネルを開く" },
