@@ -25,15 +25,25 @@ function buildEntries(
   const out: ParamEntry[] = [];
   const consumed = new Set<number>();
 
+  // showWhen フィルタ: 依存パラメータの現在値が一致しないものは除外
+  const isVisible = (d: ParamDef): boolean => {
+    if (!d.showWhen) return true;
+    const depKey = d.showWhen.key;
+    const cur = getVal(depKey);
+    // string[]/null は厳密一致不可。プリミティブのみ比較
+    return cur === d.showWhen.value;
+  };
+
   // *X/*Y ペアを 2D パッドにまとめる（R スティック同時操作用）
   for (let i = 0; i < params.length; i++) {
     if (consumed.has(i)) continue;
     const d = params[i];
     if (d.type === "strings") { consumed.add(i); continue; }
+    if (!isVisible(d)) { consumed.add(i); continue; }
     if (d.key.endsWith("X") && (d.type === "float" || d.type === "int")) {
       const prefix = d.key.slice(0, -1);
       const yIdx = params.findIndex((p, j) =>
-        j !== i && !consumed.has(j) && p.key === `${prefix}Y` && (p.type === "float" || p.type === "int")
+        j !== i && !consumed.has(j) && p.key === `${prefix}Y` && (p.type === "float" || p.type === "int") && isVisible(p)
       );
       if (yIdx >= 0) {
         const y = params[yIdx];
