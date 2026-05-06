@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import { useVJStore } from "../state/vjStore";
 import { useGamepadFocusStore, type FocusTarget } from "./gamepadFocusStore";
 import {
@@ -42,20 +42,23 @@ const REPEAT_RATE  = 80;
 function useRepeat(_key: ButtonName, onFire: () => void) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 最新の onFire を ref に保持し、関数自体は安定参照にする
+  const fireRef = useRef(onFire);
+  fireRef.current = onFire;
 
-  const start = useCallback(() => {
-    onFire();
-    timerRef.current = setTimeout(() => {
-      intervalRef.current = setInterval(onFire, REPEAT_RATE);
-    }, REPEAT_DELAY);
-  }, [onFire]);
-
-  const stop = useCallback(() => {
-    if (timerRef.current)   { clearTimeout(timerRef.current);   timerRef.current   = null; }
-    if (intervalRef.current){ clearInterval(intervalRef.current); intervalRef.current = null; }
-  }, []);
-
-  return { start, stop };
+  // useMemo で同一参照を保証。レンダー毎に新しい {start, stop} を返さない
+  return useMemo(() => ({
+    start: () => {
+      fireRef.current();
+      timerRef.current = setTimeout(() => {
+        intervalRef.current = setInterval(() => fireRef.current(), REPEAT_RATE);
+      }, REPEAT_DELAY);
+    },
+    stop: () => {
+      if (timerRef.current)   { clearTimeout(timerRef.current);   timerRef.current   = null; }
+      if (intervalRef.current){ clearInterval(intervalRef.current); intervalRef.current = null; }
+    },
+  }), []);
 }
 
 // ─── GamepadRoot ─────────────────────────────────────────────────────────────
