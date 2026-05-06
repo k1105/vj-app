@@ -36,33 +36,29 @@ export function GamepadFocusOverlay() {
     const sel = gpidFor(target);
     if (!sel) { ring.style.display = "none"; return; }
 
-    function place() {
-      const el = document.querySelector<HTMLElement>(sel!);
-      if (!el || !ring) { ring!.style.display = "none"; return; }
+    let raf = 0;
+    let lastTop = -Infinity, lastLeft = -Infinity, lastW = -Infinity, lastH = -Infinity;
 
-      // Hide if the element is clipped outside its scroll container
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const el = document.querySelector<HTMLElement>(sel);
+      if (!el) { ring.style.display = "none"; return; }
       const r = el.getBoundingClientRect();
-      if (r.width === 0 && r.height === 0) { ring!.style.display = "none"; return; }
+      if (r.width === 0 && r.height === 0) { ring.style.display = "none"; return; }
 
-      ring!.style.display = "block";
-      ring!.style.top    = `${r.top    - 2}px`;
-      ring!.style.left   = `${r.left   - 2}px`;
-      ring!.style.width  = `${r.width  + 4}px`;
-      ring!.style.height = `${r.height + 4}px`;
-    }
+      const t = r.top - 2, l = r.left - 2, w = r.width + 4, h = r.height + 4;
+      if (t === lastTop && l === lastLeft && w === lastW && h === lastH) return;
+      lastTop = t; lastLeft = l; lastW = w; lastH = h;
 
-    place();
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    const ro = new ResizeObserver(place);
-    const el = document.querySelector<HTMLElement>(sel);
-    if (el) ro.observe(el);
-
-    return () => {
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-      ro.disconnect();
+      ring.style.display = "block";
+      ring.style.top    = `${t}px`;
+      ring.style.left   = `${l}px`;
+      ring.style.width  = `${w}px`;
+      ring.style.height = `${h}px`;
     };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, [target, active, anyOverlay]);
 
   return (

@@ -67,21 +67,16 @@ export function GamepadRoot() {
   const colRef   = useRef(0);
   const r2Held   = useRef(false); // R2 押下を自前追跡
 
-  // Keep grid in sync with layers
+  // Keep grid in sync with layers (layers の参照変化のみで反応)
+  const layers = useVJStore((s) => s.state.layers);
   useEffect(() => {
-    const unsub = useVJStore.subscribe((s) => {
-      gridRef.current = buildGrid(s.state.layers);
-      // Clamp current position
-      const grid = gridRef.current;
-      rowRef.current = Math.min(rowRef.current, grid.length - 1);
-      if (grid[rowRef.current]) {
-        colRef.current = Math.min(colRef.current, grid[rowRef.current].length - 1);
-      }
-    });
-    // Init
-    gridRef.current = buildGrid(useVJStore.getState().state.layers);
-    return unsub;
-  }, []);
+    gridRef.current = buildGrid(layers);
+    const grid = gridRef.current;
+    rowRef.current = Math.min(rowRef.current, grid.length - 1);
+    if (grid[rowRef.current]) {
+      colRef.current = Math.min(colRef.current, grid[rowRef.current].length - 1);
+    }
+  }, [layers]);
 
   // Check for gamepad connection periodically
   useEffect(() => {
@@ -307,7 +302,6 @@ export function GamepadRoot() {
   // ─── Delete confirm modal (inline, small) ────────────────────────────────
   const deleteTarget = useGamepadFocusStore((s) => s.deleteTarget);
   const closeDelete  = useGamepadFocusStore((s) => s.closeDeleteConfirm);
-  const layers       = useVJStore((s) => s.state.layers);
   const removeClip   = useVJStore((s) => s.removeClip);
 
   const confirmDelete = () => {
