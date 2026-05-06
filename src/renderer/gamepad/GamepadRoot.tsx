@@ -15,11 +15,18 @@ import { GamepadAssetPicker }  from "./GamepadAssetPicker";
 
 // ─── Navigation grid ────────────────────────────────────────────────────────
 
-/** Build the D-pad navigation grid from current state. */
+/** Build the D-pad navigation grid from current state.
+ *  視覚順に合わせる: PostFX が最上段、その下にレイヤー。 */
 function buildGrid(
   layers: ReturnType<typeof useVJStore.getState>["state"]["layers"],
 ): FocusTarget[][] {
   const grid: FocusTarget[][] = [];
+  // PostFX row (first row, matches visual position above layers)
+  const pfxRow: FocusTarget[] = Array.from({ length: 8 }, (_, i) => ({
+    kind: "postfx", slotIdx: i,
+  }));
+  grid.push(pfxRow);
+  // Layer rows
   layers.forEach((layer, li) => {
     const row: FocusTarget[] = layer.clips.map((_, ci) => ({
       kind: "clip", layerIdx: li, clipIdx: ci,
@@ -27,11 +34,6 @@ function buildGrid(
     row.push({ kind: "add", layerIdx: li });
     grid.push(row);
   });
-  // PostFX row
-  const pfxRow: FocusTarget[] = Array.from({ length: 8 }, (_, i) => ({
-    kind: "postfx", slotIdx: i,
-  }));
-  grid.push(pfxRow);
   return grid;
 }
 
