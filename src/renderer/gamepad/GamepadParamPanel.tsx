@@ -299,15 +299,18 @@ export function GamepadParamPanel({ onClose }: Props) {
       const { def, value } = entry;
       if (def.type === "bool") { d2.setValue(def.key, !value); return; }
       if (def.type === "trigger") { d2.setValue(def.key, Date.now()); return; }
+      // リスト型: ↓ = 次（index+1）, ↑ = 前（index-1）
+      // 現状 ↑ = "inc" / ↓ = "dec" なので、リストでは反転させる
+      const listDelta = -delta;
       if (def.type === "enum" && def.options) {
         const cur = def.options.indexOf(String(value));
-        d2.setValue(def.key, def.options[(cur + delta + def.options.length) % def.options.length]);
+        d2.setValue(def.key, def.options[(cur + listDelta + def.options.length) % def.options.length]);
         return;
       }
       if (def.type === "camera") {
         const ids = ["", ...camerasRef.current.map(c => c.deviceId)];
         const cur = Math.max(0, ids.indexOf(String(value)));
-        d2.setValue(def.key, ids[(cur + delta + ids.length) % ids.length]);
+        d2.setValue(def.key, ids[(cur + listDelta + ids.length) % ids.length]);
         return;
       }
       if (isStepParam(def)) {

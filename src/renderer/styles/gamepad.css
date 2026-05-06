@@ -261,6 +261,24 @@
 .gp-r3      { background: rgba(255,62,165,0.18); color: var(--magenta); }
 .gp-options { background: rgba(255,255,255,0.1);  color: var(--text); }
 
+.gpa-flash-toast {
+  position: fixed;
+  bottom: 80px; left: 50%; transform: translateX(-50%);
+  z-index: 400;
+  padding: 8px 18px;
+  border-radius: 4px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+.gpa-flash-toast.level-warn {
+  border-color: var(--danger);
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+
 .gp-save-toast {
   font-size: 9px; color: var(--live);
   font-family: var(--font-mono);

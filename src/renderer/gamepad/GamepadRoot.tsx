@@ -183,12 +183,15 @@ export function GamepadRoot() {
       return;
     }
     if (fs.deleteTarget) {
-      if (button === "triangle") fs.closeDeleteConfirm();
-      if (button === "cross") {
+      // 確定は ○、キャンセルは ✕ または △
+      if (button === "triangle" || button === "cross") {
+        fs.closeDeleteConfirm();
+        return;
+      }
+      if (button === "circle") {
         const t = fs.deleteTarget;
         if (t.kind === "clip") {
           vjs.removeClip(t.layerIdx, t.clipIdx);
-          // Clamp col after removal
           const newMax = (gridRef.current[t.layerIdx]?.length ?? 1) - 1;
           colRef.current = Math.min(colRef.current, newMax);
           applyTarget();
@@ -283,6 +286,14 @@ export function GamepadRoot() {
   const handleCross = () => {
     const t = useGamepadFocusStore.getState().target;
     if (!t || t.kind !== "clip") return;
+    // online（activeClip）のクリップは削除不可
+    const layer = useVJStore.getState().state.layers[t.layerIdx];
+    if (layer && layer.activeClipIdx === t.clipIdx) {
+      window.dispatchEvent(new CustomEvent("gp:flash-status", {
+        detail: { msg: "LIVE中のアセットは削除できません", level: "warn" },
+      }));
+      return;
+    }
     useGamepadFocusStore.getState().openDeleteConfirm(t);
   };
 
@@ -339,10 +350,10 @@ export function GamepadRoot() {
             <div className="gp-delete-body">「{deleteClipName}」をレイヤーから削除します。</div>
             <div className="gp-delete-actions">
               <button className="gp-delete-btn" onClick={closeDelete}>
-                <span className="gp-btn-badge gp-tri">△</span> キャンセル
+                <span className="gp-btn-badge gp-cross">✕</span> キャンセル
               </button>
               <button className="gp-delete-btn danger" onClick={confirmDelete}>
-                <span className="gp-btn-badge gp-cross">✕</span> 削除
+                <span className="gp-btn-badge gp-circle">○</span> 削除
               </button>
             </div>
           </div>

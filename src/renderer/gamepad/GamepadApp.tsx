@@ -354,6 +354,26 @@ function GpTransportBar() {
 
 // ─── Status / hint bar ────────────────────────────────────────────────────────
 
+function GpFlashStatus() {
+  const [msg, setMsg] = useState<{ msg: string; level: string } | null>(null);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onFlash = (e: Event) => {
+      const detail = (e as CustomEvent<{ msg: string; level?: string }>).detail;
+      setMsg({ msg: detail.msg, level: detail.level ?? "info" });
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setMsg(null), 2200);
+    };
+    window.addEventListener("gp:flash-status", onFlash);
+    return () => {
+      window.removeEventListener("gp:flash-status", onFlash);
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+  if (!msg) return null;
+  return <div className={`gpa-flash-toast level-${msg.level}`}>{msg.msg}</div>;
+}
+
 function GpStatusBar() {
   const target       = useGamepadFocusStore((s) => s.target);
   const paramOpen    = useGamepadFocusStore((s) => s.paramPanelOpen);
@@ -435,10 +455,10 @@ function GpDeleteConfirm() {
         <div className="gp-delete-body">「{name}」をレイヤーから削除します。</div>
         <div className="gp-delete-actions">
           <button className="gp-delete-btn" onClick={close}>
-            <span className="gp-btn-badge gp-tri">△</span> キャンセル
+            <span className="gp-btn-badge gp-cross">✕</span> キャンセル
           </button>
           <button className="gp-delete-btn danger" onClick={confirm}>
-            <span className="gp-btn-badge gp-cross">✕</span> 削除
+            <span className="gp-btn-badge gp-circle">○</span> 削除
           </button>
         </div>
       </div>
@@ -498,6 +518,7 @@ export function GamepadApp() {
 
       <GpTransportBar />
       <GpStatusBar />
+      <GpFlashStatus />
 
       {/* Gamepad input + overlays */}
       <GamepadRoot />
