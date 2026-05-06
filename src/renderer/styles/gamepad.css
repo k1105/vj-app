@@ -298,6 +298,8 @@
 .gp-l1      { background: rgba(255,176,32,0.18); color: var(--accent); }
 .gp-r1      { background: rgba(0,255,156,0.14);  color: var(--live); }
 .gp-r3      { background: rgba(255,62,165,0.18); color: var(--magenta); }
+.gp-l3      { background: rgba(255,176,32,0.12); color: var(--accent); }
+.gp-guide-or { font-size: 8px; color: var(--text-muted); margin: 0 2px; }
 .gp-options { background: rgba(255,255,255,0.1);  color: var(--text); }
 
 .gpa-flash-toast {

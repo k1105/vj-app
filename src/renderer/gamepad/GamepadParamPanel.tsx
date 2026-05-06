@@ -295,6 +295,14 @@ export function GamepadParamPanel({ onClose }: Props) {
         d2.setValue(def.key, clamp(cur + step * delta2, def.min ?? 0, def.max ?? 1));
       }
     };
+    const flashStatus = (msg: string, level: "info" | "warn" = "info") =>
+      window.dispatchEvent(new CustomEvent("gp:flash-status", { detail: { msg, level } }));
+    const toggleAutoSyncFor = (id: string | null | undefined, label: string) => {
+      if (!id) { flashStatus(`${label}: autoSync 対象外`, "warn"); return; }
+      useAutoSyncStore.getState().toggle(id);
+      const isOn = !!useAutoSyncStore.getState().active[id];
+      flashStatus(`${label}: autoSync ${isOn ? "ON" : "OFF"}`);
+    };
     const onR3 = () => {
       const d2 = dataRef.current as (typeof activeData) | null;
       if (!d2) return;
@@ -304,23 +312,24 @@ export function GamepadParamPanel({ onClose }: Props) {
       if (entry.type === "range") {
         const sId = tFor?.(entry.startDef.key);
         const eId = tFor?.(entry.endDef.key);
-        if (sId) useAutoSyncStore.getState().toggle(sId);
+        toggleAutoSyncFor(sId, entry.startDef.key);
         if (eId) useAutoSyncStore.getState().toggle(eId);
         return;
       }
       if (entry.type === "xy") {
         const xId = tFor?.(entry.xDef.key);
         const yId = tFor?.(entry.yDef.key);
-        if (xId) useAutoSyncStore.getState().toggle(xId);
+        toggleAutoSyncFor(xId, entry.xDef.key);
         if (yId) useAutoSyncStore.getState().toggle(yId);
         return;
       }
       const def = entry.def;
-      if (def.type === "bool")    { d2.setValue(def.key, !entry.value); return; }
-      if (def.type === "trigger") { d2.setValue(def.key, Date.now());   return; }
+      if (def.type === "bool")    { d2.setValue(def.key, !entry.value); flashStatus(`${def.key}: ${!entry.value ? "ON" : "OFF"}`); return; }
+      if (def.type === "trigger") { d2.setValue(def.key, Date.now()); flashStatus(`${def.key}: fired`); return; }
       if (def.type === "float" || def.type === "int") {
-        const id = tFor?.(def.key);
-        if (id) useAutoSyncStore.getState().toggle(id);
+        toggleAutoSyncFor(tFor?.(def.key), def.key);
+      } else {
+        flashStatus(`${def.key}: 操作不可`, "warn");
       }
     };
     const onAdjust = (e: Event) => {
@@ -477,7 +486,14 @@ export function GamepadParamPanel({ onClose }: Props) {
             <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">←→</span> 選択</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-stick">R ↕</span> 連続変更</span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-dpad">↑↓</span> ステップ変更</span>
-            <span className="gp-guide-item"><span className="gp-btn-badge gp-r3">R3</span> / L3 / <span className="gp-btn-badge gp-circle">○</span> toggle/fire/auto-sync</span>
+            <span className="gp-guide-item">
+              <span className="gp-btn-badge gp-r3">R3</span>
+              <span className="gp-guide-or">or</span>
+              <span className="gp-btn-badge gp-l3">L3</span>
+              <span className="gp-guide-or">or</span>
+              <span className="gp-btn-badge gp-circle">○</span>
+              <span style={{ marginLeft: 4 }}>auto-sync / toggle / fire</span>
+            </span>
             <span className="gp-guide-item"><span className="gp-btn-badge gp-options">OPTIONS</span> 既定値として保存</span>
           </div>
         </>
